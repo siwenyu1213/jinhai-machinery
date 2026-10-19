@@ -94,6 +94,16 @@ class DocumentationIntegrityTests(unittest.TestCase):
             ["does-not-exist.md"],
         )
 
+    def test_repository_document_links_are_portable(self):
+        for path in ROOT.rglob("*.md"):
+            if ".git" in path.relative_to(ROOT).parts:
+                continue
+            for match in LINK.finditer(markdown_body(path.read_text(encoding="utf-8"))):
+                target = match.group(1).strip().strip("<>")
+                with self.subTest(path=path.relative_to(ROOT), target=target):
+                    self.assertNotEqual(urlsplit(target).scheme, "file")
+                    self.assertIsNone(re.match(r"^[A-Za-z]:[\\/]", target))
+
     def test_document_tables_have_consistent_columns(self):
         for path in ROOT.rglob("*.md"):
             if ".git" not in path.relative_to(ROOT).parts:
