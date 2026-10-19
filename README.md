@@ -4,6 +4,8 @@
 
 仓库：[siwenyu1213/jinhai-machinery](https://github.com/siwenyu1213/jinhai-machinery)。Pages 地址：[金海机械学习版](https://siwenyu1213.github.io/jinhai-machinery/)。具体部署状态见 [交接.md](交接.md) 和仓库 Actions。
 
+首版已部署，当前发布代码为 `2d2c530`。[对应工作流](https://github.com/siwenyu1213/jinhai-machinery/actions/runs/39259697587) 已通过；本地文档测试 12 项、本地及远端浏览器测试各 18 项通过，并对公开网站重复执行了 18 项浏览器测试。
+
 ## 本地运行
 
 需要 Node.js 22.12 或更新版本；CI 使用 Node 24。首次安装：
