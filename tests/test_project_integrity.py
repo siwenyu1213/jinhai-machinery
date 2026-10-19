@@ -47,6 +47,23 @@ def missing_local_links(document, text):
     return missing
 
 
+def table_width_errors(text):
+    """Report inconsistent columns in pipe-delimited documentation tables."""
+    errors = []
+    expected = None
+    for number, line in enumerate(markdown_body(text).splitlines(), start=1):
+        line = line.strip()
+        if not line.startswith("|"):
+            expected = None
+            continue
+        columns = len(re.split(r"(?<!\\)\|", line.strip("|")))
+        if expected is None:
+            expected = columns
+        elif columns != expected:
+            errors.append((number, expected, columns))
+    return errors
+
+
 class DocumentationIntegrityTests(unittest.TestCase):
     def test_repository_text_is_valid_utf8(self):
         files = [
@@ -76,6 +93,18 @@ class DocumentationIntegrityTests(unittest.TestCase):
             missing_local_links(ROOT / "example.md", "[missing](does-not-exist.md)"),
             ["does-not-exist.md"],
         )
+
+    def test_document_tables_have_consistent_columns(self):
+        for path in ROOT.rglob("*.md"):
+            if ".git" not in path.relative_to(ROOT).parts:
+                with self.subTest(path=path.relative_to(ROOT)):
+                    self.assertEqual(table_width_errors(path.read_text(encoding="utf-8")), [])
+
+    def test_table_checker_detects_missing_cell_and_accepts_escaped_pipe(self):
+        broken = "| Item | Quantity |\n| --- | --- |\n| Drill |"
+        self.assertEqual(table_width_errors(broken), [(3, 2, 1)])
+        valid = "| Item | Quantity |\n| --- | --- |\n| A\\|B | 4 |"
+        self.assertEqual(table_width_errors(valid), [])
 
     def test_checker_accepts_encoded_local_paths_and_external_links(self):
         text = "[design](%E7%BD%91%E9%A1%B5%E8%AE%BE%E8%AE%A1.md) [web](https://example.com/a)"
