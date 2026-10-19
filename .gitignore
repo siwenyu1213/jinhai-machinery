@@ -1,0 +1,31 @@
+# Credentials and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Runtime data and customer material
+instance/
+uploads/
+private/
+backups/
+*.db
+*.sqlite
+*.sqlite3
+
+# Generated files
+node_modules/
+dist/
+coverage/
+__pycache__/
+*.py[cod]
+.venv/
+artifacts/tmp/
+*.log
+
+# Editor and operating system
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,4 @@
+interface:
+  display_name: "金海机械会话交接"
+  short_description: "结束当前会话时简洁记录项目操作、主要步骤、验证结果和后续待办"
+  default_prompt: "使用 $project-handoff 结束本次对话，更新交接.md，验证并提交本次交接。"
