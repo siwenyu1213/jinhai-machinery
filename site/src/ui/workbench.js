@@ -1,6 +1,10 @@
 import { services, steps } from '../data/catalog.js';
 
+let manualStep = false;
+
 export function showStep(index, announce = false) {
+  if (announce) manualStep = true;
+  else if (manualStep) return;
   const stage = document.querySelector('.process-visual');
   stage.dataset.step = String(index);
   document.querySelectorAll('[data-step]').forEach((button) => button.setAttribute('aria-pressed', String(Number(button.dataset.step) === index)));
@@ -11,6 +15,13 @@ export function showStep(index, announce = false) {
 }
 
 export function initWorkbench() {
+  const resumeScroll = () => { manualStep = false; };
+  window.addEventListener('wheel', resumeScroll, { passive: true });
+  window.addEventListener('touchmove', resumeScroll, { passive: true });
+  window.addEventListener('keydown', (event) => {
+    if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End', ' '].includes(event.key)
+      && !event.target.closest('button, input, textarea, select, dialog')) resumeScroll();
+  });
   document.querySelectorAll('[data-service]').forEach((button) => button.addEventListener('click', () => {
     const service = services[button.dataset.service];
     document.querySelectorAll('[data-service]').forEach((item) => item.setAttribute('aria-pressed', String(item === button)));

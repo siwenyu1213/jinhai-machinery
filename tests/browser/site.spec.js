@@ -27,6 +27,11 @@ test('business and process controls support repeated state changes', async ({ pa
   await expect(page.locator('#service-caption')).toContainText('非标零配件');
   await page.getByRole('button', { name: '焊接', exact: true }).click();
   await expect(page.locator('#process-description')).toContainText('焊接');
+  await page.evaluate(async () => {
+    window.scrollBy({ top: 50, behavior: 'instant' });
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  });
+  await expect(page.locator('#process-description')).toContainText('焊接');
   await page.getByRole('button', { name: '轮廓', exact: true }).click();
   await expect(page.locator('#process-description')).toContainText('轮廓');
 });
