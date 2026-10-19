@@ -1,0 +1,17 @@
+{
+  "name": "jinhai-machinery",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.12.0" },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "playwright test",
+    "test:docs": "python -X utf8 -m unittest discover -s tests -v",
+    "capture": "node scripts/capture.mjs"
+  },
+  "dependencies": { "gsap": "3.15.0" },
+  "devDependencies": { "@playwright/test": "1.64.1", "vite": "8.3.4" }
+}

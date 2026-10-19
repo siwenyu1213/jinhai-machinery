@@ -14,6 +14,15 @@ FENCE = re.compile(r"^\s*(`{3,}|~{3,})(.*)$")
 LINK = re.compile(r"!?\[[^\]\n]*\]\(([^)\n]+)\)")
 
 
+def project_files():
+    """Inspect project sources only, excluding dependencies and generated output."""
+    result = subprocess.run(
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+        cwd=ROOT, capture_output=True, check=True,
+    )
+    return sorted({ROOT / name for name in result.stdout.decode("utf-8").split("\0") if name and (ROOT / name).is_file()})
+
+
 def markdown_body(text):
     """Exclude fenced examples so illustrative links aren't treated as files."""
     result = []
@@ -67,8 +76,8 @@ def table_width_errors(text):
 class DocumentationIntegrityTests(unittest.TestCase):
     def test_repository_text_is_valid_utf8(self):
         files = [
-            path for path in ROOT.rglob("*")
-            if path.is_file() and ".git" not in path.relative_to(ROOT).parts
+            path for path in project_files()
+            if path.is_file()
             and path.suffix in {".md", ".py", ".yaml"}
         ]
         self.assertTrue(files)
@@ -80,8 +89,7 @@ class DocumentationIntegrityTests(unittest.TestCase):
 
     def test_markdown_fences_and_local_links(self):
         documents = [
-            path for path in ROOT.rglob("*.md")
-            if ".git" not in path.relative_to(ROOT).parts
+            path for path in project_files() if path.suffix == ".md"
         ]
         self.assertTrue(documents)
         for path in documents:
@@ -95,8 +103,8 @@ class DocumentationIntegrityTests(unittest.TestCase):
         )
 
     def test_repository_document_links_are_portable(self):
-        for path in ROOT.rglob("*.md"):
-            if ".git" in path.relative_to(ROOT).parts:
+        for path in project_files():
+            if path.suffix != ".md":
                 continue
             for match in LINK.finditer(markdown_body(path.read_text(encoding="utf-8"))):
                 target = match.group(1).strip().strip("<>")
@@ -105,8 +113,8 @@ class DocumentationIntegrityTests(unittest.TestCase):
                     self.assertIsNone(re.match(r"^[A-Za-z]:[\\/]", target))
 
     def test_document_tables_have_consistent_columns(self):
-        for path in ROOT.rglob("*.md"):
-            if ".git" not in path.relative_to(ROOT).parts:
+        for path in project_files():
+            if path.suffix == ".md":
                 with self.subTest(path=path.relative_to(ROOT)):
                     self.assertEqual(table_width_errors(path.read_text(encoding="utf-8")), [])
 
