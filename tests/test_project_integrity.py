@@ -100,6 +100,19 @@ class DocumentationIntegrityTests(unittest.TestCase):
                 with self.subTest(path=path.relative_to(ROOT)):
                     self.assertEqual(table_width_errors(path.read_text(encoding="utf-8")), [])
 
+    def test_machine_detail_counts_reconcile_with_inventory_total(self):
+        text = (ROOT / "网页设计.md").read_text(encoding="utf-8")
+        summary = re.search(r"^\| 机床合计 \| (\d+) 台 \|", text, re.MULTILINE)
+        self.assertIsNotNone(summary, "Inventory must state its machine total")
+        detail = text.split("### 机床明细", 1)[1].split("\n### ", 1)[0]
+        rows = re.findall(r"^\| ([^|\n]+) \| (\d+) 台 \|", detail, re.MULTILINE)
+        self.assertTrue(rows, "Machine breakdown cannot be empty")
+        names = [name.strip() for name, _ in rows]
+        self.assertEqual(len(names), len(set(names)), "Do not duplicate machine rows")
+        counts = [int(quantity) for _, quantity in rows]
+        self.assertTrue(all(quantity > 0 for quantity in counts))
+        self.assertEqual(sum(counts), int(summary.group(1)))
+
     def test_table_checker_detects_missing_cell_and_accepts_escaped_pipe(self):
         broken = "| Item | Quantity |\n| --- | --- |\n| Drill |"
         self.assertEqual(table_width_errors(broken), [(3, 2, 1)])
