@@ -144,6 +144,7 @@ class DocumentationIntegrityTests(unittest.TestCase):
             "uploads/drawing.dxf", "instance/app.db", "local.sqlite3",
             "backups/archive.zip", "server.key", "server.pem",
             "node_modules/package/index.js", "dist/index.html",
+            "dist/assets/main-hash.js", "coverage/index.html",
             "tests/__pycache__/test_project_integrity.cpython-313.pyc",
         ]
         result = subprocess.run(
@@ -157,6 +158,8 @@ class DocumentationIntegrityTests(unittest.TestCase):
     def test_source_and_skill_paths_are_not_ignored(self):
         paths = [
             "AGENTS.md", ".env.example", "site/index.html",
+            "site/src/motion/hero.js", "site/public/images/workpiece.webp",
+            "package.json", "package-lock.json", "vite.config.js",
             ".agents/skills/project-handoff/SKILL.md",
             "tests/test_project_integrity.py",
         ]
