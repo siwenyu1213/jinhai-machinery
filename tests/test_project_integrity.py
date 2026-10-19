@@ -2,9 +2,11 @@
 
 import re
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -40,7 +42,7 @@ def missing_local_links(document, text):
         if url.scheme or url.netloc or not url.path:
             continue
         path = (document.parent / unquote(url.path)).resolve()
-        if not path.is_file():
+        if not path.is_relative_to(ROOT) or not path.is_file():
             missing.append(target)
     return missing
 
@@ -83,6 +85,16 @@ class DocumentationIntegrityTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             markdown_body("```text\nunclosed")
         self.assertEqual(markdown_body("~~~text\nexample\n~~~\nvisible"), "visible")
+
+    def test_checker_rejects_links_outside_repository(self):
+        # Even an existing outside file cannot be a portable project reference.
+        with tempfile.TemporaryDirectory() as directory:
+            temporary_root = Path(directory).resolve()
+            target = temporary_root / "outside.md"
+            target.write_text("External reference", encoding="utf-8")
+            document = temporary_root / "nested" / "example.md"
+            with mock.patch(__name__ + ".ROOT", temporary_root / "nested"):
+                self.assertEqual(missing_local_links(document, "[outside](../outside.md)"), ["../outside.md"])
 
     def test_private_and_generated_paths_are_ignored(self):
         paths = [
