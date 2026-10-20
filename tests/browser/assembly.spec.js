@@ -13,10 +13,15 @@ async function openAssembly(page) {
 
 test('a direct assembly fragment opens the model after motion initialization', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
+  // Exercise the load/refresh ordering with a late hero image as well.
+  await page.route('**/images/chuck.webp', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    await route.continue();
+  });
   await page.goto('./#assembly');
   await expect(page.locator('html')).toHaveAttribute('data-motion', 'full');
-  await expect(page.locator('#assembly')).toHaveAttribute('data-renderer', 'webgl');
   await expect(page.locator('#assembly-title')).toBeInViewport();
+  await expect(page.locator('#assembly')).toHaveAttribute('data-renderer', 'webgl');
   await page.getByRole('button', { name: '拆解', exact: true }).click();
   await expect(page.locator('#assembly')).toHaveAttribute('data-progress', '0.550');
 });

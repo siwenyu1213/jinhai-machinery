@@ -14,6 +14,9 @@ export function initAssembly() {
   let animation = 0;
   let disposed = false;
   let reduced = document.documentElement.dataset.motion === 'reduced';
+  const hintText = () => document.documentElement.dataset.motion === 'full'
+    ? '向下滚动，拆开再组合'
+    : '拖动进度或点击按钮，查看结构';
 
   function apply(progress) {
     const pose = assemblyPose(progress);
@@ -43,7 +46,7 @@ export function initAssembly() {
       scene.setProgress(value);
       section.dataset.renderer = 'webgl';
       controls.hidden = false;
-      section.querySelector('.assembly-hint').textContent = reduced ? '拖动进度或点击按钮，查看结构' : '向下滚动，拆开再组合';
+      section.querySelector('.assembly-hint').textContent = hintText();
     }).catch(() => {
       section.dataset.renderer = 'fallback';
       section.querySelector('.assembly-hint').textContent = '静态结构展示';
@@ -83,7 +86,7 @@ export function initAssembly() {
   const preference = new MutationObserver(() => {
     reduced = document.documentElement.dataset.motion === 'reduced';
     if (reduced) { stopAnimation(); apply(0); }
-    if (scene) section.querySelector('.assembly-hint').textContent = reduced ? '拖动进度或点击按钮，查看结构' : '向下滚动，拆开再组合';
+    if (scene && section.dataset.renderer === 'webgl') section.querySelector('.assembly-hint').textContent = hintText();
   });
   preference.observe(document.documentElement, { attributes: true, attributeFilter: ['data-motion'] });
   const rendererState = new MutationObserver(() => {
@@ -96,7 +99,7 @@ export function initAssembly() {
     }
     if (available) {
       apply(value);
-      section.querySelector('.assembly-hint').textContent = reduced ? '拖动进度或点击按钮，查看结构' : '向下滚动，拆开再组合';
+      section.querySelector('.assembly-hint').textContent = hintText();
     }
   });
   rendererState.observe(section, { attributes: true, attributeFilter: ['data-renderer'] });

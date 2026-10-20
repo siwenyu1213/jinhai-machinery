@@ -19,19 +19,31 @@ let cleanup;
 let generation = 0;
 const initialAnchor = window.location.hash;
 let initialAnchorPending = Boolean(initialAnchor);
+const anchorEvents = ['wheel', 'touchstart', 'pointerdown', 'keydown'];
+const cancelInitialAnchor = () => {
+  initialAnchorPending = false;
+  anchorEvents.forEach((name) => window.removeEventListener(name, cancelInitialAnchor, true));
+};
+if (initialAnchorPending) anchorEvents.forEach((name) => window.addEventListener(name, cancelInitialAnchor, { capture: true, passive: true }));
 function restoreInitialAnchor() {
   if (!initialAnchorPending) return;
-  initialAnchorPending = false;
   let target;
   try { target = document.getElementById(decodeURIComponent(initialAnchor.slice(1))); } catch { return; }
   if (!target) return;
-  requestAnimationFrame(() => {
-    // Initial ScrollTrigger measurements can interrupt the browser's smooth
-    // fragment jump. Restore only an untouched navigation still at the top.
-    if (window.location.hash === initialAnchor && window.scrollY < 2 && !document.querySelector('dialog[open]')) {
+  const align = () => {
+    if (initialAnchorPending && window.location.hash === initialAnchor && !document.querySelector('dialog[open]')) {
       target.scrollIntoView({ behavior: 'instant', block: 'start' });
     }
-  });
+  };
+  const afterLoad = () => requestAnimationFrame(() => requestAnimationFrame(() => {
+    // Browsers can be halfway through a native smooth fragment jump when
+    // ScrollTrigger takes its measurements. Align after load, then once more
+    // after its deferred refresh; any real user input cancels this restoration.
+    align();
+    setTimeout(() => { align(); cancelInitialAnchor(); }, 300);
+  }));
+  if (document.readyState === 'complete') afterLoad();
+  else window.addEventListener('load', afterLoad, { once: true });
 }
 async function updateMotion() {
   const current = ++generation;

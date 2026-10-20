@@ -186,4 +186,10 @@ test('animation chunk failure leaves functional UI available', async ({ page }) 
   await expect(page.locator('#motion-toggle')).toHaveText('基础展示模式');
   await page.locator('[data-service="sheet"]').click();
   await expect(page.locator('#service-caption')).toHaveText('钣金定制');
+  await page.locator('#assembly').scrollIntoViewIfNeeded();
+  await expect(page.locator('#assembly')).toHaveAttribute('data-renderer', 'webgl');
+  await expect(page.locator('.assembly-hint')).toContainText('点击按钮');
+  await expect(page.locator('.pin-spacer:has(.assembly-stage)')).toHaveCount(0);
+  await page.getByRole('button', { name: '拆解', exact: true }).click();
+  await expect(page.locator('#assembly')).toHaveAttribute('data-spread', '1.000');
 });
