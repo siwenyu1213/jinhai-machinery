@@ -2,6 +2,12 @@
 
 原生 HTML/CSS/JavaScript、Vite 与 GSAP 构建的静态展示网站。仅供学习，不用于商业接单，不收集真实客户需求。
 
+2026-10-20 新增三爪卡盘拆装展示：位于主营业务之后，用 Three.js 呈现可独立运动的金属卡爪、导向面盘、平面螺纹盘、壳体、后盖和紧固件。下滑依次展开、展示、组合，反向滚动可连续回看；也可用整体、拆解、组合按钮或键盘进度条查看。
+
+金属表面使用 PBR 材质、程序生成的车削与拉丝微纹理，以及本地生成的摄影棚环境反射。普通加工面、抛光边缘和深色紧固件分别设置粗糙度。模型是通用结构示意，非本厂产品或客户案例，不作为制造图纸。
+
+3D 代码临近该区域才加载，渲染按状态变化触发，区域离开视口时停止绘制。减少动效时取消滚动固定并保留即时操作；脚本、3D 模块或 WebGL 不可用时显示同一模型的 [chuck-assembly.webp](site/public/images/generated/chuck-assembly.webp)，来源与哈希见 [模型素材记录](site/public/images/generated/chuck-assembly.json) 和 [素材说明.md](素材说明.md)。
+
 仓库：[siwenyu1213/jinhai-machinery](https://github.com/siwenyu1213/jinhai-machinery)。Pages 地址：[金海机械学习版](https://siwenyu1213.github.io/jinhai-machinery/)。具体部署状态见 [交接.md](交接.md) 和仓库 Actions。
 
 首版已部署，首次验证的发布代码为 `2d2c530`。[首版工作流](https://github.com/siwenyu1213/jinhai-machinery/actions/runs/39259697587) 已通过。2026-10-20 的视觉更新以真实机械摄影替换简化模型；最新提交和发布结果见交接与仓库 Actions。
@@ -20,6 +26,8 @@ npm run dev
 打开终端提示的 `http://127.0.0.1:5173/jinhai-machinery/`。开发服务用于本机预览。
 
 ## 构建与测试
+
+npm test 会先运行 4 项模型与材质检查，再运行桌面和手机浏览器测试。CI 的图形检查使用 Chromium 软件渲染，不能代替真实手机的 GPU 性能验收。
 
 ```powershell
 npm run test:docs
@@ -44,6 +52,13 @@ npm run preview
 预览服务运行后，在另一个终端执行 `npm run capture`，生成 360、390、768、1440px 截图，位置为 `artifacts/tmp/screenshots/`。截图与测试临时产物不进入 Git。
 
 ## 内容与代码入口
+
+拆装展示的视觉回放可运行 npm run capture:assembly，在 artifacts/tmp/assembly/ 保存 360、390、768、1440px 下 0%、25%、55%、85%、100% 的画面和控制台报告。增加 -- --poster 参数会另外导出透明背景的 poster.png，供重新生成静态 WebP 时使用；更新成品后需同步模型素材记录中的哈希。截图脚本不自动覆盖发布素材。
+
+- [chuck-model.js](site/src/three/chuck-model.js)：带倒角、中心通孔、独立卡爪及微纹理的参数化结构。
+- [chuck-scene.js](site/src/three/chuck-scene.js)：环境反射、灯光、镜头适配、按需渲染及上下文恢复。
+- [assembly.js](site/src/ui/assembly.js)：滚动进度、手动控制、减少动效及静态回退。
+- [模型与材质测试](tests/model/chuck.test.mjs)、[拆装浏览器测试](tests/browser/assembly.spec.js)：结构、滚动、键盘、降级和恢复验证。
 
 - [site/index.html](site/index.html)：业务、设备、地域、学习说明与页面结构。
 - [site/src/styles/main.css](site/src/styles/main.css)：样式入口；主题与布局分别位于同目录内。

@@ -2,11 +2,13 @@ import { initNavigation } from './ui/navigation.js';
 import { initContact } from './ui/contact.js';
 import { initGallery } from './ui/gallery.js';
 import { initWorkbench } from './ui/workbench.js';
+import { initAssembly } from './ui/assembly.js';
 
 initNavigation();
 initContact();
 initGallery();
 initWorkbench();
+initAssembly();
 document.documentElement.dataset.ready = 'true';
 
 const media = window.matchMedia('(prefers-reduced-motion: reduce)');

@@ -20,7 +20,7 @@
       </a>
       <button class="menu-toggle" aria-expanded="false" aria-controls="main-nav" hidden>菜单 <span aria-hidden="true">☰</span></button>
       <nav id="main-nav" aria-label="主导航">
-        <a href="#services">主营业务</a><a href="#process">加工细节</a><a href="#equipment">设备能力</a><a href="#work">机械影像</a><a href="#scope">维修范围</a>
+        <a href="#services">主营业务</a><a href="#assembly">拆装展示</a><a href="#process">加工细节</a><a href="#equipment">设备能力</a><a href="#work">机械影像</a><a href="#scope">维修范围</a>
       </nav>
       <button class="button button-small header-contact" data-contact>联系演示 <span aria-hidden="true">↗</span></button>
     </div>
@@ -56,6 +56,44 @@
           <img id="service-image" src="./images/parts.webp" width="1200" height="1800" alt="轴套与紧固件的金属细节，图库参考摄影" loading="lazy">
           <figcaption><strong id="service-caption">非标零配件与设备定制</strong><p id="service-detail" aria-live="polite">先准备图纸或照片、尺寸、数量与材料要求。设备定制的具体范围需进一步沟通。</p><a id="service-credit" class="caption-note photo-credit" href="https://unsplash.com/photos/a-pile-of-metal-parts-sitting-next-to-each-other-fx-F1sWUW0Y" target="_blank" rel="noopener noreferrer">摄影参考：Matt Richmond / Unsplash，非本厂实拍 ↗</a></figcaption>
         </figure>
+      </div>
+    </section>
+
+    <section class="assembly-section" id="assembly" data-assembly data-renderer="poster" aria-labelledby="assembly-title">
+      <div class="assembly-stage">
+        <div class="wrap assembly-layout">
+          <div class="assembly-copy">
+            <p class="assembly-kind">三爪自定心卡盘</p>
+            <h2 id="assembly-title">一只卡盘，<br>拆开来看。</h2>
+            <p class="assembly-intro">从外面的夹持，到里面的配合。<br>沿着零件的装配方向，看见机械的秩序。</p>
+            <div class="assembly-reading">
+              <h3 id="assembly-state" aria-live="polite">展开，看到里面</h3>
+              <p id="assembly-description">卡爪、盘件与壳体逐层分离，沿着装配的方向，看清零件之间的关系。</p>
+            </div>
+          </div>
+          <figure class="assembly-visual">
+            <div class="assembly-viewport" role="img" aria-label="银灰色金属三爪卡盘，展示卡爪、导向面盘、平面螺纹盘、壳体与后盖的分离和组合">
+              <img class="assembly-poster" src="./images/generated/chuck-assembly.webp" width="1200" height="1000" alt="三爪卡盘的金属爆炸结构示意，包含独立卡爪、壳体与盘件" loading="lazy">
+            </div>
+            <figcaption>三爪卡盘结构示意 <span>非本厂产品或客户案例</span></figcaption>
+          </figure>
+          <div class="assembly-bottom">
+            <p class="assembly-hint">三爪卡盘的分层结构</p>
+            <div class="assembly-controls" hidden>
+              <div class="assembly-buttons" role="group" aria-label="选择卡盘拆装状态">
+                <button data-assembly-stop="0" aria-pressed="true">整体</button>
+                <button data-assembly-stop="1" aria-pressed="false">拆解</button>
+                <button data-assembly-stop="2" aria-pressed="false">组合</button>
+              </div>
+              <div class="assembly-scrubber">
+                <label class="sr-only" for="assembly-progress">卡盘拆装进度</label>
+                <div class="assembly-track"><span class="assembly-progress-fill"></span></div>
+                <input id="assembly-progress" type="range" min="0" max="100" value="0" aria-valuetext="0%，完整的配合">
+                <span class="assembly-percentage" aria-hidden="true"><span id="assembly-percent">00</span><small> / 100</small></span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 

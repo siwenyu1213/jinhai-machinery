@@ -1,0 +1,12 @@
+{
+  "kind": "procedural-render",
+  "file": "chuck-assembly.webp",
+  "subject": "三爪卡盘爆炸结构示意",
+  "source": "site/src/three/chuck-model.js",
+  "renderer": "site/src/three/chuck-scene.js",
+  "width": 1200,
+  "height": 1000,
+  "bytes": 93808,
+  "sha256": "1276e63204d80f448b47e36da880bd4d4c8b0723c16a2c7ee08a2314b566fccf",
+  "usage": "自主参数化结构示意，非本厂产品或客户案例；不作为制造图纸或维修指导。"
+}
