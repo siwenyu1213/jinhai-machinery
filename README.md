@@ -14,6 +14,16 @@
 
 当前三爪卡盘版 UI 代码为 `e4bd47d`，[发布工作流](https://github.com/siwenyu1213/jinhai-machinery/actions/runs/39371144888) 的构建与部署已成功。文档与素材检查 17 项、模型与材质检查 4 项、生产构建通过；本地生产预览、远端 CI 和公开网站上的同一套 42 项桌面/手机浏览器测试均通过。线上 HTML、CSS、JavaScript 和卡盘静态图共 7 个文件与本地构建字节一致，模型来源记录及静态图 SHA-256 匹配。最新文档提交见 Git 记录，文档单独更新不触发部署。
 
+## 五地维修地图
+
+维修范围改为泉州南部交互地图：晋江、南安、石狮、鲤城、丰泽分别用五种颜色标出，周边地区保持灰色。将鼠标移到区域或地名，对应的车床、钻床、铣床、激光切割机、折弯机插画升起并高亮，其他设备保持灰色；手机点按、Tab 聚焦及方向键切换也可操作，Escape 清除选择。设备仅为交互示意，不代表当地驻点或可维修机型。
+
+地理数据来自 [DataV.GeoAtlas / 高德开放平台](https://datav.aliyun.com/portal/school/atlas/area_selector)，为 2021 年 5 月版本，仅供学习交流；页面显示泉州南部局部边界示意。数据、来源与 SHA-256 随项目保存在 [quanzhou.geojson](site/public/maps/quanzhou.geojson)、[source.json](site/public/maps/source.json)，访客无需实时请求地图 API。五类设备为 [原创 SVG 插画](site/public/maps/machines.svg)。无脚本时保留静态彩色地图和五地名称；减少动效时保留即时高亮，取消升起位移。
+
+地理边界使用 [build-scope-map.py](scripts/build-scope-map.py) 从本地原始数据生成至 HTML，保留所有区县与岛屿拓扑，并将投影坐标四舍五入到 0.1 SVG 单位；无需额外依赖。重新生成运行 `python -X utf8 scripts/build-scope-map.py`，核对运行同一命令并追加 `--check`。相关回归见 [数据与来源验证](tests/test_scope_map.py)、[地图浏览器测试](tests/browser/scope-map.spec.js)。
+
+运行 `node scripts/capture-scope-map.mjs` 可保存 360、375、768、1280、1440px 的地图状态与整页截图至 `artifacts/tmp/scope-map/`，需要先启动生产预览。1280px 额外记录五种设备各自升起的画面。
+
 ## 本地运行
 
 需要 Node.js 22.12 或更新版本；CI 使用 Node 24。首次安装：

@@ -8,6 +8,10 @@
   --line: #cdd3d0;
   --orange: #79591e;
   --orange-light: #deb66b;
+  --map-teal: #8bd5cb;
+  --map-blue: #8cc8e3;
+  --map-copper: #d19961;
+  --map-violet: #c09bd4;
   --max-width: 1312px;
   --ease: cubic-bezier(.23, 1, .32, 1);
   --space: clamp(24px, 4.4vw, 64px);

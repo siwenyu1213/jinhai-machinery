@@ -3,12 +3,14 @@ import { initContact } from './ui/contact.js';
 import { initGallery } from './ui/gallery.js';
 import { initWorkbench } from './ui/workbench.js';
 import { initAssembly } from './ui/assembly.js';
+import { initScopeMap } from './ui/scope-map.js';
 
 initNavigation();
 initContact();
 initGallery();
 initWorkbench();
 initAssembly();
+initScopeMap();
 document.documentElement.dataset.ready = 'true';
 
 const media = window.matchMedia('(prefers-reduced-motion: reduce)');

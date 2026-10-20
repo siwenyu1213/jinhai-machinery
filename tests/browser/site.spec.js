@@ -10,7 +10,7 @@ test('production subpath loads with accurate content and no broken local resourc
   await expect(page.locator('.learning-note')).toContainText('不用于商业接单');
   await expect(page.locator('.equipment-highlights')).toContainText('6000');
   await expect(page.locator('.equipment-highlights')).toContainText('165');
-  await expect(page.locator('.scope-places > span')).toHaveText(['晋江', '南安', '石狮', '鲤城', '丰泽']);
+  await expect(page.locator('.scope-place')).toHaveText(['晋江', '南安', '石狮', '鲤城', '丰泽']);
   await page.locator('img[src]').evaluateAll((images) => images.forEach((image) => { image.loading = 'eager'; }));
   await expect.poll(() => page.locator('img[src]').evaluateAll((images) => images.every((image) => image.complete && image.naturalWidth > 0))).toBe(true);
   expect(errors).toEqual([]);

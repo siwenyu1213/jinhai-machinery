@@ -1,0 +1,18 @@
+{
+  "source": "https://geo.datav.aliyun.com/areas_v3/bound/350500_full.json",
+  "provider": "DataV.GeoAtlas / 高德开放平台",
+  "provider_page": "https://datav.aliyun.com/portal/school/atlas/area_selector",
+  "source_updated": "2021-05",
+  "retrieved": "2026-10-20",
+  "sha256": "60671d99f346c67541042d410a5d645b115d3bb78c1102b110d5fe87d37c71ba",
+  "bytes": 91227,
+  "coverage_adcodes": [
+    350582,
+    350583,
+    350581,
+    350502,
+    350503
+  ],
+  "usage": "仅供学习交流；泉州南部局部范围示意；边界按本地墨卡托投影保留拓扑并四舍五入至 0.1 SVG 单位；不作导航依据。",
+  "machinery": "原创等距设备交互插画，非本厂实拍，不代表当地驻点或可维修机型。"
+}
