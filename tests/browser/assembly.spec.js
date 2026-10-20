@@ -11,6 +11,16 @@ async function openAssembly(page) {
   await expect.poll(() => page.locator('.assembly-viewport').getAttribute('data-frames')).not.toBeNull();
 }
 
+test('a direct assembly fragment opens the model after motion initialization', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('./#assembly');
+  await expect(page.locator('html')).toHaveAttribute('data-motion', 'full');
+  await expect(page.locator('#assembly')).toHaveAttribute('data-renderer', 'webgl');
+  await expect(page.locator('#assembly-title')).toBeInViewport();
+  await page.getByRole('button', { name: '拆解', exact: true }).click();
+  await expect(page.locator('#assembly')).toHaveAttribute('data-progress', '0.550');
+});
+
 test('metal assembly renders real geometry on demand and supports keyboard scrubbing', async ({ page }) => {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));

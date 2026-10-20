@@ -17,6 +17,22 @@ let userReduced = false;
 try { userReduced = localStorage.getItem('jinhai-reduced-motion') === 'true'; } catch { /* Storage is optional. */ }
 let cleanup;
 let generation = 0;
+const initialAnchor = window.location.hash;
+let initialAnchorPending = Boolean(initialAnchor);
+function restoreInitialAnchor() {
+  if (!initialAnchorPending) return;
+  initialAnchorPending = false;
+  let target;
+  try { target = document.getElementById(decodeURIComponent(initialAnchor.slice(1))); } catch { return; }
+  if (!target) return;
+  requestAnimationFrame(() => {
+    // Initial ScrollTrigger measurements can interrupt the browser's smooth
+    // fragment jump. Restore only an untouched navigation still at the top.
+    if (window.location.hash === initialAnchor && window.scrollY < 2 && !document.querySelector('dialog[open]')) {
+      target.scrollIntoView({ behavior: 'instant', block: 'start' });
+    }
+  });
+}
 async function updateMotion() {
   const current = ++generation;
   cleanup?.();
@@ -40,6 +56,7 @@ async function updateMotion() {
       button.disabled = true;
     }
   }
+  restoreInitialAnchor();
 }
 button.hidden = false;
 button.addEventListener('click', () => {
