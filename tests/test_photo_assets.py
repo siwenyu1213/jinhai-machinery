@@ -23,6 +23,17 @@ class ImageParser(HTMLParser):
 
 
 class PhotographyIntegrityTests(unittest.TestCase):
+    def test_source_inventory_is_documented_for_future_replacement(self):
+        records = json.loads((IMAGES / "credits.json").read_text(encoding="utf-8"))
+        documentation = (ROOT / "素材说明.md").read_text(encoding="utf-8")
+        for record in records:
+            with self.subTest(photo=record["file"]):
+                self.assertIn(f"(site/public/images/{record['file']})", documentation)
+                self.assertIn(record["source"], documentation)
+                self.assertIn(record["license_url"], documentation)
+        for name in ("README.md", "交接.md"):
+            self.assertIn("[素材说明.md](素材说明.md)", (ROOT / name).read_text(encoding="utf-8"))
+
     def test_photographs_have_complete_and_matching_attribution(self):
         records = json.loads((IMAGES / "credits.json").read_text(encoding="utf-8"))
         self.assertTrue(records)
