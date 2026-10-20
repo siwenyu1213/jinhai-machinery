@@ -5,6 +5,10 @@ export default defineConfig({
   fullyParallel: true,
   workers: process.env.CI ? 2 : 3,
   retries: process.env.CI ? 1 : 0,
+  // CI renders the PBR environment on the CPU. Allow initialization time
+  // without relaxing any geometry, interaction or fallback assertions.
+  timeout: process.env.CI ? 60_000 : 30_000,
+  expect: { timeout: process.env.CI ? 15_000 : 5_000 },
   reporter: [['list'], ['html', { outputFolder: 'artifacts/tmp/playwright-report', open: 'never' }]],
   outputDir: 'artifacts/tmp/test-results',
   use: {

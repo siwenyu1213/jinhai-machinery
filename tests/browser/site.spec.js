@@ -178,13 +178,9 @@ test('core information remains readable without JavaScript', async ({ browser, b
 });
 
 test('animation chunk failure leaves functional UI available', async ({ page }) => {
-  // Simulate all optional GSAP-containing chunks failing, identified from built imports.
-  await page.route('**/assets/*.js', async (route) => {
-    const response = await route.fetch();
-    const source = await response.text();
-    if (source.includes('ScrollTrigger') && !source.includes('jinhai-reduced-motion')) return route.abort();
-    return route.fulfill({ response, body: source });
-  });
+  // Block the optional GSAP entry directly. Fetching and parsing every JS
+  // response races context teardown when the lazy 3D chunk starts loading.
+  await page.route('**/assets/motion-*.js', (route) => route.abort());
   await page.goto('./');
   await expect(page.locator('html')).toHaveAttribute('data-ready', 'true');
   await expect(page.locator('#motion-toggle')).toHaveText('基础展示模式');
