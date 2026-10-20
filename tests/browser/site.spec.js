@@ -154,6 +154,8 @@ test('layout remains inside viewport at narrow and medium widths', async ({ page
   for (const width of [360, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    const titleLines = await page.locator('#hero-title').evaluate((title) => title.getBoundingClientRect().height / Number.parseFloat(getComputedStyle(title).lineHeight));
+    expect(titleLines, `Hero title must remain two lines at ${width}px`).toBeLessThan(2.1);
   }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: '菜单' }).click();
