@@ -28,3 +28,10 @@
 - 入口：[.agents/skills/project-handoff/SKILL.md](.agents/skills/project-handoff/SKILL.md)
 - 当用户说“此对话结束”，或明确要求结束当前会话并交接时，必须读取并执行该技能，将本次会话实际操作和主要步骤简洁更新至根目录 `交接.md`，验证后创建对应 commit。
 - 新聊天即使未自动发现技能，也通过本文件的入口执行。仅创建技能不代表已经触发结束对话操作。
+
+### refactoring-ui
+
+- 入口：[.agents/skills/refactoring-ui/SKILL.md](.agents/skills/refactoring-ui/SKILL.md)。
+- 在本项目构建、调整或评审网页界面时，先阅读该技能并按意图选择工作流；只按需读取相应参考文件，不一次加载整个 references 目录。
+- 将视觉层级、间距、排版与配色规则映射到现有原生 CSS 和设计变量，遵循已确认的机械风格与项目约定；参考中的 Tailwind 写法不代表需要安装 Tailwind。
+- 来源与固定版本、本地兼容修订及文件哈希见 [upstream.json](.agents/skills/refactoring-ui/upstream.json)，保留上游 MIT 许可与署名。

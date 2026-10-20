@@ -1,0 +1,187 @@
+{
+  "repository": "https://github.com/edisonmbli/refactoring-ui-skill",
+  "commit": "4459662c4fbf36d54342b1546d8851273031442c",
+  "source_path": "skills/refactoring-ui",
+  "installed_at": "2026-10-20",
+  "license": "MIT",
+  "local_changes": [
+    {
+      "path": "SKILL.md",
+      "reason": "Use a folded YAML description scalar so its colon-space text parses correctly; preserve the description value and Markdown body."
+    },
+    {
+      "path": "references/11-design-tokens.md",
+      "reason": "Complete the missing empty Rule cell in the Radius row so its Markdown table has three columns; preserve the rule text."
+    }
+  ],
+  "files": [
+    {
+      "path": "ATTRIBUTION.md",
+      "upstream_path": "ATTRIBUTION.md",
+      "upstream_sha256": "2c75036ce920d105b0bec14760855da60a6aae2d5fff356c9f4b18f48abe89b1",
+      "installed_sha256": "2c75036ce920d105b0bec14760855da60a6aae2d5fff356c9f4b18f48abe89b1"
+    },
+    {
+      "path": "LICENSE",
+      "upstream_path": "LICENSE",
+      "upstream_sha256": "354acb4d68b59785265a558b923e6539b971542cc9b98022fd1e6b82b511a81d",
+      "installed_sha256": "354acb4d68b59785265a558b923e6539b971542cc9b98022fd1e6b82b511a81d"
+    },
+    {
+      "path": "SKILL.md",
+      "upstream_path": "skills/refactoring-ui/SKILL.md",
+      "upstream_sha256": "3999889099b5a35c377960ca4e2853c460d2e095b5932f3f06f117c29cff3259",
+      "installed_sha256": "2d3b095dbbce4ab7e08cbbfc0d59c1598df95fd985bb998ee9e5ef59884f3593"
+    },
+    {
+      "path": "assets/theme.template.css",
+      "upstream_path": "skills/refactoring-ui/assets/theme.template.css",
+      "upstream_sha256": "deebbf23c89101cafe026dfc62ffe2bbfc36c48df0f2dffb42fc63d4ec956c21",
+      "installed_sha256": "deebbf23c89101cafe026dfc62ffe2bbfc36c48df0f2dffb42fc63d4ec956c21"
+    },
+    {
+      "path": "assets/tokens.template.json",
+      "upstream_path": "skills/refactoring-ui/assets/tokens.template.json",
+      "upstream_sha256": "7eafc955697731d37d95a08d3d8e67fd0d4180f1bbdbede070f099b107b6a541",
+      "installed_sha256": "7eafc955697731d37d95a08d3d8e67fd0d4180f1bbdbede070f099b107b6a541"
+    },
+    {
+      "path": "examples/01-stat-card.md",
+      "upstream_path": "skills/refactoring-ui/examples/01-stat-card.md",
+      "upstream_sha256": "8fc70c6751d7f60a1f5cb3dc6cddd5dea3ea0168d28880ddd830fe70c1abad77",
+      "installed_sha256": "8fc70c6751d7f60a1f5cb3dc6cddd5dea3ea0168d28880ddd830fe70c1abad77"
+    },
+    {
+      "path": "examples/02-form-group.md",
+      "upstream_path": "skills/refactoring-ui/examples/02-form-group.md",
+      "upstream_sha256": "ac73b1db8f0dbde73e72f1f9b884c079b49eb9004c902532896168eaf0151f70",
+      "installed_sha256": "ac73b1db8f0dbde73e72f1f9b884c079b49eb9004c902532896168eaf0151f70"
+    },
+    {
+      "path": "examples/03-empty-state.md",
+      "upstream_path": "skills/refactoring-ui/examples/03-empty-state.md",
+      "upstream_sha256": "8c9b473bc12086016995f682f453cb58e1ea76d6780b3f872cd1ae7a7833e3e0",
+      "installed_sha256": "8c9b473bc12086016995f682f453cb58e1ea76d6780b3f872cd1ae7a7833e3e0"
+    },
+    {
+      "path": "examples/README.md",
+      "upstream_path": "skills/refactoring-ui/examples/README.md",
+      "upstream_sha256": "1571b37c8de4561e49c5b333b705a3f962a4dfb31892efb90d554f21062763d3",
+      "installed_sha256": "1571b37c8de4561e49c5b333b705a3f962a4dfb31892efb90d554f21062763d3"
+    },
+    {
+      "path": "references/00-coverage-matrix.md",
+      "upstream_path": "skills/refactoring-ui/references/00-coverage-matrix.md",
+      "upstream_sha256": "e140bfe6835ae58bff8a7a367c669ad3adae59ef32fb3425f27194ef86f7dc67",
+      "installed_sha256": "e140bfe6835ae58bff8a7a367c669ad3adae59ef32fb3425f27194ef86f7dc67"
+    },
+    {
+      "path": "references/01-starting-from-scratch.md",
+      "upstream_path": "skills/refactoring-ui/references/01-starting-from-scratch.md",
+      "upstream_sha256": "2e8d80ac28fe299b8a5bd025a86734bcbb31bb49094d67175dc13768a5b2c90e",
+      "installed_sha256": "2e8d80ac28fe299b8a5bd025a86734bcbb31bb49094d67175dc13768a5b2c90e"
+    },
+    {
+      "path": "references/02-hierarchy.md",
+      "upstream_path": "skills/refactoring-ui/references/02-hierarchy.md",
+      "upstream_sha256": "507aeca51f48ed658a0d18b7cfd7edf379195ffb3d4f8aca72b7138b2a2b14a8",
+      "installed_sha256": "507aeca51f48ed658a0d18b7cfd7edf379195ffb3d4f8aca72b7138b2a2b14a8"
+    },
+    {
+      "path": "references/03-layout-spacing.md",
+      "upstream_path": "skills/refactoring-ui/references/03-layout-spacing.md",
+      "upstream_sha256": "938bdb2e07735918a516ebcbaac7efcb44e68c85fb35f87d683b57710016e8a7",
+      "installed_sha256": "938bdb2e07735918a516ebcbaac7efcb44e68c85fb35f87d683b57710016e8a7"
+    },
+    {
+      "path": "references/04-typography.md",
+      "upstream_path": "skills/refactoring-ui/references/04-typography.md",
+      "upstream_sha256": "ff8d821ac9716176b335a1e49bdc93a9ec8c1e58d56402ec4fde411a825550b8",
+      "installed_sha256": "ff8d821ac9716176b335a1e49bdc93a9ec8c1e58d56402ec4fde411a825550b8"
+    },
+    {
+      "path": "references/05-color.md",
+      "upstream_path": "skills/refactoring-ui/references/05-color.md",
+      "upstream_sha256": "844a31a27038f8e728a85b233977f912244e20ec591b098f74a76fb3d3299439",
+      "installed_sha256": "844a31a27038f8e728a85b233977f912244e20ec591b098f74a76fb3d3299439"
+    },
+    {
+      "path": "references/06-depth.md",
+      "upstream_path": "skills/refactoring-ui/references/06-depth.md",
+      "upstream_sha256": "83646d1e2dbde0d13411effe09804d39c0a7d3de47ff5e1bca4a751ecb14d7fb",
+      "installed_sha256": "83646d1e2dbde0d13411effe09804d39c0a7d3de47ff5e1bca4a751ecb14d7fb"
+    },
+    {
+      "path": "references/07-images.md",
+      "upstream_path": "skills/refactoring-ui/references/07-images.md",
+      "upstream_sha256": "27b6f7d8a97f50e8ebb7e8a6c2d66c9ea1b511fecdadcb814394de326024b6d1",
+      "installed_sha256": "27b6f7d8a97f50e8ebb7e8a6c2d66c9ea1b511fecdadcb814394de326024b6d1"
+    },
+    {
+      "path": "references/08-finishing-touches.md",
+      "upstream_path": "skills/refactoring-ui/references/08-finishing-touches.md",
+      "upstream_sha256": "757eb635425926f72fa493e1ff60679b8c80925445cecd292d952f3e0eba7aab",
+      "installed_sha256": "757eb635425926f72fa493e1ff60679b8c80925445cecd292d952f3e0eba7aab"
+    },
+    {
+      "path": "references/10-tailwind-mapping.md",
+      "upstream_path": "skills/refactoring-ui/references/10-tailwind-mapping.md",
+      "upstream_sha256": "eed6da96d32223fbc510498cd8f8dec01e9b73b957792fe4a658ec72661ed62e",
+      "installed_sha256": "eed6da96d32223fbc510498cd8f8dec01e9b73b957792fe4a658ec72661ed62e"
+    },
+    {
+      "path": "references/11-design-tokens.md",
+      "upstream_path": "skills/refactoring-ui/references/11-design-tokens.md",
+      "upstream_sha256": "b0392a032fd014991a2c58bf0d6179619588db1cee2bc94d449c8168ebb35f57",
+      "installed_sha256": "8ede2021aa45c07aa1a34496cd2eec3ed19dcb897ffe20361231bb8ada981468"
+    },
+    {
+      "path": "references/12-component-recipes.md",
+      "upstream_path": "skills/refactoring-ui/references/12-component-recipes.md",
+      "upstream_sha256": "eb8dc8449cdcdcbfbbd01e8ad5fd7486d8f5606a24c833e84bd66d2476afdebb",
+      "installed_sha256": "eb8dc8449cdcdcbfbbd01e8ad5fd7486d8f5606a24c833e84bd66d2476afdebb"
+    },
+    {
+      "path": "references/13-audit-rubric.md",
+      "upstream_path": "skills/refactoring-ui/references/13-audit-rubric.md",
+      "upstream_sha256": "8bcc3f062a03317313b2d76ed831c5d19a06910d0961a0e534a947d971d6af72",
+      "installed_sha256": "8bcc3f062a03317313b2d76ed831c5d19a06910d0961a0e534a947d971d6af72"
+    },
+    {
+      "path": "references/14-antipatterns.md",
+      "upstream_path": "skills/refactoring-ui/references/14-antipatterns.md",
+      "upstream_sha256": "b1960a32e2e66b711b70b29eaa76d983969507992830efb6170ad62084832f6c",
+      "installed_sha256": "b1960a32e2e66b711b70b29eaa76d983969507992830efb6170ad62084832f6c"
+    },
+    {
+      "path": "references/15-beyond-the-book.md",
+      "upstream_path": "skills/refactoring-ui/references/15-beyond-the-book.md",
+      "upstream_sha256": "c34ce58d8391be46ed81a69055635668d68b66faa45272c7d338b1cf497d6f9f",
+      "installed_sha256": "c34ce58d8391be46ed81a69055635668d68b66faa45272c7d338b1cf497d6f9f"
+    },
+    {
+      "path": "references/16-component-libraries.md",
+      "upstream_path": "skills/refactoring-ui/references/16-component-libraries.md",
+      "upstream_sha256": "8b0b7803c7a64f5312dfd8f0150a92c5dc1169c8b5afb2f9284637e13d5bc35c",
+      "installed_sha256": "8b0b7803c7a64f5312dfd8f0150a92c5dc1169c8b5afb2f9284637e13d5bc35c"
+    },
+    {
+      "path": "scripts/check_contrast.py",
+      "upstream_path": "skills/refactoring-ui/scripts/check_contrast.py",
+      "upstream_sha256": "e6f93a8603bb1e8b1fba1e671f97751d7cfe48bf01eab8434671cc92d33f7aac",
+      "installed_sha256": "e6f93a8603bb1e8b1fba1e671f97751d7cfe48bf01eab8434671cc92d33f7aac"
+    },
+    {
+      "path": "scripts/emit_tokens.py",
+      "upstream_path": "skills/refactoring-ui/scripts/emit_tokens.py",
+      "upstream_sha256": "c3d2f506c6f10bb481b7eb78b39286662377ce1ea1771d157f0251f095addd72",
+      "installed_sha256": "c3d2f506c6f10bb481b7eb78b39286662377ce1ea1771d157f0251f095addd72"
+    },
+    {
+      "path": "scripts/generate_palette.py",
+      "upstream_path": "skills/refactoring-ui/scripts/generate_palette.py",
+      "upstream_sha256": "7b1081e61d121d5b04a3f02aacd939fc34e812df4b9b2e2b43ddf39d5583a9c5",
+      "installed_sha256": "7b1081e61d121d5b04a3f02aacd939fc34e812df4b9b2e2b43ddf39d5583a9c5"
+    }
+  ]
+}

@@ -75,6 +75,12 @@ npm run preview
 
 当前 `base` 为 `/jinhai-machinery/`，仓库名改变或使用自定义域名时，需同步调整 Vite 配置、404 首页链接及浏览器测试地址，并重跑子路径测试。
 
+## 项目内设计技能
+
+已在本项目安装 [refactoring-ui](.agents/skills/refactoring-ui/SKILL.md)，来源为 [edisonmbli/refactoring-ui-skill](https://github.com/edisonmbli/refactoring-ui-skill)，固定至上游提交 `4459662c4fbf36d54342b1546d8851273031442c`。项目 [AGENTS.md](AGENTS.md) 已接入使用入口；后续界面制作、精修和评审按需读取相应设计规则，也可明确提出“用 $refactoring-ui 检查拆装区的视觉层级和间距”。
+
+该技能包含参考文档、示例、模板及调色板生成、对比度检查、设计变量导出 3 个 Python 工具。安装记录见 [upstream.json](.agents/skills/refactoring-ui/upstream.json)，原始许可与署名一并保留。本地仅修复两处格式：将 description 改为 YAML 折叠字符串，修复冒号导致的解析失败；为设计变量参考中的 Radius 表格行补齐空单元格。规则含义与工具保持原样。
+
 ## 当前素材与功能边界
 
 - 现有图片为本地 WebP 机械摄影，保留实际金属表面纹理；均为图库参考，非本厂实拍或客户案例。原先的三个 SVG 工件素材已移除，来源见 [素材说明.md](素材说明.md)。
