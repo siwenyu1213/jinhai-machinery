@@ -6,12 +6,18 @@ export function showStep(index, announce = false) {
   if (announce) manualStep = true;
   else if (manualStep) return;
   const stage = document.querySelector('.process-visual');
-  stage.dataset.step = String(index);
+  stage.dataset.processStep = String(index);
   document.querySelectorAll('[data-step]').forEach((button) => button.setAttribute('aria-pressed', String(Number(button.dataset.step) === index)));
   const description = document.querySelector('#process-description');
   description.setAttribute('aria-live', announce ? 'polite' : 'off');
-  description.textContent = steps[index];
-  stage.style.setProperty('--step', index);
+  description.textContent = steps[index].description;
+  document.querySelectorAll('[data-process-photo]').forEach((photo) => { photo.hidden = Number(photo.dataset.processPhoto) !== index; });
+  document.querySelector('#process-current').textContent = String(index + 1).padStart(2, '0');
+  document.querySelector('#process-photo-label').textContent = steps[index].label;
+  const credit = document.querySelector('#process-credit');
+  credit.textContent = `${steps[index].credit} ↗`;
+  credit.href = steps[index].source;
+  stage.style.setProperty('--progress', (index + 1) / steps.length);
 }
 
 export function initWorkbench() {
@@ -27,7 +33,10 @@ export function initWorkbench() {
     document.querySelectorAll('[data-service]').forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
     const image = document.querySelector('#service-image');
     image.src = service.image;
-    image.alt = `${service.title}概念示意`;
+    image.alt = service.alt;
+    const credit = document.querySelector('#service-credit');
+    credit.textContent = `摄影参考：${service.credit}，非本厂实拍 ↗`;
+    credit.href = service.source;
     document.querySelector('#service-caption').textContent = service.title;
     document.querySelector('#service-detail').textContent = service.description;
     document.dispatchEvent(new CustomEvent('servicechange'));

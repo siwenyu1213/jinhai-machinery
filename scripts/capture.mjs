@@ -16,7 +16,7 @@ try {
     await page.screenshot({ path: `${directory}/home-${width}.png`, fullPage: true });
     if (width === 1440 || width === 390) await page.screenshot({ path: `${directory}/hero-${width}.png` });
     if (width === 1440) {
-      await page.locator('[data-step="3"]').click();
+      await page.locator('[data-step="2"]').click();
       await page.locator('#process').screenshot({ path: `${directory}/process.png` });
       await page.locator('.hero-actions [data-contact]').click();
       await page.locator('#contact-dialog').screenshot({ path: `${directory}/contact.png` });

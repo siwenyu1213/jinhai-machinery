@@ -12,6 +12,9 @@ export function initGallery() {
     document.querySelector('#image-dialog-title').textContent = item.dataset.title;
     image.src = item.href;
     image.alt = item.querySelector('img').alt;
+    const credit = document.querySelector('#dialog-credit');
+    credit.textContent = `${item.dataset.credit} ↗`;
+    credit.href = item.dataset.source;
     open(item);
   }));
 }

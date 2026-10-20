@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="金海机械学习展示页：非标零配件与设备定制、钣金定制、机台维修。了解实际设备与晋江、南安、石狮、鲤城、丰泽上门维修范围。">
-  <meta name="theme-color" content="#18364b">
+  <meta name="theme-color" content="#252c2e">
   <title>金海机械｜非标定制、钣金加工与机台维修 · 学习版</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./src/styles/main.css">
@@ -16,11 +16,11 @@
     <div class="header-inner wrap">
       <a class="brand" href="#home" aria-label="金海机械，返回首页">
         <svg width="34" height="34" viewBox="0 0 40 40" aria-hidden="true"><path d="M4 8h26v8H12v16H4zm14 14h18v10H18z" fill="currentColor"/></svg>
-        <span>金海机械<small>机械加工 · 学习展示</small></span>
+        <span>金海机械<small>非标定制 · 钣金加工 · 机台维修</small></span>
       </a>
       <button class="menu-toggle" aria-expanded="false" aria-controls="main-nav" hidden>菜单 <span aria-hidden="true">☰</span></button>
       <nav id="main-nav" aria-label="主导航">
-        <a href="#services">主营业务</a><a href="#process">加工示意</a><a href="#equipment">设备能力</a><a href="#work">行业与案例</a><a href="#scope">维修范围</a>
+        <a href="#services">主营业务</a><a href="#process">加工细节</a><a href="#equipment">设备能力</a><a href="#work">机械影像</a><a href="#scope">维修范围</a>
       </nav>
       <button class="button button-small header-contact" data-contact>联系演示 <span aria-hidden="true">↗</span></button>
     </div>
@@ -29,40 +29,23 @@
     <section class="hero" id="home" aria-labelledby="hero-title">
       <div class="wrap hero-layout">
         <div class="hero-copy">
-          <p class="hero-intro">扎根本地的家庭机械加工厂</p>
+          <p class="hero-intro"><span aria-hidden="true"></span> 扎根本地的家庭机械加工厂</p>
           <h1 id="hero-title">把想法，<br>加工成形。</h1>
-          <p class="hero-description">非标零配件与设备定制、钣金定制、机台维修。<br class="desktop-break">面向食品、印刷、包装相关客户，把具体需求一步步说明白。</p>
+          <p class="hero-description">非标零配件与设备定制、钣金定制、机台维修。<br class="desktop-break">从零件的形状，到设备的运转，把具体需求一步步说明白。</p>
           <div class="hero-actions"><a class="button button-orange" href="#services">了解加工业务 <span aria-hidden="true">↓</span></a><button class="text-button light" data-contact>查看联系演示 <span aria-hidden="true">↗</span></button></div>
           <p class="learning-note">本页仅用于学习与练习，不用于商业接单。</p>
         </div>
         <figure class="hero-art">
-          <svg class="hero-drawing" viewBox="0 0 620 520" role="img" aria-labelledby="hero-art-title">
-            <title id="hero-art-title">带开孔的折弯工件概念示意，非真实成品照片</title>
-            <ellipse cx="330" cy="425" rx="210" ry="32" fill="#112b3d"/>
-            <g class="hero-piece">
-              <path d="M101 313 327 192 524 290 300 416Z" fill="#6c8fa5"/>
-              <path d="M101 313v19l199 105v-21Z" fill="#36586e"/>
-              <path d="m300 416 224-126v20L300 437Z" fill="#486f86"/>
-              <path d="M101 313V141L327 23v169Z" fill="#afc4ce"/>
-              <path d="M101 141 327 23l15 9-225 119v168l-16-6Z" fill="#d0dce2"/>
-              <path d="m117 151 225-119v167L117 319Z" fill="#8ba9b9"/>
-              <path d="m160 159 43-23v45l-43 24Zm100-52 43-23v45l-43 24Z" fill="#18364b"/>
-              <ellipse cx="259" cy="310" rx="29" ry="15" transform="rotate(-28 259 310)" fill="#18364b"/>
-              <ellipse cx="382" cy="325" rx="29" ry="15" transform="rotate(-28 382 325)" fill="#18364b"/>
-              <path class="cut-path" d="M101 313V141L327 23l15 9v167l182 91v20L300 437 101 332Z" fill="none" stroke="#f79b62" stroke-width="3" stroke-linejoin="round"/>
-              <circle class="cut-point" cx="101" cy="313" r="6" fill="#f79b62"/>
-            </g>
-            <path d="m139 377 119 63m-112-70-13 12m131 51-13 13" fill="none" stroke="#7b9bac" stroke-width="1.5"/>
-            <text x="153" y="427" fill="#d0dde5" font-size="16" font-family="sans-serif">形状，来自需求</text>
-          </svg>
-          <figcaption><span class="art-dot" aria-hidden="true"></span>工件概念示意 <span>切割 / 折弯 / 焊接</span></figcaption>
+          <div class="hero-photo-frame"><img class="hero-photo" src="./images/chuck.webp" width="1600" height="2406" alt="钻夹头的金属滚花、齿圈与切削纹理，图库参考摄影" fetchpriority="high"></div>
+          <div class="hero-detail"><img src="./images/parts.webp" width="1200" height="1800" alt="轴套与紧固件的金属表面细节，图库参考摄影"><span>从金属的纹理，<br>看见机械的质感。</span></div>
+          <figcaption>钻夹头 / 金属细节 <a class="photo-credit" href="https://unsplash.com/photos/a-close-up-shot-of-a-drill-chuck--D_-zq54DpI" target="_blank" rel="noopener noreferrer">图库参考，非本厂实拍 ↗</a></figcaption>
         </figure>
       </div>
-      <div class="hero-bottom wrap"><span>非标定制，从中小件开始</span><span>大件需沟通协商后确定</span><a href="#services">继续向下了解 <span aria-hidden="true">↓</span></a></div>
+      <div class="hero-bottom wrap"><span>食品 · 印刷 · 包装</span><span>非标加工以中小件为主，大件协商确定</span><a href="#services">了解我们的业务 <span aria-hidden="true">↓</span></a></div>
     </section>
 
     <section class="section wrap" id="services" aria-labelledby="services-title">
-      <div class="section-heading"><h2 id="services-title">从一个零件，<br>到一个解决思路。</h2><p>把定制与维修的需求拆开看。<br>选择一项业务，看看需要先沟通什么。</p></div>
+      <div class="section-heading"><h2 id="services-title">做什么，<br>从需求谈起。</h2><p>零件定制、钣金成形、机台维修。<br>选择一项业务，了解沟通前需要准备的资料。</p></div>
       <div class="service-layout">
         <div class="service-choices" role="group" aria-label="选择业务">
           <button class="service-choice" data-service="custom" aria-pressed="true"><span class="choice-heading">非标零配件与设备定制 <span aria-hidden="true">↗</span></span><span>线上线下中小件非标定制加工。大件需沟通协商后确定。</span></button>
@@ -70,29 +53,28 @@
           <button class="service-choice" data-service="repair" aria-pressed="false"><span class="choice-heading">维修服务 <span aria-hidden="true">↗</span></span><span>先了解机台类型和故障现象，再判断处理方式与上门安排。</span></button>
         </div>
         <figure class="service-stage">
-          <img id="service-image" src="./images/custom.svg" width="600" height="400" alt="非标零配件概念示意" loading="lazy">
-          <figcaption><strong id="service-caption">非标零配件与设备定制</strong><p id="service-detail" aria-live="polite">先准备图纸或照片、尺寸、数量与材料要求。设备定制的具体范围需进一步沟通。</p><span class="caption-note">交互示意，非真实客户案例</span></figcaption>
+          <img id="service-image" src="./images/parts.webp" width="1200" height="1800" alt="轴套与紧固件的金属细节，图库参考摄影" loading="lazy">
+          <figcaption><strong id="service-caption">非标零配件与设备定制</strong><p id="service-detail" aria-live="polite">先准备图纸或照片、尺寸、数量与材料要求。设备定制的具体范围需进一步沟通。</p><a id="service-credit" class="caption-note photo-credit" href="https://unsplash.com/photos/a-pile-of-metal-parts-sitting-next-to-each-other-fx-F1sWUW0Y" target="_blank" rel="noopener noreferrer">摄影参考：Matt Richmond / Unsplash，非本厂实拍 ↗</a></figcaption>
         </figure>
       </div>
     </section>
 
     <section class="process-section" id="process" aria-labelledby="process-title">
       <div class="wrap process-layout">
-        <div class="process-copy"><h2 id="process-title">一块板件，<br>如何逐步成形。</h2><p>从轮廓到立体，跟随滚动看一个加工概念。也可以点击下方工序，直接查看。</p><p class="caption-note">工序仅作学习示意，实际项目按需求确定。</p>
-          <div class="process-steps" role="group" aria-label="查看工艺步骤"><button data-step="0" aria-pressed="true">轮廓</button><button data-step="1" aria-pressed="false">切割</button><button data-step="2" aria-pressed="false">折弯</button><button data-step="3" aria-pressed="false">焊接</button></div>
-          <p id="process-description" class="process-description" aria-live="polite">轮廓：先明确形状与尺寸要求。</p>
+        <div class="process-copy"><h2 id="process-title">金属的变化，<br>藏在加工的细节里。</h2><p>从机床的进给、板材的切割，到焊缝的连接。点击或跟随滚动，查看不同加工环节的摄影细节。</p><p class="caption-note">以下为图库工艺参考，非本厂设备或客户案例。实际工序按需求确定。</p>
+          <div class="process-steps" role="group" aria-label="查看工艺步骤"><button data-step="0" aria-pressed="true">机床加工</button><button data-step="1" aria-pressed="false">激光切割</button><button data-step="2" aria-pressed="false">焊接连接</button></div>
+          <p id="process-description" class="process-description" aria-live="polite">机床加工：从形状与尺寸要求出发，沟通适合的加工方式。</p>
         </div>
-        <div class="process-visual">
-          <svg viewBox="0 0 600 400" role="img" aria-label="切割、折弯与焊接工艺变化示意">
-            <path d="M80 245 295 130 510 240 295 355Z" fill="#d5e0e6"/>
-            <g class="fold-panel"><path d="M80 245V120L295 5v125Z" fill="#6b91ab"/><path d="M80 120 295 5l10 6L90 126v125l-10-6Z" fill="#a5c0d0"/></g>
-            <path class="process-cut" d="M80 245 295 130 510 240 295 355 80 245" fill="none" stroke="#b64b12" stroke-width="4" stroke-dasharray="20 6"/>
-            <path class="weld-seam" d="m88 246 208-110" stroke="#b64b12" stroke-width="7" stroke-linecap="round" fill="none"/>
-            <circle cx="293" cy="253" r="22" fill="#f5f7f8"/>
-          </svg>
+        <figure class="process-visual">
+          <div class="process-photo-frame">
+            <img data-process-photo="0" src="./images/lathe.webp" width="1600" height="1067" alt="车床刀架、导轨与手轮的摄影细节，非本厂实拍" loading="lazy">
+            <img data-process-photo="1" src="./images/cutting.webp" width="1200" height="1800" alt="激光切割头在金属板上切割的摄影细节，非本厂设备" loading="lazy" hidden>
+            <img data-process-photo="2" src="./images/welding.webp" width="1200" height="1800" alt="金属管件与板材连接处的焊接摄影细节，非本厂实拍" loading="lazy" hidden>
+            <span class="process-index" aria-hidden="true"><span id="process-current">01</span> / 03</span>
+          </div>
           <div class="process-progress" aria-hidden="true"><span></span></div>
-          <p>轮廓明确，才能讨论下一步。</p>
-        </div>
+          <figcaption><span id="process-photo-label">机床 / 刀架与导轨</span><a id="process-credit" class="photo-credit" href="https://unsplash.com/photos/close-up-of-an-old-metal-lathe-in-a-workshop-_VBsh_IKsD8" target="_blank" rel="noopener noreferrer">LISK OBE / Unsplash ↗</a></figcaption>
+        </figure>
       </div>
     </section>
 
@@ -111,12 +93,12 @@
     </section>
 
     <section class="work-section section" id="work" aria-labelledby="work-title"><div class="wrap">
-      <div class="section-heading"><h2 id="work-title">服务不同的行业，<br>从具体问题出发。</h2><p>主要面向食品、印刷、包装相关客户。<br>下方为学习用概念图，真实案例照片后续补充。</p></div>
-      <div class="filter-bar" role="group" aria-label="示意分类"><button data-gallery="all" aria-pressed="true">全部示意</button><button data-gallery="custom" aria-pressed="false">非标定制</button><button data-gallery="sheet" aria-pressed="false">钣金加工</button><button data-gallery="repair" aria-pressed="false">维修沟通</button></div>
+      <div class="section-heading"><h2 id="work-title">近一点，<br>看见机械的质感。</h2><p>轴套的纹理、切口的光泽、机床的结构。<br>图库摄影用于展示机械细节，本厂真实案例待补充。</p></div>
+      <div class="filter-bar" role="group" aria-label="影像分类"><button data-gallery="all" aria-pressed="true">全部影像</button><button data-gallery="custom" aria-pressed="false">零件细节</button><button data-gallery="sheet" aria-pressed="false">钣金加工</button><button data-gallery="repair" aria-pressed="false">机台结构</button></div>
       <div class="gallery-grid">
-        <a class="gallery-item" data-category="custom" href="./images/custom.svg" data-title="非标零配件示意"><img src="./images/custom.svg" alt="带孔零件与轴类轮廓的概念图" width="600" height="400" loading="lazy"><h3>非标零配件</h3><p>从图纸、照片和尺寸开始沟通。</p><span>学习示意 · 点击查看</span></a>
-        <a class="gallery-item" data-category="sheet" href="./images/sheet.svg" data-title="钣金折弯示意"><img src="./images/sheet.svg" alt="板件切割与折弯的概念图" width="600" height="400" loading="lazy"><h3>钣金定制</h3><p>明确板材、形状与装配需求。</p><span>学习示意 · 点击查看</span></a>
-        <a class="gallery-item" data-category="repair" href="./images/repair.svg" data-title="机台维修沟通示意"><img src="./images/repair.svg" alt="齿轮与检修工具的概念图" width="600" height="400" loading="lazy"><h3>机台维修</h3><p>先说明机台类型和故障现象。</p><span>学习示意 · 点击查看</span></a>
+        <a class="gallery-item" data-category="custom" href="./images/parts.webp" data-title="轴套与紧固件 · 细节参考" data-credit="Matt Richmond / Unsplash" data-source="https://unsplash.com/photos/a-pile-of-metal-parts-sitting-next-to-each-other-fx-F1sWUW0Y"><div class="gallery-photo"><img src="./images/parts.webp" alt="轴套与紧固件上的金属切削纹、螺纹和使用痕迹" width="1200" height="1800" loading="lazy"><span aria-hidden="true">↗</span></div><h3>零件的纹理</h3><p>从形状、尺寸与装配用途开始沟通。</p><span>图库参考 · 非本厂产品 · 点击放大</span></a>
+        <a class="gallery-item" data-category="sheet" href="./images/cutting.webp" data-title="激光切割 · 工艺参考" data-credit="Cemrecan Yurtman / Unsplash" data-source="https://unsplash.com/photos/a-machine-cutting-a-piece-of-metal-with-sparks-thdb7o0nLyc"><div class="gallery-photo"><img src="./images/cutting.webp" alt="激光切割头、金属板切口与飞溅的火花" width="1200" height="1800" loading="lazy"><span aria-hidden="true">↗</span></div><h3>切割的瞬间</h3><p>板材、板厚与轮廓共同决定加工方案。</p><span>图库参考 · 非本厂设备 · 点击放大</span></a>
+        <a class="gallery-item" data-category="repair" href="./images/lathe.webp" data-title="车床结构 · 机台参考" data-credit="LISK OBE / Unsplash" data-source="https://unsplash.com/photos/close-up-of-an-old-metal-lathe-in-a-workshop-_VBsh_IKsD8"><div class="gallery-photo"><img src="./images/lathe.webp" alt="车床的刀架、导轨和手轮结构" width="1600" height="1067" loading="lazy"><span aria-hidden="true">↗</span></div><h3>机台的结构</h3><p>维修先说明机台类型与故障现象。</p><span>图库参考 · 非本厂设备 · 点击放大</span></a>
       </div>
     </div></section>
 
@@ -126,9 +108,9 @@
 
     <section class="contact-section wrap" id="contact"><div><h2>先把需求准备好。</h2><p>了解一次加工或维修沟通，通常需要哪些资料。</p></div><button class="button" data-contact>打开联系演示 <span aria-hidden="true">↗</span></button></section>
   </main>
-  <footer class="site-footer"><div class="wrap footer-main"><a class="brand" href="#home">金海机械</a><p>学习演示，不用于商业接单。图片均为加工概念示意。</p><button id="motion-toggle" class="motion-toggle" aria-pressed="false" hidden>减少动效</button><a href="#home">返回顶部 ↑</a></div></footer>
+  <footer class="site-footer"><div class="wrap footer-main"><a class="brand" href="#home">金海机械</a><p>学习演示，不用于商业接单。图库摄影非本厂实拍或客户案例。<br>摄影：Miguel Ángel Padriñán Alba、Matt Richmond、LISK OBE、Cemrecan Yurtman、Rodrigo Rodrigues / <a href="./images/credits.json" class="photo-credit">素材来源</a></p><button id="motion-toggle" class="motion-toggle" aria-pressed="false" hidden>减少动效</button><a href="#home">返回顶部 ↑</a></div></footer>
   <dialog id="contact-dialog" aria-labelledby="contact-dialog-title"><div class="dialog-top"><span>联系流程演示</span><button class="dialog-close" aria-label="关闭联系演示" data-close>×</button></div><h2 id="contact-dialog-title">先准备好这些资料</h2><p class="contact-placeholder">业务微信、二维码与电话尚未提供。<br>本学习版不接收真实需求，不会自动提交任何资料。</p><ul><li>非标定制：图纸或照片、尺寸、材料、数量。</li><li>钣金加工：板材、板厚、形状与用途。</li><li>机台维修：机台类型、故障现象、照片、所在区域。</li></ul><button id="copy-checklist" class="button">复制资料清单</button><p id="copy-status" role="status"></p><label id="manual-copy-label" for="manual-copy" hidden>自动复制不可用，请手动选中并复制：</label><textarea id="manual-copy" rows="5" readonly hidden></textarea></dialog>
-  <dialog id="image-dialog" aria-labelledby="image-dialog-title"><div class="dialog-top"><h2 id="image-dialog-title">加工概念示意</h2><button class="dialog-close" aria-label="关闭图片" data-close>×</button></div><img id="dialog-image" width="900" height="600" alt=""><p>学习用概念图，非真实客户案例。</p></dialog>
+  <dialog id="image-dialog" aria-labelledby="image-dialog-title"><div class="dialog-top"><h2 id="image-dialog-title">机械细节摄影</h2><button class="dialog-close" aria-label="关闭图片" data-close>×</button></div><img id="dialog-image" width="900" height="600" alt=""><p>图库参考摄影，非本厂实拍或客户案例。<a id="dialog-credit" class="photo-credit" target="_blank" rel="noopener noreferrer">查看摄影来源 ↗</a></p></dialog>
   <noscript><div class="noscript-note">当前浏览器未启用 JavaScript，可阅读业务与设备信息；联系演示暂不可用，真实联系方式尚未提供。</div></noscript>
 </body>
 </html>

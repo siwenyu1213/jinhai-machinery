@@ -20,23 +20,24 @@ test('business and process controls support repeated state changes', async ({ pa
   await page.goto('./');
   await page.getByRole('button', { name: '钣金定制' }).click();
   await expect(page.locator('#service-caption')).toHaveText('钣金定制');
-  await expect(page.locator('#service-image')).toHaveAttribute('src', /sheet.svg$/);
+  await expect(page.locator('#service-image')).toHaveAttribute('src', /cutting\.webp$/);
+  await expect(page.locator('#service-credit')).toHaveAttribute('href', /thdb7o0nLyc$/);
   await page.getByRole('button', { name: '维修服务', exact: false }).click();
   await expect(page.locator('#service-detail')).toContainText('丰泽');
   await page.locator('[data-service="custom"]').click();
   await expect(page.locator('#service-caption')).toContainText('非标零配件');
-  await page.getByRole('button', { name: '焊接', exact: true }).click();
+  await page.getByRole('button', { name: '焊接连接', exact: true }).click();
   await expect(page.locator('#process-description')).toContainText('焊接');
   await page.evaluate(async () => {
     window.scrollBy({ top: 50, behavior: 'instant' });
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   });
   await expect(page.locator('#process-description')).toContainText('焊接');
-  await page.getByRole('button', { name: '轮廓', exact: true }).click();
-  await expect(page.locator('#process-description')).toContainText('轮廓');
+  await page.getByRole('button', { name: '机床加工', exact: true }).click();
+  await expect(page.locator('#process-description')).toContainText('机床加工');
 });
 
-test('equipment filtering and concept gallery work', async ({ page }) => {
+test('equipment filtering and photographic gallery work', async ({ page }) => {
   await page.goto('./');
   await page.locator('.equipment-details summary').click();
   await page.getByRole('button', { name: '车床', exact: true }).click();
@@ -48,7 +49,9 @@ test('equipment filtering and concept gallery work', async ({ page }) => {
   const item = page.locator('.gallery-item:visible');
   await item.click();
   await expect(page.locator('#image-dialog')).toBeVisible();
-  await expect(page.locator('#dialog-image')).toHaveAttribute('src', /sheet.svg$/);
+  await expect(page.locator('#dialog-image')).toHaveAttribute('src', /cutting\.webp$/);
+  await expect(page.locator('#dialog-credit')).toContainText('Cemrecan Yurtman');
+  await expect(page.locator('#dialog-credit')).toHaveAttribute('href', /thdb7o0nLyc$/);
   await page.keyboard.press('Escape');
   await expect(page.locator('#image-dialog')).not.toBeVisible();
   await expect(item).toBeFocused();
@@ -82,14 +85,68 @@ test('motion preference persists and system reduction is respected', async ({ pa
   await expect(page.locator('#motion-toggle')).toBeDisabled();
 });
 
-test('full motion initializes and the cutting path actually progresses', async ({ page }) => {
+test('full motion completes with a readable photographic hero', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('./');
   await expect(page.locator('html')).toHaveAttribute('data-motion', 'full');
-  const path = page.locator('.cut-path');
-  const initial = await path.evaluate((element) => Number.parseFloat(getComputedStyle(element).strokeDashoffset));
-  expect(initial).toBeGreaterThan(0);
-  await expect.poll(() => path.evaluate((element) => Number.parseFloat(getComputedStyle(element).strokeDashoffset))).toBeLessThan(initial);
+  const photo = page.locator('.hero-photo');
+  await expect(photo).toBeVisible();
+  await expect.poll(() => photo.evaluate((element) => getComputedStyle(element).transform)).toBe('none');
+  await expect(photo).toHaveJSProperty('complete', true);
+});
+
+test('mechanical photography replaces drawn models and remains local with attributable sources', async ({ page }) => {
+  const externalImages = [];
+  page.on('request', (request) => {
+    if (request.resourceType() === 'image' && new URL(request.url()).origin !== new URL(page.url()).origin) externalImages.push(request.url());
+  });
+  await page.goto('./');
+  await expect(page.locator('.hero-art svg, .service-stage svg, .process-visual svg')).toHaveCount(0);
+  await expect(page.locator('img[src$=".svg"], .gallery-item[href$=".svg"]')).toHaveCount(0);
+  await expect(page.locator('.hero-art figcaption')).toContainText('非本厂实拍');
+  await expect(page.locator('.hero-photo')).toHaveAttribute('fetchpriority', 'high');
+  await expect(page.locator('.hero-photo')).toHaveAttribute('src', /chuck\.webp$/);
+  const response = await page.request.get('./images/credits.json');
+  expect(response.ok()).toBe(true);
+  const credits = await response.json();
+  expect(credits).toHaveLength(5);
+  for (const credit of credits) {
+    expect(credit.source).toMatch(/^https:\/\/unsplash\.com\/photos\//);
+    expect(credit.license).toBe('Unsplash License');
+    const photo = await page.request.get(`./images/${credit.file}`);
+    expect(photo.ok()).toBe(true);
+    expect(photo.headers()['content-type']).toContain('image/webp');
+  }
+  expect(externalImages).toEqual([]);
+});
+
+test('process photography and source follow the last selected step under reduced motion', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('./');
+  for (const index of [2, 0, 1, 2]) {
+    await page.locator(`[data-step="${index}"]`).click();
+    await expect(page.locator(`[data-step="${index}"]`)).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('.process-photo-frame img:visible')).toHaveCount(1);
+    await expect(page.locator('.process-photo-frame img:visible')).toHaveAttribute('data-process-photo', String(index));
+    await expect.poll(() => page.locator('.process-photo-frame img:visible').evaluate((image) => image.complete && image.naturalWidth > 0)).toBe(true);
+    await expect(page.locator('#process-current')).toHaveText(String(index + 1).padStart(2, '0'));
+  }
+  await expect(page.locator('#process-credit')).toHaveAttribute('href', /dmgYI2uuOoY$/);
+  await expect(page.locator('#process-credit')).toContainText('Rodrigo Rodrigues');
+  await expect(page.locator('.process-visual')).not.toHaveAttribute('aria-pressed');
+  await expect(page.locator('.hero-photo')).toHaveCSS('transform', 'none');
+});
+
+test('photo loading failure preserves business content and contact controls', async ({ page }) => {
+  await page.route('**/images/*.webp', (route) => route.abort());
+  await page.goto('./');
+  await expect(page.locator('.hero-photo')).toHaveAttribute('alt', /图库参考/);
+  await page.locator('[data-service="repair"]').click();
+  await expect(page.locator('#service-detail')).toContainText('丰泽');
+  await page.locator('[data-step="2"]').click();
+  await expect(page.locator('#process-description')).toContainText('焊接');
+  await page.locator('.hero-actions [data-contact]').click();
+  await expect(page.locator('#contact-dialog')).toBeVisible();
 });
 
 test('layout remains inside viewport at narrow and medium widths', async ({ page }) => {
