@@ -18,6 +18,13 @@ REGIONS = {
     350502: ("licheng", "鲤城", "laser", "激光切割机", (290, 490)),
     350503: ("fengze", "丰泽", "press", "折弯机", (760, 380)),
 }
+WIDE_ANCHORS = {
+    "jinjiang": (450, 650),
+    "nanan": (-70, 230),
+    "shishi": (1030, 570),
+    "licheng": (-80, 520),
+    "fengze": (1000, 300),
+}
 
 
 def project(point):
@@ -65,7 +72,8 @@ def render_map(source):
         props = next(feature["properties"] for feature in source["features"] if feature["properties"]["adcode"] == code)
         x, y = project(props["centroid"])
         ax, ay = anchor
-        lines.append(f'<g class="scope-link scope-color-{key}" data-scope-link="{key}"><path d="M{x:.1f},{y:.1f}L{ax},{ay}"/><circle cx="{x:.1f}" cy="{y:.1f}" r="5"/></g>')
+        wx, wy = WIDE_ANCHORS[key]
+        lines.append(f'<g class="scope-link scope-color-{key}" data-scope-link="{key}" data-origin="{x:.1f},{y:.1f}" data-compact-end="{ax},{ay}" data-wide-end="{wx},{wy}"><path d="M{x:.1f},{y:.1f}L{ax},{ay}"/><circle cx="{x:.1f}" cy="{y:.1f}" r="5"/></g>')
     lines.append('</g>')
     return "\n".join(lines)
 

@@ -156,6 +156,83 @@ test('map, visible place names and controls fit mobile, tablet and desktop width
   }
 });
 
+test('map occupies one complete row with a compact explanation panel inside its bottom', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openMap(page);
+  for (const width of [375, 768, 1280, 1440]) {
+    await page.setViewportSize({ width, height: 1100 });
+    await expect(page.locator('#scope')).toHaveAttribute('data-map-layout', width > 760 ? 'wide' : 'compact');
+    const layout = await page.locator('#scope').evaluate((section) => {
+      const rect = (selector) => section.querySelector(selector).getBoundingClientRect();
+      const wrap = rect('.scope-layout');
+      const figure = rect('.scope-map');
+      const canvas = rect('.scope-map-canvas');
+      const caption = rect('.scope-map-caption');
+      const copy = rect('.scope-copy');
+      const styles = getComputedStyle(section);
+      return {
+        wrapWidth: wrap.width, mapWidth: figure.width, canvasWidth: canvas.width,
+        figureBottom: figure.bottom, canvasBottom: canvas.bottom, captionTop: caption.top,
+        copyTop: copy.top, captionBottom: caption.bottom, figureTop: figure.top,
+        sectionTop: section.getBoundingClientRect().top,
+        topPadding: Number.parseFloat(styles.paddingTop), bottomPadding: Number.parseFloat(styles.paddingBottom),
+        figureHeight: figure.height,
+        titleInCaption: Boolean(section.querySelector('.scope-map-caption #scope-title')),
+        controlsInCaption: Boolean(section.querySelector('.scope-map-caption .scope-places')),
+      };
+    });
+    expect(Math.abs(layout.mapWidth - layout.wrapWidth)).toBeLessThan(2);
+    expect(Math.abs(layout.canvasWidth - layout.wrapWidth)).toBeLessThan(2);
+    expect(layout.captionTop).toBeGreaterThanOrEqual(layout.canvasBottom - 1);
+    expect(layout.copyTop).toBeGreaterThan(layout.canvasBottom);
+    expect(layout.captionBottom).toBeLessThanOrEqual(layout.figureBottom + 1);
+    expect(layout.figureTop - layout.sectionTop).toBeLessThanOrEqual(33);
+    expect(layout.topPadding).toBeLessThanOrEqual(32);
+    expect(layout.bottomPadding).toBeLessThanOrEqual(32);
+    expect(layout.titleInCaption && layout.controlsInCaption).toBe(true);
+    if (width === 375) expect(layout.figureHeight).toBeLessThan(820);
+  }
+});
+
+test('north south remains vertical with uniform scale and attached callouts after resizing', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openMap(page);
+  for (const width of [1280, 375, 768, 1440, 390]) {
+    await page.setViewportSize({ width, height: 1100 });
+    await expect(page.locator('.scope-map-geography')).toHaveAttribute('viewBox', width > 760 ? '-300 0 1600 820' : '0 0 1000 820');
+    const orientation = await page.locator('.scope-map-canvas').evaluate((canvas) => {
+      const svg = canvas.querySelector('.scope-map-geography');
+      const transform = svg.getScreenCTM();
+      const north = canvas.querySelector('.scope-north').getBoundingClientRect();
+      const south = canvas.querySelector('.scope-south').getBoundingClientRect();
+      const callouts = [...canvas.querySelectorAll('[data-scope-link]')].map((link) => {
+        const point = link.querySelector('path').getPointAtLength(link.querySelector('path').getTotalLength());
+        const position = point.matrixTransform(transform);
+        const button = canvas.querySelector(`.scope-machine[data-scope-select="${link.dataset.scopeLink}"]`);
+        const styles = getComputedStyle(button);
+        const bounds = canvas.getBoundingClientRect();
+        return { dx: position.x - bounds.left - Number.parseFloat(styles.left), dy: position.y - bounds.top - Number.parseFloat(styles.top) };
+      });
+      const sourcePoint = (key) => {
+        const marker = canvas.querySelector(`[data-scope-link="${key}"] circle`);
+        return new DOMPoint(Number(marker.getAttribute('cx')), Number(marker.getAttribute('cy'))).matrixTransform(transform);
+      };
+      return { a: transform.a, b: transform.b, c: transform.c, d: transform.d, northY: north.top, southY: south.top, northX: north.left, southX: south.left, geographicNorth: sourcePoint('nanan').y, geographicSouth: sourcePoint('jinjiang').y, callouts };
+    });
+    expect(orientation.b).toBe(0);
+    expect(orientation.c).toBe(0);
+    expect(orientation.a).toBeGreaterThan(0);
+    expect(Math.abs(orientation.a - orientation.d)).toBeLessThan(.001);
+    expect(orientation.northY).toBeLessThan(orientation.southY);
+    expect(Math.abs(orientation.northX - orientation.southX)).toBeLessThan(2);
+    expect(orientation.geographicNorth).toBeLessThan(orientation.geographicSouth);
+    for (const item of orientation.callouts) {
+      expect(Math.abs(item.dx)).toBeLessThan(2);
+      expect(Math.abs(item.dy)).toBeLessThan(2);
+    }
+  }
+});
+
 test('geography and all five place names remain visible without scripts', async ({ browser, baseURL }) => {
   const context = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 375, height: 1000 } });
   const page = await context.newPage();

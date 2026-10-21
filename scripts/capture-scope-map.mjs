@@ -1,7 +1,7 @@
 import { chromium, expect } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 
-const directory = 'artifacts/tmp/scope-map';
+const directory = process.env.SCOPE_CAPTURE_DIR || 'artifacts/tmp/scope-map';
 await mkdir(directory, { recursive: true });
 const browser = await chromium.launch({ channel: process.platform === 'win32' ? 'msedge' : undefined });
 const errors = [];

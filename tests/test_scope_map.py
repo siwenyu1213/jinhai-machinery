@@ -78,6 +78,16 @@ class ServiceMapIntegrityTests(unittest.TestCase):
                 for reference in re.findall(r"url\(#([^)]+)\)", value):
                     self.assertIn(reference, ids)
 
+    def test_projection_keeps_north_south_vertical_and_east_west_horizontal(self):
+        origin = BUILDER.project((118.5, 24.8))
+        north = BUILDER.project((118.5, 25.1))
+        east = BUILDER.project((118.7, 24.8))
+        self.assertEqual(north[0], origin[0], "Latitude must not change the horizontal axis")
+        self.assertLess(north[1], origin[1], "North must be above south in SVG coordinates")
+        self.assertEqual(east[1], origin[1])
+        self.assertGreater(east[0], origin[0])
+        self.assertEqual(set(BUILDER.WIDE_ANCHORS), {value[0] for value in BUILDER.REGIONS.values()})
+
     def test_documentation_keeps_coverage_and_equipment_boundaries_explicit(self):
         documentation = (ROOT / "README.md").read_text(encoding="utf-8")
         for name in ("晋江", "南安", "石狮", "鲤城", "丰泽", "2021", "驻点", "可维修机型"):
