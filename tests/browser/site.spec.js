@@ -105,7 +105,7 @@ test('mechanical photography replaces drawn models and remains local with attrib
   await expect(page.locator('img[src$=".svg"], .gallery-item[href$=".svg"]')).toHaveCount(0);
   await expect(page.locator('.hero-art figcaption')).toContainText('非本厂实拍');
   await expect(page.locator('.hero-photo')).toHaveAttribute('fetchpriority', 'high');
-  await expect(page.locator('.hero-photo')).toHaveAttribute('src', /chuck\.webp$/);
+  await expect(page.locator('.hero-photo')).toHaveAttribute('src', /lathe\.webp$/);
   const response = await page.request.get('./images/credits.json');
   expect(response.ok()).toBe(true);
   const credits = await response.json();
@@ -132,7 +132,7 @@ test('process photography and source follow the last selected step under reduced
     await expect(page.locator('#process-current')).toHaveText(String(index + 1).padStart(2, '0'));
   }
   await expect(page.locator('#process-credit')).toHaveAttribute('href', /dmgYI2uuOoY$/);
-  await expect(page.locator('#process-credit')).toContainText('Rodrigo Rodrigues');
+  await expect(page.locator('#process-credit')).toHaveAccessibleName(/Rodrigo Rodrigues/);
   await expect(page.locator('.process-visual')).not.toHaveAttribute('aria-pressed');
   await expect(page.locator('.hero-photo')).toHaveCSS('transform', 'none');
 });

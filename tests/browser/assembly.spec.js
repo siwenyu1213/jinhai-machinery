@@ -14,7 +14,7 @@ async function openAssembly(page) {
 test('a direct assembly fragment opens the model after motion initialization', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   // Exercise the load/refresh ordering with a late hero image as well.
-  await page.route('**/images/chuck.webp', async (route) => {
+  await page.route('**/images/lathe.webp', async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 350));
     await route.continue();
   });

@@ -15,7 +15,8 @@ export function showStep(index, announce = false) {
   document.querySelector('#process-current').textContent = String(index + 1).padStart(2, '0');
   document.querySelector('#process-photo-label').textContent = steps[index].label;
   const credit = document.querySelector('#process-credit');
-  credit.textContent = `${steps[index].credit} ↗`;
+  credit.textContent = '摄影来源 ↗';
+  credit.setAttribute('aria-label', `摄影来源：${steps[index].credit}`);
   credit.href = steps[index].source;
   stage.style.setProperty('--progress', (index + 1) / steps.length);
 }
@@ -35,7 +36,8 @@ export function initWorkbench() {
     image.src = service.image;
     image.alt = service.alt;
     const credit = document.querySelector('#service-credit');
-    credit.textContent = `摄影参考：${service.credit}，非本厂实拍 ↗`;
+    credit.textContent = '图库参考，非本厂实拍 ↗';
+    credit.setAttribute('aria-label', `摄影来源：${service.credit}，非本厂实拍`);
     credit.href = service.source;
     document.querySelector('#service-caption').textContent = service.title;
     document.querySelector('#service-detail').textContent = service.description;
