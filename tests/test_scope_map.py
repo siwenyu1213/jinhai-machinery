@@ -78,15 +78,34 @@ class ServiceMapIntegrityTests(unittest.TestCase):
                 for reference in re.findall(r"url\(#([^)]+)\)", value):
                     self.assertIn(reference, ids)
 
-    def test_projection_keeps_north_south_vertical_and_east_west_horizontal(self):
+    def test_projection_keeps_east_west_vertical_and_north_south_horizontal(self):
         origin = BUILDER.project((118.5, 24.8))
         north = BUILDER.project((118.5, 25.1))
         east = BUILDER.project((118.7, 24.8))
-        self.assertEqual(north[0], origin[0], "Latitude must not change the horizontal axis")
-        self.assertLess(north[1], origin[1], "North must be above south in SVG coordinates")
-        self.assertEqual(east[1], origin[1])
-        self.assertGreater(east[0], origin[0])
+        self.assertEqual(east[0], origin[0], "Longitude must only change the vertical axis")
+        self.assertLess(east[1], origin[1], "East must be above west in SVG coordinates")
+        self.assertEqual(north[1], origin[1])
+        self.assertLess(north[0], origin[0], "North must be left of south")
         self.assertEqual(set(BUILDER.WIDE_ANCHORS), {value[0] for value in BUILDER.REGIONS.values()})
+
+    def test_cropped_viewports_keep_all_five_service_boundaries_inside(self):
+        source = json.loads((MAPS / "quanzhou.geojson").read_text(encoding="utf-8"))
+        html = (ROOT / "site/index.html").read_text(encoding="utf-8")
+        views = re.findall(r'data-(?:wide|compact)-view="([^"]+)"', html)
+        self.assertEqual(len(views), 2)
+        for value in views:
+            vx, vy, width, height = map(float, value.split())
+            for feature in source["features"]:
+                if feature["properties"]["adcode"] not in COVERAGE:
+                    continue
+                geometry = feature["geometry"]
+                polygons = geometry["coordinates"] if geometry["type"] == "MultiPolygon" else [geometry["coordinates"]]
+                for polygon in polygons:
+                    for ring in polygon:
+                        for point in ring:
+                            x, y = BUILDER.project(point)
+                            self.assertTrue(vx + 6 <= x <= vx + width - 6, (feature["properties"]["name"], value, point))
+                            self.assertTrue(vy + 8 <= y <= vy + height - 8, (feature["properties"]["name"], value, point))
 
     def test_documentation_keeps_coverage_and_equipment_boundaries_explicit(self):
         documentation = (ROOT / "README.md").read_text(encoding="utf-8")

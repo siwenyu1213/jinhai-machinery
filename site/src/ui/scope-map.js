@@ -8,19 +8,23 @@ export function initScopeMap() {
   const links = [...root.querySelectorAll('[data-scope-link]')];
   const geography = root.querySelector('.scope-map-geography');
   const wideMedia = window.matchMedia('(min-width: 761px)');
-  // Expand the visible geographic window for a whole-row map. The projection
-  // stays uniform and north-up; only machinery callouts spread into the sides.
-  const wideView = [-300, 0, 1600, 820];
+  // Geography is projected east-up; symbols and text stay upright. Read the
+  // cropped windows from the SVG so callouts follow the same uniform scale.
+  const wideView = geography.dataset.wideView.split(' ').map(Number);
+  const compactView = geography.dataset.compactView.split(' ').map(Number);
   root.querySelectorAll('.scope-machine').forEach((machine) => {
     const link = links.find((item) => item.dataset.scopeLink === machine.dataset.scopeSelect);
     const [x, y] = link.dataset.wideEnd.split(',').map(Number);
+    const [cx, cy] = link.dataset.compactEnd.split(',').map(Number);
+    machine.style.setProperty('--map-x', `${(cx - compactView[0]) / compactView[2] * 100}%`);
+    machine.style.setProperty('--map-y', `${(cy - compactView[1]) / compactView[3] * 100}%`);
     machine.style.setProperty('--wide-map-x', `${(x - wideView[0]) / wideView[2] * 100}%`);
     machine.style.setProperty('--wide-map-y', `${(y - wideView[1]) / wideView[3] * 100}%`);
   });
   function updateLayout() {
     const wide = wideMedia.matches;
     root.dataset.mapLayout = wide ? 'wide' : 'compact';
-    geography.setAttribute('viewBox', wide ? wideView.join(' ') : '0 0 1000 820');
+    geography.setAttribute('viewBox', (wide ? wideView : compactView).join(' '));
     links.forEach((link) => {
       const end = wide ? link.dataset.wideEnd : link.dataset.compactEnd;
       link.querySelector('path').setAttribute('d', `M${link.dataset.origin}L${end}`);

@@ -52,6 +52,11 @@ test('the five actual service districts are colored and all surrounding district
   await expect(page.locator('#scope')).toContainText('超出以下范围的上门维修需求不接');
   await expect(page.locator('.scope-note')).toContainText('不代表当地驻点或可维修机型');
   await expect(page.locator('.scope-map figcaption')).toContainText('2021 年数据');
+  const contextLabels = await page.locator('[data-context-adcode]').evaluateAll((labels) => labels.map((label) => {
+    const path = document.querySelector(`#scope-boundary-${label.dataset.contextAdcode}`);
+    return path.isPointInFill(new DOMPoint(Number(label.getAttribute('x')), Number(label.getAttribute('y'))));
+  }));
+  expect(contextLabels).toEqual([true, true, true, true]);
   expect(external).toEqual([]);
 });
 
@@ -186,25 +191,28 @@ test('map occupies one complete row with a compact explanation panel inside its 
     expect(layout.captionTop).toBeGreaterThanOrEqual(layout.canvasBottom - 1);
     expect(layout.copyTop).toBeGreaterThan(layout.canvasBottom);
     expect(layout.captionBottom).toBeLessThanOrEqual(layout.figureBottom + 1);
-    expect(layout.figureTop - layout.sectionTop).toBeLessThanOrEqual(33);
-    expect(layout.topPadding).toBeLessThanOrEqual(32);
-    expect(layout.bottomPadding).toBeLessThanOrEqual(32);
+    expect(layout.figureTop - layout.sectionTop).toBeLessThanOrEqual(17);
+    expect(layout.topPadding).toBeLessThanOrEqual(16);
+    expect(layout.bottomPadding).toBeLessThanOrEqual(16);
     expect(layout.titleInCaption && layout.controlsInCaption).toBe(true);
     if (width === 375) expect(layout.figureHeight).toBeLessThan(820);
   }
 });
 
-test('north south remains vertical with uniform scale and attached callouts after resizing', async ({ page }) => {
+test('east west remains vertical at an enlarged uniform scale with attached callouts after resizing', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await openMap(page);
   for (const width of [1280, 375, 768, 1440, 390]) {
     await page.setViewportSize({ width, height: 1100 });
-    await expect(page.locator('.scope-map-geography')).toHaveAttribute('viewBox', width > 760 ? '-300 0 1600 820' : '0 0 1000 820');
+    await expect(page.locator('.scope-map-geography')).toHaveAttribute('viewBox', width > 760 ? '-80 240 1240 640' : '40 200 930 760');
+    // The SVG viewport and the CSS aspect ratio settle on separate rendering
+    // frames after a browser resize. Measure the painted layout, not that frame.
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     const orientation = await page.locator('.scope-map-canvas').evaluate((canvas) => {
       const svg = canvas.querySelector('.scope-map-geography');
       const transform = svg.getScreenCTM();
-      const north = canvas.querySelector('.scope-north').getBoundingClientRect();
-      const south = canvas.querySelector('.scope-south').getBoundingClientRect();
+      const east = canvas.querySelector('.scope-east').getBoundingClientRect();
+      const west = canvas.querySelector('.scope-west').getBoundingClientRect();
       const callouts = [...canvas.querySelectorAll('[data-scope-link]')].map((link) => {
         const point = link.querySelector('path').getPointAtLength(link.querySelector('path').getTotalLength());
         const position = point.matrixTransform(transform);
@@ -217,15 +225,17 @@ test('north south remains vertical with uniform scale and attached callouts afte
         const marker = canvas.querySelector(`[data-scope-link="${key}"] circle`);
         return new DOMPoint(Number(marker.getAttribute('cx')), Number(marker.getAttribute('cy'))).matrixTransform(transform);
       };
-      return { a: transform.a, b: transform.b, c: transform.c, d: transform.d, northY: north.top, southY: south.top, northX: north.left, southX: south.left, geographicNorth: sourcePoint('nanan').y, geographicSouth: sourcePoint('jinjiang').y, callouts };
+      return { a: transform.a, b: transform.b, c: transform.c, d: transform.d, eastY: east.top, westY: west.top, eastX: east.left + east.width / 2, westX: west.left + west.width / 2, geographicEast: sourcePoint('shishi').y, geographicWest: sourcePoint('nanan').y, canvasWidth: canvas.getBoundingClientRect().width, callouts };
     });
     expect(orientation.b).toBe(0);
     expect(orientation.c).toBe(0);
     expect(orientation.a).toBeGreaterThan(0);
     expect(Math.abs(orientation.a - orientation.d)).toBeLessThan(.001);
-    expect(orientation.northY).toBeLessThan(orientation.southY);
-    expect(Math.abs(orientation.northX - orientation.southX)).toBeLessThan(2);
-    expect(orientation.geographicNorth).toBeLessThan(orientation.geographicSouth);
+    expect(orientation.eastY).toBeLessThan(orientation.westY);
+    expect(Math.abs(orientation.eastX - orientation.westX)).toBeLessThan(2);
+    expect(orientation.geographicEast).toBeLessThan(orientation.geographicWest);
+    const enlargement = orientation.a / (orientation.canvasWidth / (width > 760 ? 1600 : 1000));
+    expect(enlargement).toBeGreaterThan(width > 760 ? 1.28 : 1.07);
     for (const item of orientation.callouts) {
       expect(Math.abs(item.dx)).toBeLessThan(2);
       expect(Math.abs(item.dy)).toBeLessThan(2);

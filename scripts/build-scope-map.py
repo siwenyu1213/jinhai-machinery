@@ -12,26 +12,28 @@ MAPS = ROOT / "site/public/maps"
 START = "<!-- scope-map:generated:start -->"
 END = "<!-- scope-map:generated:end -->"
 REGIONS = {
-    350582: ("jinjiang", "晋江", "lathe", "车床", (480, 700)),
-    350583: ("nanan", "南安", "drill", "钻床", (300, 245)),
-    350581: ("shishi", "石狮", "mill", "铣床", (780, 650)),
-    350502: ("licheng", "鲤城", "laser", "激光切割机", (290, 490)),
-    350503: ("fengze", "丰泽", "press", "折弯机", (760, 380)),
+    350582: ("jinjiang", "晋江", "lathe", "车床", (800, 760)),
+    350583: ("nanan", "南安", "drill", "钻床", (450, 890)),
+    350581: ("shishi", "石狮", "mill", "铣床", (730, 450)),
+    350502: ("licheng", "鲤城", "laser", "激光切割机", (190, 720)),
+    350503: ("fengze", "丰泽", "press", "折弯机", (190, 500)),
 }
 WIDE_ANCHORS = {
-    "jinjiang": (450, 650),
-    "nanan": (-70, 230),
-    "shishi": (1030, 570),
-    "licheng": (-80, 520),
-    "fengze": (1000, 300),
+    "jinjiang": (900, 700),
+    "nanan": (430, 820),
+    "shishi": (900, 440),
+    "licheng": (180, 650),
+    "fengze": (300, 420),
 }
 
 
 def project(point):
-    """Local Mercator projection; preserve the source topology and all islands."""
+    """Rotate the local Mercator projection 90 degrees: east up, west down."""
     lon, lat = point
     mercator = lambda value: math.log(math.tan(math.pi / 4 + math.radians(value) / 2))
-    return ((lon - 118) * 820 + 44, (mercator(25.39) - mercator(lat)) * 820 * 180 / math.pi + 8)
+    east = (lon - 118) * 820 + 44
+    south = (mercator(25.39) - mercator(lat)) * 820 * 180 / math.pi + 8
+    return south, 1000 - east
 
 
 def path_data(geometry):
