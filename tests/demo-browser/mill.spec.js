@@ -129,9 +129,36 @@ test('components keep visibly rotating while simultaneously converging to their 
   }
 });
 
+test('arrival already rotates and the broad tornado shrinks continuously into the normal funnel', async ({ page }, testInfo) => {
+  await ready(page);
+  const samples = [];
+  for (const progress of [.18, .22, .30, .42]) {
+    await page.evaluate((value) => window.__millDemo.setProgress(value), progress);
+    samples.push(await page.evaluate(() => {
+      const parts = window.__millDemo.getParts();
+      const Box3 = window.__millDemo.getBounds().constructor;
+      const centers = parts.map((part) => new Box3().setFromObject(part.object).getCenter(part.object.position.clone()));
+      const base = parts.find((part) => part.id === 'base').object;
+      return { state: window.__millDemo.getState(), quaternion: base.quaternion.toArray(),
+        radius: centers.reduce((sum, point) => sum + Math.hypot(point.x, point.z), 0) / centers.length };
+    }));
+    if (progress === .18 || progress === .42) await testInfo.attach(`rotating-funnel-${Math.round(progress * 100)}`, { body: await page.screenshot(), contentType: 'image/png' });
+  }
+  expect(samples[0].state.stage).toBe('arrival');
+  expect(samples[0].state.rotationProgress).toBeGreaterThan(.05);
+  expect(samples[0].radius).toBeGreaterThan(samples.at(-1).radius * 1.6);
+  for (let index = 1; index < samples.length; index++) {
+    const before = samples[index - 1], after = samples[index];
+    expect(after.radius).toBeLessThan(before.radius);
+    expect(after.state.rotationProgress).toBeGreaterThan(before.state.rotationProgress);
+    const dot = Math.abs(before.quaternion.reduce((sum, value, component) => sum + value * after.quaternion[component], 0));
+    expect(2 * Math.acos(Math.min(1, dot))).toBeGreaterThan(.1);
+  }
+});
+
 test('the vortex fills both sides at several heights and stays readable within the viewport', async ({ page }, testInfo) => {
   await ready(page);
-  for (const progress of [.24, .33, .42, .52, .63]) {
+  for (const progress of [.42, .46, .52, .58, .63]) {
     await page.evaluate((value) => window.__millDemo.setProgress(value), progress);
     const distribution = await page.evaluate(() => {
       const camera = window.__millDemo.getCamera();

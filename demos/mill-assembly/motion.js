@@ -1,6 +1,6 @@
 import { Box3, Euler, Quaternion, Vector3 } from 'three';
 
-export const VORTEX_TIMING = Object.freeze({ arrivalEnd: .24, assemblyStart: .64, assemblyEnd: .94 });
+export const VORTEX_TIMING = Object.freeze({ arrivalEnd: .24, funnelSettled: .42, assemblyStart: .64, assemblyEnd: .94 });
 const TAU = Math.PI * 2;
 const Y_AXIS = new Vector3(0, 1, 0);
 const clamp = (value) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
@@ -45,7 +45,7 @@ export function scrollToProgress(value) {
 // a few wheel steps. Rotation and contraction share one physical scroll clock.
 function windTurn(value) {
   const t = clamp(value);
-  return smoother(t);
+  return t * t * (3 - 2 * t);
 }
 
 function hash(value) {
@@ -144,6 +144,8 @@ export function createAssemblyFlight(parts, { stagger = true } = {}) {
   const controlA = new Vector3();
   const controlB = new Vector3();
   const position = new Vector3();
+  const orbitPosition = new Vector3();
+  const orbitOrientation = new Quaternion();
   const offset = new Vector3();
   const corner = new Vector3();
   const turn = new Quaternion();
@@ -151,15 +153,20 @@ export function createAssemblyFlight(parts, { stagger = true } = {}) {
   const startRotation = new Quaternion();
   const rotation = new Quaternion();
   const euler = new Euler();
-  let state = { progress: 0, rotationProgress: 0, assemblyProgress: 0, assembledCount: 0, activeLabels: [], phase: 0, stage: 'arrival', totalParts: parts.length };
+  let state = { progress: 0, rotationProgress: 0, funnelScale: 2.1, assemblyProgress: 0, assembledCount: 0, activeLabels: [], phase: 0, stage: 'arrival', totalParts: parts.length };
 
   function apply(value, camera) {
     const progress = clamp(value);
     const stage = progress < VORTEX_TIMING.arrivalEnd ? 'arrival' : progress < VORTEX_TIMING.assemblyStart ? 'vortex' : progress < VORTEX_TIMING.assemblyEnd ? 'assembly' : 'complete';
     const phase = { arrival: 0, vortex: 2, assembly: 4, complete: 5 }[stage];
-    const rotationClock = clamp((progressToScroll(progress) - progressToScroll(VORTEX_TIMING.arrivalEnd))
-      / (progressToScroll(VORTEX_TIMING.assemblyEnd) - progressToScroll(VORTEX_TIMING.arrivalEnd)));
+    // One clock begins with the flight, so neither entering the funnel nor
+    // reaching its normal radius resets angular velocity to zero.
+    const rotationClock = clamp(progressToScroll(progress) / progressToScroll(VORTEX_TIMING.assemblyEnd));
     const rotationProgress = windTurn(rotationClock);
+    const formation = smoother(clamp((progress - .035) / .145));
+    const shrinkClock = clamp((progressToScroll(progress) - progressToScroll(.10))
+      / (progressToScroll(VORTEX_TIMING.funnelSettled) - progressToScroll(.10)));
+    const funnelScale = 1 + 1.1 * (1 - smoother(shrinkClock));
     const assemblyProgress = smoother(clamp((progress - VORTEX_TIMING.assemblyStart)
       / (VORTEX_TIMING.assemblyEnd - VORTEX_TIMING.assemblyStart)));
     camera.updateWorldMatrix(true, false);
@@ -181,6 +188,26 @@ export function createAssemblyFlight(parts, { stagger = true } = {}) {
         continue;
       }
 
+      const u = rotationClock;
+      const envelope = Math.sin(Math.PI * u) ** 2;
+      const phaseOffset = seed * TAU;
+      const angularDrift = .085 * Math.sin(TAU * u + phaseOffset) * envelope * envelope * (1 - assemblyProgress);
+      const lift = (.20 + .16 * Math.sin(TAU * u + phaseOffset)) * envelope;
+      const breathing = 1 + .035 * Math.sin(TAU * u * 1.3 + phaseOffset) * envelope;
+      const orbitRadius = (entry.orbitRadius * breathing + lift * .12) * funnelScale;
+      const orbitY = 1.3 + (entry.orbitY - 1.3) * (1 + .06 * (funnelScale - 1)) + lift;
+      orbitPosition.set(Math.cos(entry.angle) * orbitRadius, orbitY, Math.sin(entry.angle) * orbitRadius);
+      orbitPosition.lerp(homeCenter, assemblyProgress);
+      turn.setFromAxisAngle(Y_AXIS, -(TAU * rotationProgress + angularDrift));
+      const response = Math.max(.35, 1 - radius * .15) * (1 - assemblyProgress);
+      euler.set(
+        .24 * response * Math.sin(TAU * u * 1.2 + phaseOffset) * envelope,
+        .14 * response * Math.sin(TAU * u * .8 + phaseOffset * 1.7) * envelope,
+        .20 * response * Math.cos(TAU * u + phaseOffset) * envelope,
+      );
+      spin.setFromEuler(euler);
+      orbitOrientation.copy(orbitRotation).slerp(entry.rotation, assemblyProgress);
+
       let size;
       if (stage === 'arrival') {
         const arrival = progress / VORTEX_TIMING.arrivalEnd;
@@ -201,40 +228,25 @@ export function createAssemblyFlight(parts, { stagger = true } = {}) {
           .addScaledVector(controlA, 3 * inverse * inverse * t)
           .addScaledVector(controlB, 3 * inverse * t * t)
           .addScaledVector(orbitCenter, t * t * t);
+        // Bend the incoming streams into the already-moving broad funnel.
+        // Formation is complete before the arrival stage ends, while its
+        // radius continues shrinking across that boundary with no stop.
+        if (formation === 1) position.copy(orbitPosition);
+        else position.lerp(orbitPosition, formation);
+        orbitOrientation.premultiply(spin);
         euler.set(timing.side * (1.1 + seed), (seed - .5) * 3.3, timing.side * (1.2 + seed));
         spin.setFromEuler(euler);
         startRotation.copy(orbitRotation).premultiply(spin);
-        rotation.copy(startRotation).slerp(orbitRotation, t);
-        size = 1 + (scale - 1) * t;
+        const orientationBlend = 1 - (1 - t) * (1 - formation);
+        rotation.copy(startRotation).slerp(orbitOrientation, orientationBlend);
+        size = 1 + (scale - 1) * orientationBlend;
       } else {
-        const u = rotationClock;
-        const t = rotationProgress;
-        const envelope = Math.sin(Math.PI * u) ** 2;
-        const phaseOffset = seed * TAU;
-        const angularDrift = .085 * Math.sin(TAU * u + phaseOffset) * envelope * envelope * (1 - assemblyProgress);
-        const angle = entry.angle + TAU * t + angularDrift;
-        const lift = (.20 + .16 * Math.sin(TAU * u + phaseOffset)) * envelope;
-        const breathing = 1 + .035 * Math.sin(TAU * u * 1.3 + phaseOffset) * envelope;
-        const orbitRadius = entry.orbitRadius * breathing + lift * .12;
-        position.set(Math.cos(angle) * orbitRadius, entry.orbitY + lift, Math.sin(angle) * orbitRadius);
-        turn.setFromAxisAngle(Y_AXIS, -(TAU * t + angularDrift));
-        // Contract in the rotating frame so partially joined components keep
-        // turning together, then land at the exact saved home pose.
-        offset.copy(homeCenter).applyQuaternion(turn);
-        position.lerp(offset, assemblyProgress);
-        rotation.copy(orbitRotation).slerp(entry.rotation, assemblyProgress).premultiply(turn);
-        // Independent small banks and tumbles read as entrained objects rather
-        // than a rigid carousel. Heavy castings respond less than small rings.
-        const response = Math.max(.35, 1 - radius * .15) * (1 - assemblyProgress);
-        euler.set(
-          .24 * response * Math.sin(TAU * u * 1.2 + phaseOffset) * envelope,
-          .14 * response * Math.sin(TAU * u * .8 + phaseOffset * 1.7) * envelope,
-          .20 * response * Math.cos(TAU * u + phaseOffset) * envelope,
-        );
-        spin.setFromEuler(euler);
-        rotation.premultiply(spin);
+        position.copy(orbitPosition);
+        rotation.copy(orbitOrientation).premultiply(spin);
         size = scale + (1 - scale) * assemblyProgress;
       }
+      position.applyQuaternion(turn);
+      rotation.premultiply(turn);
 
       // Keep rotated castings above the floor, accounting for offset origins.
       let lowest = Infinity;
@@ -247,7 +259,7 @@ export function createAssemblyFlight(parts, { stagger = true } = {}) {
     }
 
     const completed = stage === 'complete';
-    state = { progress, rotationProgress, assemblyProgress, assembledCount: completed ? parts.length : 0,
+    state = { progress, rotationProgress, funnelScale, assemblyProgress, assembledCount: completed ? parts.length : 0,
       activeLabels: progress > 0 && !completed ? parts.map((part) => part.label) : [],
       phase, stage, totalParts: parts.length };
     return getState();

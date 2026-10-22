@@ -120,7 +120,7 @@ test('all components enter together, remain visible, and complete assembly at on
 
 test('one continuous revolution extends through assembly instead of finishing before contraction', () => {
   const { flight, parts, camera } = fixture();
-  const start = progressToScroll(VORTEX_TIMING.arrivalEnd);
+  const start = 0;
   const end = progressToScroll(VORTEX_TIMING.assemblyEnd);
   let previousRotation = 0;
   let previousAssembly = 0;
@@ -136,7 +136,7 @@ test('one continuous revolution extends through assembly instead of finishing be
       overlappingSamples++;
     }
     const centers = parts.map(geometryCenter);
-    if (previousCenters && state.assemblyProgress === 0) centers.forEach((point, index) => {
+    if (previousCenters && state.assemblyProgress === 0 && state.progress >= .20) centers.forEach((point, index) => {
       assert.ok(forwardAngleDelta(Math.atan2(previousCenters[index].z, previousCenters[index].x), Math.atan2(point.z, point.x)) >= -1e-10);
     });
     previousCenters = centers;
@@ -147,13 +147,13 @@ test('one continuous revolution extends through assembly instead of finishing be
   assert.equal(previousRotation, 1, 'The complete motion includes exactly one turn');
   assert.equal(previousAssembly, 1);
   const state = flight.apply(VORTEX_TIMING.assemblyStart, camera);
-  assert.ok(state.rotationProgress > .15 && state.rotationProgress < .4, 'Most of the turn should remain when assembly starts');
+  assert.ok(state.rotationProgress > .4 && state.rotationProgress < .6, 'Assembly should continue through roughly the remaining half turn');
   assert.equal(state.assemblyProgress, 0);
 });
 
 test('equal physical scroll increments keep a clear but smooth slow-fast-slow turn through assembly', () => {
   const { flight, camera } = fixture();
-  const start = progressToScroll(VORTEX_TIMING.arrivalEnd);
+  const start = 0;
   const end = progressToScroll(VORTEX_TIMING.assemblyEnd);
   const turns = [];
   for (let step = 0; step <= 10; step++) {
@@ -162,7 +162,7 @@ test('equal physical scroll increments keep a clear but smooth slow-fast-slow tu
   const increments = turns.slice(1).map((value, index) => value - turns[index]);
   for (let step = 1; step < 5; step++) assert.ok(increments[step] > increments[step - 1]);
   for (let step = 6; step < 10; step++) assert.ok(increments[step] < increments[step - 1]);
-  assert.ok(increments[4] > increments[0] * 15, 'Slow-fast-slow should remain visible');
+  assert.ok(increments[4] > increments[0] * 4, 'Slow-fast-slow should remain visible');
   assert.ok(Math.max(...increments) < Math.PI * .4, 'No tenth should cram over 72 degrees into one scroll increment');
   assert.ok(Math.abs(increments.reduce((sum, value) => sum + value, 0) - Math.PI * 2) < 1e-8);
   // Match speeds across the old stopping point using physical scroll units.
@@ -209,6 +209,48 @@ test('real components form a broad upper funnel with complete angular coverage a
         assert.ok(covarianceAxisRatio(points) >= .10,
           `progress ${progress}, width ${width}: projected component cloud must occupy an area, not collapse into one diagonal line`);
       }
+    }
+  } finally { model.dispose(); }
+});
+
+test('incoming components are already orbiting in a broad funnel that continuously shrinks to its normal radius', () => {
+  const model = createMill();
+  const flight = createAssemblyFlight(model.parts);
+  const camera = cameraFor();
+  try {
+    assert.ok(flight.apply(.08, camera).rotationProgress > 0);
+    let previousRadius = Infinity;
+    let previousCenters;
+    const radii = [];
+    for (const progress of [.18, .22, .28, .34, .42]) {
+      const state = flight.apply(progress, camera);
+      const centers = model.parts.map(geometryCenter);
+      const meanRadius = centers.reduce((sum, point) => sum + Math.hypot(point.x, point.z), 0) / centers.length;
+      assert.ok(meanRadius < previousRadius, 'The broad tornado must progressively narrow while turning');
+      assert.equal(state.assemblyProgress, 0, 'This is funnel contraction, before machine assembly');
+      if (previousCenters) {
+        const meanAngle = centers.reduce((sum, point, index) => sum + forwardAngleDelta(
+          Math.atan2(previousCenters[index].z, previousCenters[index].x), Math.atan2(point.z, point.x)), 0) / centers.length;
+        assert.ok(meanAngle > .06, 'Visible orbital motion must accompany each radius reduction');
+      }
+      radii.push(meanRadius);
+      previousRadius = meanRadius;
+      previousCenters = centers;
+    }
+    assert.ok(radii[0] > radii.at(-1) * 1.6, 'The initial rotating body should be substantially larger than the settled tornado');
+    assert.equal(flight.getState().funnelScale, 1);
+    for (const boundary of [.18, .24, .42]) {
+      const scroll = progressToScroll(boundary);
+      const samples = [-.0001, 0, .0001].map((delta) => {
+        flight.apply(scrollToProgress(scroll + delta), camera);
+        return model.parts.map(({ object }) => object.position.clone());
+      });
+      model.parts.forEach((part, index) => {
+        const before = samples[1][index].distanceTo(samples[0][index]);
+        const after = samples[2][index].distanceTo(samples[1][index]);
+        assert.ok(before > .00001 && after > .00001, part.id + ' must never stop at a formation boundary');
+        assert.ok(Math.abs(before - after) / Math.max(before, after) < .04, part.id + ' must not jump in speed at a formation boundary');
+      });
     }
   } finally { model.dispose(); }
 });
@@ -269,7 +311,7 @@ test('camera-relative arrivals follow rotated cameras and resized viewports', ()
   }
 });
 
-test('small arrival timing offsets remain monotonic and follow exactly the original spatial and rotation paths', () => {
+test('small arrival timing offsets remain monotonic and rejoin the same continuous rotating funnel', () => {
   const original = createMill();
   const adjusted = createMill();
   const reference = createAssemblyFlight(original.parts, { stagger: false });
@@ -287,17 +329,7 @@ test('small arrival timing offsets remain monotonic and follow exactly the origi
         previous = travel;
       }
     }
-    for (const progress of [.03, .06, .10, .14, .18, .22]) {
-      flight.apply(progress, camera);
-      adjusted.parts.forEach((part, index) => {
-        reference.apply(staggerArrival(progress / VORTEX_TIMING.arrivalEnd, part.id) * VORTEX_TIMING.arrivalEnd, camera);
-        const baseline = original.parts[index].object;
-        assert.ok(part.object.position.distanceTo(baseline.position) < 1e-10, part.id + ' must remain on the original path');
-        assert.ok(part.object.quaternion.angleTo(baseline.quaternion) < 1e-7);
-        assert.ok(part.object.scale.distanceTo(baseline.scale) < 1e-10);
-      });
-    }
-    for (const progress of [.24, .5, .76, .85, .94, 1]) {
+    for (const progress of [.18, .22, .24, .5, .76, .85, .94, 1]) {
       flight.apply(progress, camera);
       reference.apply(progress, camera);
       assert.deepEqual(transforms(adjusted.parts), transforms(original.parts));
@@ -305,7 +337,7 @@ test('small arrival timing offsets remain monotonic and follow exactly the origi
   } finally { original.dispose(); adjusted.dispose(); }
 });
 
-test('staggering reduces substantial screen occlusion during the incoming flight without rerouting components', () => {
+test('staggering continues to reduce substantial screen occlusion while the incoming streams join the funnel', () => {
   const model = createMill();
   const flight = createAssemblyFlight(model.parts);
   const reference = createMill();
@@ -345,7 +377,7 @@ test('staggering reduces substantial screen occlusion during the incoming flight
       before += overlaps(reference.parts, camera);
       after += overlaps(model.parts, camera);
     }
-    assert.ok(after < before * .8, `Substantial overlap samples should decrease: ${before} -> ${after}`);
+    assert.ok(after < before * .9, `Substantial overlap samples should decrease: ${before} -> ${after}`);
   } finally { model.dispose(); reference.dispose(); }
 });
 

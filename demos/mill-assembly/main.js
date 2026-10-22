@@ -12,7 +12,7 @@ const phaseName = document.querySelector('#phase-name');
 const activePart = document.querySelector('#active-part');
 const firstHint = document.querySelector('#first-hint');
 const reducedQuery = matchMedia('(prefers-reduced-motion: reduce)');
-const stageNames = { arrival: '两侧飞入', vortex: '中央旋绕', assembly: '旋转组装', complete: '装配完成' };
+const stageNames = { arrival: '旋转飞入', vortex: '中央旋绕', assembly: '旋转组装', complete: '装配完成' };
 const clamp = (value) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
 const smooth = (value) => { const t = clamp(value); return t * t * (3 - 2 * t); };
 const cameraTarget = new THREE.Vector3();
@@ -52,8 +52,8 @@ function describe() {
   phaseName.textContent = progress === 0 ? '等待滚动' : stageNames[state.stage];
   firstHint.hidden = progress > .005 || !ready;
   const descriptions = {
-    arrival: `${state.totalParts} 个组件同时从两侧飞入`,
-    vortex: `${state.totalParts} 个组件在中央旋绕一圈`,
+    arrival: `${state.totalParts} 个组件边飞入边旋转，汇入较大的旋涡`,
+    vortex: progress < VORTEX_TIMING.funnelSettled ? '旋涡持续旋转，逐渐收至正常大小' : '组件继续旋绕，准备同步收拢',
     assembly: '所有组件边旋转边收拢到安装位置',
     complete: inspection ? '外壳已透视，可观察内部组件' : '所有组件已就位',
   };
