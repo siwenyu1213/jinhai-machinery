@@ -101,6 +101,27 @@ test('every component completes one full central Y-axis revolution before the sh
   }
 });
 
+test('equal scroll increments create an unmistakable slow-fast-slow single revolution', () => {
+  const { flight, parts, camera } = fixture();
+  const angles = [];
+  for (let step = 0; step <= 10; step++) {
+    flight.apply(VORTEX_TIMING.arrivalEnd + (VORTEX_TIMING.vortexEnd - VORTEX_TIMING.arrivalEnd) * step / 10, camera);
+    angles.push(parts.map((part) => {
+      const center = geometryCenter(part);
+      return Math.atan2(center.z, center.x);
+    }));
+  }
+  const meanSteps = Array.from({ length: 10 }, (_, step) => parts.reduce((sum, _, index) =>
+    sum + forwardAngleDelta(angles[step][index], angles[step + 1][index]), 0) / parts.length);
+  for (let step = 1; step < 5; step++) assert.ok(meanSteps[step] > meanSteps[step - 1], 'The first half must visibly accelerate under constant scrolling');
+  for (let step = 6; step < 10; step++) assert.ok(meanSteps[step] < meanSteps[step - 1], 'The second half must progressively slow down');
+  const peak = Math.min(meanSteps[4], meanSteps[5]);
+  assert.ok(peak > meanSteps[0] * 35 && peak > meanSteps[9] * 35,
+    'Middle scroll steps must turn far more than the equal-sized first and last steps');
+  assert.ok(Math.abs(meanSteps.reduce((sum, angle) => sum + angle, 0) - Math.PI * 2) < 1e-8,
+    'Acceleration changes the pacing, never the total turn count');
+});
+
 test('real components form a broad upper funnel with complete angular coverage at multiple heights', () => {
   const model = createMill();
   const flight = createAssemblyFlight(model.parts);

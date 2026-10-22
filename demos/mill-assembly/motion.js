@@ -6,14 +6,12 @@ const Y_AXIS = new Vector3(0, 1, 0);
 const clamp = (value) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
 const smoother = (value) => value * value * value * (value * (value * 6 - 15) + 10);
 
-// Brief wind-up / wind-down with a long, nearly constant-speed middle. The
-// previous whole-circle ease accelerated every component together at mid-turn.
+// One revolution with a pronounced slow-fast-slow response to equal scroll
+// increments. Its symmetric velocity peaks at the middle and reaches zero at
+// both ends, so it joins the arrival and assembly poses without a speed jump.
 function windTurn(value) {
-  const edge = .14;
-  if (value > 1 - edge) return 1 - windTurn(1 - value);
-  if (value >= edge) return (value - edge / 2) / (1 - edge);
-  const t = value / edge;
-  return edge * (t * t * t - .5 * t * t * t * t) / (1 - edge);
+  const t = clamp(value);
+  return t ** 4 * (35 + t * (-84 + t * (70 - 20 * t)));
 }
 
 function hash(value) {
@@ -166,7 +164,7 @@ export function createAssemblyFlight(parts) {
         const t = windTurn(u);
         const envelope = Math.sin(Math.PI * u) ** 2;
         const phaseOffset = seed * TAU;
-        const angularDrift = .085 * Math.sin(TAU * u + phaseOffset) * envelope * Math.sin(Math.PI * u);
+        const angularDrift = .085 * Math.sin(TAU * u + phaseOffset) * envelope * envelope;
         const angle = entry.angle + TAU * t + angularDrift;
         const lift = (.20 + .16 * Math.sin(TAU * u + phaseOffset)) * envelope;
         const breathing = 1 + .035 * Math.sin(TAU * u * 1.3 + phaseOffset) * envelope;
