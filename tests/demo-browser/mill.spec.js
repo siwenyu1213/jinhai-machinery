@@ -107,6 +107,53 @@ test('all components stay visible through the vortex and assemble together once'
   expect(final.exact).toBe(true);
 });
 
+test('incoming parts use all four corners and avoid silhouette occlusion on wide and narrow screens', async ({ page }, testInfo) => {
+  await ready(page);
+  if (testInfo.project.name === 'demo-desktop') await page.setViewportSize({ width: 1600, height: 640 });
+  await page.evaluate(() => window.__millDemo.setProgress(.00000001));
+  const directions = await page.evaluate(() => {
+    const camera = window.__millDemo.getCamera();
+    const Box3 = window.__millDemo.getBounds().constructor;
+    const groups = [0, 0, 0, 0];
+    for (const part of window.__millDemo.getParts()) {
+      const center = new Box3().setFromObject(part.object).getCenter(part.object.position.clone()).project(camera);
+      if (Math.abs(center.x) > 1 && Math.abs(center.y) > 1) groups[(center.x > 0 ? 1 : 0) + (center.y > 0 ? 2 : 0)]++;
+    }
+    return groups;
+  });
+  expect(directions.every((count) => count >= 3)).toBe(true);
+  for (const progress of [.08, .10, .14, .17]) {
+    await page.evaluate((value) => window.__millDemo.setProgress(value), progress);
+    const worstOverlap = await page.evaluate(() => {
+      const camera = window.__millDemo.getCamera();
+      const point = camera.position.clone();
+      const boxes = window.__millDemo.getParts().map((part) => {
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+        part.object.traverse((object) => {
+          if (!object.isMesh) return;
+          const vertices = object.geometry.attributes.position;
+          for (let index = 0; index < vertices.count; index++) {
+            point.fromBufferAttribute(vertices, index).applyMatrix4(object.matrixWorld).project(camera);
+            x0 = Math.min(x0, point.x); x1 = Math.max(x1, point.x);
+            y0 = Math.min(y0, point.y); y1 = Math.max(y1, point.y);
+          }
+        });
+        return { x0, y0, x1, y1 };
+      });
+      let worst = 0;
+      for (let first = 0; first < boxes.length; first++) for (let second = first + 1; second < boxes.length; second++) {
+        const a = boxes[first], b = boxes[second];
+        const area = Math.min((a.x1 - a.x0) * (a.y1 - a.y0), (b.x1 - b.x0) * (b.y1 - b.y0));
+        const overlap = Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0));
+        worst = Math.max(worst, overlap / area);
+      }
+      return worst;
+    });
+    expect(worstOverlap).toBeLessThan(.03);
+  }
+  await testInfo.attach('separated-diagonal-arrivals', { body: await page.screenshot(), contentType: 'image/png' });
+});
+
 test('the vortex fills both sides at several heights and stays readable within the viewport', async ({ page }, testInfo) => {
   await ready(page);
   for (const progress of [.24, .37, .5, .63, .76]) {

@@ -227,10 +227,11 @@ test('real components advance consistently with small independent orbital speed 
   } finally { model.dispose(); }
 });
 
-test('entries start at both camera edges and are nearer and larger through perspective', () => {
+test('entries start beyond the sides and all four corners with bounded near-camera footprints', () => {
   for (const aspect of [16 / 9, 375 / 812]) {
     const { flight, parts, camera } = fixture(34, aspect);
     flight.apply(.00000001, camera);
+    const corners = new Map();
     for (const [index, part] of parts.entries()) {
       const center = geometryCenter(part);
       const projected = center.clone().project(camera);
@@ -239,9 +240,51 @@ test('entries start at both camera edges and are nearer and larger through persp
       const entryDepth = -center.clone().applyMatrix4(camera.matrixWorldInverse).z;
       const homeDepth = -part.homePosition.clone().applyMatrix4(camera.matrixWorldInverse).z;
       assert.ok(entryDepth > camera.near && entryDepth < homeDepth * .65);
-      assert.ok(part.object.scale.x > .99, 'Early large appearance primarily comes from near-camera placement');
+      assert.ok(part.object.scale.x > 0 && part.object.scale.x <= 1);
+      const vertical = getFlightSchedule(parts)[index].vertical;
+      if (vertical !== 0) {
+        assert.ok(projected.y * vertical > 1.05, 'Diagonal arrivals begin above or below the screen');
+        const key = `${side},${vertical}`;
+        corners.set(key, (corners.get(key) || 0) + 1);
+      }
     }
+    assert.equal(corners.size, 4);
+    assert.ok([...corners.values()].every((count) => count >= 5));
   }
+});
+
+test('incoming real castings keep separate projected silhouettes instead of hiding small components', () => {
+  const model = createMill();
+  const flight = createAssemblyFlight(model.parts);
+  try {
+    for (const aspect of [1.6, 2.5, 375 / 812]) {
+      const camera = cameraFor(aspect);
+      for (const progress of [.08, .10, .14, .17]) {
+        flight.apply(progress, camera);
+        const boxes = model.parts.map((part) => {
+          let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+          part.object.updateWorldMatrix(true, true);
+          const point = new Vector3();
+          part.object.traverse((object) => {
+            if (!object.isMesh) return;
+            const vertices = object.geometry.attributes.position;
+            for (let index = 0; index < vertices.count; index++) {
+              point.fromBufferAttribute(vertices, index).applyMatrix4(object.matrixWorld).project(camera);
+              x0 = Math.min(x0, point.x); x1 = Math.max(x1, point.x);
+              y0 = Math.min(y0, point.y); y1 = Math.max(y1, point.y);
+            }
+          });
+          return { id: part.id, x0, x1, y0, y1 };
+        });
+        for (let first = 0; first < boxes.length; first++) for (let second = first + 1; second < boxes.length; second++) {
+          const a = boxes[first], b = boxes[second];
+          const overlap = Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0));
+          const area = Math.min((a.x1 - a.x0) * (a.y1 - a.y0), (b.x1 - b.x0) * (b.y1 - b.y0));
+          assert.ok(overlap / area < .03, `${aspect}, ${progress}: ${a.id} overlaps ${b.id}`);
+        }
+      }
+    }
+  } finally { model.dispose(); }
 });
 
 test('camera-relative arrivals follow rotated cameras and resized viewports', () => {
@@ -258,6 +301,24 @@ test('camera-relative arrivals follow rotated cameras and resized viewports', ()
       assert.ok(ndc.z > -1 && ndc.z < 1);
     });
   }
+});
+
+test('separated arrivals stay continuous instead of changing avoidance lanes abruptly', () => {
+  const model = createMill();
+  const flight = createAssemblyFlight(model.parts);
+  const camera = cameraFor();
+  let previous;
+  try {
+    for (let step = 60; step <= 180; step++) {
+      flight.apply(step / 1000, camera);
+      const centers = model.parts.map((part) => geometryCenter(part).project(camera));
+      if (previous) centers.forEach((point, index) => {
+        assert.ok(Math.hypot(point.x - previous[index].x, point.y - previous[index].y) < .065,
+          `${model.parts[index].id} must stay on its continuous flight corridor`);
+      });
+      previous = centers;
+    }
+  } finally { model.dispose(); }
 });
 
 test('stage boundaries are continuous and reversing or jumping never accumulates drift', () => {
@@ -293,7 +354,7 @@ test('real castings remain above the floor in a layered vortex and all 34 instal
       for (const { object } of model.parts) {
         object.updateWorldMatrix(true, true);
         const box = new Box3().setFromObject(object);
-        assert.ok(box.min.y >= -.00001, object.name + ' must not cut through the floor');
+        if (progress >= VORTEX_TIMING.arrivalEnd) assert.ok(box.min.y >= -.00001, object.name + ' must not cut through the visible machine floor');
         assert.ok([...object.position.toArray(), ...object.quaternion.toArray(), ...object.scale.toArray()].every(Number.isFinite));
         assert.ok(object.visible);
       }
