@@ -30,6 +30,30 @@ function geometryCenter(part) {
   return new Box3().setFromObject(part.object).getCenter(new Vector3());
 }
 
+function forwardAngleDelta(before, after) {
+  let delta = after - before;
+  if (delta < -Math.PI) delta += Math.PI * 2;
+  if (delta > Math.PI) delta -= Math.PI * 2;
+  return delta;
+}
+
+function covarianceAxisRatio(points) {
+  const average = points.reduce((sum, point) => ({ x: sum.x + point.x, y: sum.y + point.y }), { x: 0, y: 0 });
+  average.x /= points.length;
+  average.y /= points.length;
+  let xx = 0, xy = 0, yy = 0;
+  for (const point of points) {
+    const x = point.x - average.x;
+    const y = point.y - average.y;
+    xx += x * x;
+    xy += x * y;
+    yy += y * y;
+  }
+  const trace = xx + yy;
+  const discriminant = Math.hypot(xx - yy, 2 * xy);
+  return (trace - discriminant) / Math.max(Number.EPSILON, trace + discriminant);
+}
+
 test('all components enter together, remain visible, and complete assembly at one shared instant', () => {
   const { flight, parts, camera } = fixture();
   flight.apply(0, camera);
@@ -63,20 +87,81 @@ test('every component completes one full central Y-axis revolution before the sh
       const center = geometryCenter(part);
       angles[index].push(Math.atan2(center.z, center.x));
       assert.ok(center.y > 0 && center.y < 9);
-      assert.ok(Math.hypot(center.x, center.z) < 3.5, 'The vortex stays around the machine');
+      assert.ok(Math.hypot(center.x, center.z) < 4.2, 'The wider upper funnel stays within the preview staging area');
     });
   }
   for (const samples of angles) {
     let revolution = 0;
     for (let index = 1; index < samples.length; index++) {
-      let delta = samples[index] - samples[index - 1];
-      if (delta < -Math.PI) delta += Math.PI * 2;
-      if (delta > Math.PI) delta -= Math.PI * 2;
+      const delta = forwardAngleDelta(samples[index - 1], samples[index]);
       assert.ok(delta >= -1e-10, 'All parts follow a consistent vortex direction');
       revolution += delta;
     }
     assert.ok(Math.abs(revolution - Math.PI * 2) < 1e-8, 'Exactly one full revolution is required');
   }
+});
+
+test('real components form a broad upper funnel with complete angular coverage at multiple heights', () => {
+  const model = createMill();
+  const flight = createAssemblyFlight(model.parts);
+  const camera = cameraFor();
+  try {
+    for (const progress of [.24, .37, .50, .63, .76]) {
+      flight.apply(progress, camera);
+      const centers = model.parts.map(geometryCenter);
+      const minimum = Math.min(...centers.map((point) => point.y));
+      const maximum = Math.max(...centers.map((point) => point.y));
+      const bands = [[], [], []];
+      for (const point of centers) {
+        const band = Math.min(2, Math.floor((point.y - minimum) / (maximum - minimum) * 3));
+        bands[band].push(point);
+      }
+      for (const [band, points] of bands.entries()) {
+        assert.ok(points.length >= 6, `progress ${progress}, height band ${band} needs a substantial ring of components`);
+        const quadrants = new Set(points.map((point) => (point.x >= 0 ? 1 : 0) + (point.z >= 0 ? 2 : 0)));
+        assert.equal(quadrants.size, 4, `progress ${progress}, height band ${band} must surround the axis rather than trace a diagonal strip`);
+      }
+      const meanRadius = (points) => points.reduce((sum, point) => sum + Math.hypot(point.x, point.z), 0) / points.length;
+      const lowerRadius = meanRadius(bands[0]);
+      const upperRadius = meanRadius(bands[2]);
+      assert.ok(upperRadius > lowerRadius * 1.25, `progress ${progress}: the upper funnel must be substantially wider than its lower section`);
+      assert.ok(upperRadius - lowerRadius > .45, 'A tiny radial difference does not communicate a funnel');
+      for (const [width, height] of [[1280, 720], [375, 812]]) {
+        const projectionCamera = cameraFor(width / height);
+        const points = centers.map((center) => {
+          const projected = center.clone().project(projectionCamera);
+          // Compare actual pixel axes; raw NDC coordinates distort covariance
+          // in portrait viewports because their X and Y scales differ.
+          return { x: projected.x * width / 2, y: projected.y * height / 2 };
+        });
+        assert.ok(covarianceAxisRatio(points) >= .10,
+          `progress ${progress}, width ${width}: projected component cloud must occupy an area, not collapse into one diagonal line`);
+      }
+    }
+  } finally { model.dispose(); }
+});
+
+test('real components advance consistently with small independent orbital speed variations', () => {
+  const model = createMill();
+  const flight = createAssemblyFlight(model.parts);
+  const camera = cameraFor();
+  try {
+    for (const progress of [.30, .42, .55, .67]) {
+      flight.apply(progress, camera);
+      const before = model.parts.map((part) => {
+        const point = geometryCenter(part);
+        return Math.atan2(point.z, point.x);
+      });
+      flight.apply(progress + .01, camera);
+      const increments = model.parts.map((part, index) => {
+        const point = geometryCenter(part);
+        return forwardAngleDelta(before[index], Math.atan2(point.z, point.x));
+      });
+      assert.ok(increments.every((delta) => delta > 0), 'Independent motion must not make parts reverse against the vortex');
+      assert.ok(Math.max(...increments) - Math.min(...increments) > .001,
+        `progress ${progress}: independent angular variations should avoid a rigid carousel turning at identical speed`);
+    }
+  } finally { model.dispose(); }
 });
 
 test('entries start at both camera edges and are nearer and larger through perspective', () => {

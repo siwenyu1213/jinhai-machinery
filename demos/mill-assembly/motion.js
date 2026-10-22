@@ -6,6 +6,16 @@ const Y_AXIS = new Vector3(0, 1, 0);
 const clamp = (value) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
 const smoother = (value) => value * value * value * (value * (value * 6 - 15) + 10);
 
+// Brief wind-up / wind-down with a long, nearly constant-speed middle. The
+// previous whole-circle ease accelerated every component together at mid-turn.
+function windTurn(value) {
+  const edge = .14;
+  if (value > 1 - edge) return 1 - windTurn(1 - value);
+  if (value >= edge) return (value - edge / 2) / (1 - edge);
+  const t = value / edge;
+  return edge * (t * t * t - .5 * t * t * t * t) / (1 - edge);
+}
+
 function hash(value) {
   let number = 2166136261;
   for (const character of String(value)) number = Math.imul(number ^ character.charCodeAt(0), 16777619);
@@ -34,27 +44,58 @@ export function createAssemblyFlight(parts) {
     const worldBox = new Box3().setFromObject(part.object);
     const localBox = worldBox.clone().applyMatrix4(part.object.matrixWorld.clone().invert());
     const center = localBox.getCenter(new Vector3());
-    const radius = Math.max(.12, localBox.getSize(new Vector3()).length() / 2);
+    const dimensions = localBox.getSize(new Vector3());
+    const radius = Math.max(.12, dimensions.length() / 2);
     const seed = hash(part.id);
-    const scale = Math.max(.66, .91 - radius * .075);
-    const angle = index * Math.PI * (3 - Math.sqrt(5)) + .3;
-    // Large castings use the outside of the vortex; small rings and tools stay
-    // nearer the axis. A helix-like distribution separates the height layers.
-    const orbitRadius = 1.05 + Math.min(1, radius / 2.6) * 1.75 + seed * .28;
-    const heightSeed = (index * .61803398875 + .17) % 1;
-    const orbitY = Math.max(radius * scale + .2, Math.min(8.45 - radius * scale, 1.65 + heightSeed * 5.9));
+    const scale = Math.max(.54, .88 - radius * .09);
     const rotation = part.homeQuaternion.clone();
-    const tilt = new Quaternion().setFromEuler(new Euler((seed - .5) * .72, angle * .33, (heightSeed - .5) * .7));
-    const orbitRotation = rotation.clone().premultiply(tilt);
     const home = part.homePosition.clone();
     const homeCenter = center.clone().applyQuaternion(rotation).add(home);
-    const orbitCenter = new Vector3(Math.cos(angle) * orbitRadius, orbitY, Math.sin(angle) * orbitRadius);
     const corners = [];
     for (let x = 0; x < 2; x++) for (let y = 0; y < 2; y++) for (let z = 0; z < 2; z++) {
       corners.push(new Vector3(x ? localBox.max.x : localBox.min.x, y ? localBox.max.y : localBox.min.y, z ? localBox.max.z : localBox.min.z).sub(center));
     }
-    return { part, timing: schedule[index], home, homeCenter, rotation, center, corners, radius, seed, scale, angle, orbitRadius, orbitY, orbitCenter, orbitRotation };
+    return { part, timing: schedule[index], home, homeCenter, rotation, center, corners, radius, dimensions, seed, scale };
   });
+
+  // Independent rings break the old angle/height correlation. In particular,
+  // golden-angle azimuths paired with inverse-golden-ratio heights form a single
+  // helix: a side view can collapse the entire distribution to a diagonal line.
+  const layers = Math.min(6, Math.max(1, Math.floor(parts.length / 4)));
+  const slots = [];
+  for (let layer = 0; layer < layers; layer++) {
+    const count = Math.floor(parts.length / layers) + (layer < parts.length % layers ? 1 : 0);
+    const height = layers > 1 ? layer / (layers - 1) : .5;
+    const azimuth = hash('ring-' + layer) * TAU;
+    for (let item = 0; item < count; item++) {
+      const jitter = hash(`height-${layer}-${item}`) - .5;
+      slots.push({
+        layer,
+        angle: azimuth + item * TAU / count + (hash(`angle-${layer}-${item}`) - .5) * .10,
+        orbitY: 1.30 + height * 5.55 + jitter * .22,
+        orbitRadius: (.93 + height * 2.68) * (.96 + hash(`radius-${layer}-${item}`) * .08),
+      });
+    }
+  }
+  // Give broad castings room near the upper rim, keep tall columns in the
+  // middle, and fill the remaining slots without coupling size to azimuth.
+  for (const entry of [...entries].sort((a, b) => b.radius - a.radius)) {
+    const halfHeight = (entry.dimensions.y / 2 + Math.max(entry.dimensions.x, entry.dimensions.z) * .18) * entry.scale;
+    let choices = slots.filter((slot) => slot.orbitY > halfHeight + .15 && slot.orbitY < 8.65 - halfHeight);
+    if (!choices.length) choices = slots;
+    const targetHeight = entry.radius > 1.5
+      ? entry.dimensions.y > Math.max(entry.dimensions.x, entry.dimensions.z) ? 4.2 : 6.3
+      : 1.3 + hash(entry.part.id + '-layer') * 5.55;
+    choices.sort((a, b) => Math.abs(a.orbitY - targetHeight) - Math.abs(b.orbitY - targetHeight)
+      || hash(entry.part.id + a.angle) - hash(entry.part.id + b.angle));
+    const slot = choices[0];
+    slots.splice(slots.indexOf(slot), 1);
+    Object.assign(entry, slot);
+    entry.orbitCenter = new Vector3(Math.cos(slot.angle) * slot.orbitRadius, slot.orbitY, Math.sin(slot.angle) * slot.orbitRadius);
+    entry.orbitRotation = entry.rotation.clone().premultiply(new Quaternion().setFromEuler(new Euler(
+      (entry.seed - .5) * .20, -slot.angle + .35 + (entry.seed - .5) * .6, (entry.seed - .5) * .18,
+    )));
+  }
   const cameraPosition = new Vector3();
   const right = new Vector3();
   const up = new Vector3();
@@ -121,11 +162,28 @@ export function createAssemblyFlight(parts) {
         rotation.copy(startRotation).slerp(orbitRotation, t);
         size = 1 + (scale - 1) * t;
       } else if (stage === 'vortex') {
-        const t = smoother((progress - VORTEX_TIMING.arrivalEnd) / (VORTEX_TIMING.vortexEnd - VORTEX_TIMING.arrivalEnd));
-        const angle = entry.angle + TAU * t;
-        position.set(Math.cos(angle) * entry.orbitRadius, entry.orbitY, Math.sin(angle) * entry.orbitRadius);
-        turn.setFromAxisAngle(Y_AXIS, TAU * t);
+        const u = (progress - VORTEX_TIMING.arrivalEnd) / (VORTEX_TIMING.vortexEnd - VORTEX_TIMING.arrivalEnd);
+        const t = windTurn(u);
+        const envelope = Math.sin(Math.PI * u) ** 2;
+        const phaseOffset = seed * TAU;
+        const angularDrift = .085 * Math.sin(TAU * u + phaseOffset) * envelope * Math.sin(Math.PI * u);
+        const angle = entry.angle + TAU * t + angularDrift;
+        const lift = (.20 + .16 * Math.sin(TAU * u + phaseOffset)) * envelope;
+        const breathing = 1 + .035 * Math.sin(TAU * u * 1.3 + phaseOffset) * envelope;
+        const orbitRadius = entry.orbitRadius * breathing + lift * .12;
+        position.set(Math.cos(angle) * orbitRadius, entry.orbitY + lift, Math.sin(angle) * orbitRadius);
+        turn.setFromAxisAngle(Y_AXIS, -(TAU * t + angularDrift));
         rotation.copy(orbitRotation).premultiply(turn);
+        // Independent small banks and tumbles read as entrained objects rather
+        // than a rigid carousel. Heavy castings respond less than small rings.
+        const response = Math.max(.35, 1 - radius * .15);
+        euler.set(
+          .24 * response * Math.sin(TAU * u * 1.2 + phaseOffset) * envelope,
+          .14 * response * Math.sin(TAU * u * .8 + phaseOffset * 1.7) * envelope,
+          .20 * response * Math.cos(TAU * u + phaseOffset) * envelope,
+        );
+        spin.setFromEuler(euler);
+        rotation.premultiply(spin);
         size = scale;
       } else {
         const t = smoother((progress - VORTEX_TIMING.vortexEnd) / (VORTEX_TIMING.assemblyEnd - VORTEX_TIMING.vortexEnd));

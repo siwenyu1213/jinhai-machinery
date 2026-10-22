@@ -41,6 +41,74 @@ test('all components stay visible through the vortex and assemble together once'
   expect(final.exact).toBe(true);
 });
 
+test('the vortex fills both sides at several heights and stays readable within the viewport', async ({ page }, testInfo) => {
+  await ready(page);
+  for (const progress of [.24, .37, .5, .63, .76]) {
+    await page.evaluate((value) => window.__millDemo.setProgress(value), progress);
+    const distribution = await page.evaluate(() => {
+      const camera = window.__millDemo.getCamera();
+      const Box3 = window.__millDemo.getBounds().constructor;
+      let meshMinX = Infinity;
+      let meshMaxX = -Infinity;
+      const entries = window.__millDemo.getParts().map((part) => {
+        const box = new Box3().setFromObject(part.object);
+        const center = box.getCenter(part.object.position.clone());
+        const projected = center.clone().project(camera);
+        const axis = center.clone().set(0, center.y, 0).project(camera);
+        const vertex = center.clone();
+        part.object.traverse((object) => {
+          if (!object.isMesh) return;
+          const positions = object.geometry.getAttribute('position');
+          for (let index = 0; index < positions.count; index++) {
+            vertex.fromBufferAttribute(positions, index).applyMatrix4(object.matrixWorld).project(camera);
+            meshMinX = Math.min(meshMinX, vertex.x);
+            meshMaxX = Math.max(meshMaxX, vertex.x);
+          }
+        });
+        return { id: part.id, height: center.y, x: projected.x, y: projected.y, side: projected.x - axis.x, visible: part.object.visible };
+      }).sort((a, b) => a.height - b.height);
+      const bands = Array.from({ length: 3 }, (_, band) => {
+        const group = entries.slice(Math.floor(entries.length * band / 3), Math.floor(entries.length * (band + 1) / 3));
+        return { left: group.filter((part) => part.side < -.025).length, right: group.filter((part) => part.side > .025).length };
+      });
+      return { entries, bands, meshMinX, meshMaxX, inside: entries.filter((part) => Math.abs(part.x) < 1 && Math.abs(part.y) < .95).length };
+    });
+    expect(distribution.entries.every((entry) => entry.visible)).toBe(true);
+    for (const band of distribution.bands) {
+      expect(band.left).toBeGreaterThanOrEqual(2);
+      expect(band.right).toBeGreaterThanOrEqual(2);
+    }
+    expect(distribution.inside).toBeGreaterThanOrEqual(Math.floor(distribution.entries.length * .9));
+    expect(distribution.meshMinX).toBeGreaterThan(-.98);
+    expect(distribution.meshMaxX).toBeLessThan(.98);
+    await testInfo.attach(`vortex-${Math.round(progress * 100)}`, { body: await page.screenshot(), contentType: 'image/png' });
+  }
+});
+
+test('the narrow-screen camera pulls back smoothly for the vortex and returns for the complete machine', async ({ page }) => {
+  await ready(page);
+  const baseline = await page.evaluate(() => {
+    const camera = window.__millDemo.getCamera();
+    return { position: camera.position.toArray(), distance: camera.position.distanceTo(window.__millDemo.getBounds().getCenter(camera.position.clone())), width: innerWidth };
+  });
+  await page.evaluate(() => window.__millDemo.setProgress(.5));
+  const vortexDistance = await page.evaluate(() => {
+    const camera = window.__millDemo.getCamera();
+    return camera.position.distanceTo(window.__millDemo.getBounds().getCenter(camera.position.clone()));
+  });
+  expect(vortexDistance / baseline.distance).toBeCloseTo(baseline.width < 600 ? 1.2 : 1, 5);
+  const thresholdPositions = [];
+  for (const progress of [.239, .241]) {
+    await page.evaluate((value) => window.__millDemo.setProgress(value), progress);
+    thresholdPositions.push(await page.evaluate(() => window.__millDemo.getCamera().position.toArray()));
+  }
+  const thresholdStep = Math.hypot(...thresholdPositions[0].map((value, index) => value - thresholdPositions[1][index]));
+  expect(thresholdStep).toBeLessThan(.01);
+  await page.evaluate(() => window.__millDemo.setProgress(1));
+  const completed = await page.evaluate(() => window.__millDemo.getCamera().position.toArray());
+  completed.forEach((value, index) => expect(value).toBeCloseTo(baseline.position[index], 8));
+});
+
 test('native range, keyboard, completion and replay stay synchronized', async ({ page }) => {
   await ready(page);
   const slider = page.getByRole('slider', { name: '装配进度' });

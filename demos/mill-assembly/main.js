@@ -14,6 +14,10 @@ const firstHint = document.querySelector('#first-hint');
 const reducedQuery = matchMedia('(prefers-reduced-motion: reduce)');
 const stageNames = { arrival: '两侧飞入', vortex: '中央旋绕', assembly: '同步组装', complete: '装配完成' };
 const clamp = (value) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
+const smooth = (value) => { const t = clamp(value); return t * t * (3 - 2 * t); };
+const cameraTarget = new THREE.Vector3();
+const cameraEye = new THREE.Vector3(11, 4.5, 14).normalize();
+let completeCameraDistance = 20;
 let renderer, scene, camera, model, flight, frame = 0, progress = 0;
 let state = { progress: 0, assembledCount: 0, activeLabels: [], phase: 0, totalParts: 0 };
 let ready = false;
@@ -54,6 +58,7 @@ function describe() {
 function draw() {
   frame = 0;
   if (!ready || disposed) return;
+  updateCameraForProgress();
   flight.apply(progress, camera);
   state = flight.getState();
   if (reducedQuery.matches) {
@@ -143,6 +148,18 @@ function inspectPart(id) {
 
 function invalidate() { if (!frame && ready && !disposed) frame = requestAnimationFrame(draw); }
 
+function updateCameraForProgress() {
+  const entering = smooth((progress - .1) / (VORTEX_TIMING.arrivalEnd - .1));
+  const leaving = 1 - smooth((progress - VORTEX_TIMING.vortexEnd) / (VORTEX_TIMING.assemblyEnd - VORTEX_TIMING.vortexEnd));
+  const pullback = host.clientWidth < 600 && !reducedQuery.matches ? .2 * entering * leaving : 0;
+  const distance = completeCameraDistance * (1 + pullback);
+  camera.position.copy(cameraTarget).addScaledVector(cameraEye, distance);
+  camera.lookAt(cameraTarget);
+  camera.updateMatrixWorld(true);
+  scene.fog.near = distance + 12;
+  scene.fog.far = distance + 55;
+}
+
 function fitCamera() {
   if (!ready) return;
   const width = host.clientWidth;
@@ -167,14 +184,11 @@ function fitCamera() {
     const near = point.dot(eye);
     distance = Math.max(distance, near + Math.abs(point.dot(right)) / (tanVertical * camera.aspect * fillX), near + Math.abs(point.dot(up)) / (tanVertical * fillY));
   }
-  camera.position.copy(target).addScaledVector(eye, Math.max(15, distance));
-  camera.lookAt(target);
-  camera.updateMatrixWorld(true);
+  cameraTarget.copy(target);
+  completeCameraDistance = Math.max(15, distance);
   // Keep the machine untouched while the distant floor fades into the backdrop.
   // The mobile fit places the camera farther away, so anchor fog to that distance.
-  const cameraDistance = camera.position.distanceTo(target);
-  scene.fog.near = cameraDistance + 12;
-  scene.fog.far = cameraDistance + 55;
+  updateCameraForProgress();
   renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
   renderer.setSize(width, height, false);
   invalidate();
