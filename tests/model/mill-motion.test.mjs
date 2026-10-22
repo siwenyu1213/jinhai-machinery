@@ -54,14 +54,13 @@ function covarianceAxisRatio(points) {
   return (trace - discriminant) / Math.max(Number.EPSILON, trace + discriminant);
 }
 
-test('only the final assembly receives triple the physical scroll while input mappings stay reversible', () => {
-  const span = 1.36;
-  for (const progress of [0, .12, .24, .5, .76]) {
-    assert.ok(Math.abs(progressToScroll(progress) * span - progress) < 1e-12,
-      'The arrival and vortex must keep their previous physical scroll positions');
-  }
-  const assemblyDistance = (progressToScroll(.94) - progressToScroll(.76)) * span;
-  assert.ok(Math.abs(assemblyDistance - 3 * (.94 - .76)) < 1e-12);
+test('arrival is slower and rotating assembly gets more scroll time with reversible input mappings', () => {
+  const span = 1.57;
+  assert.ok(Math.abs(progressToScroll(.24) * span - .24 * 1.5) < 1e-12);
+  assert.ok(Math.abs((progressToScroll(.64) - progressToScroll(.24)) * span - (.64 - .24)) < 1e-12);
+  const assemblyDistance = (progressToScroll(.94) - progressToScroll(.64)) * span;
+  assert.ok(Math.abs(assemblyDistance - 2.5 * (.94 - .64)) < 1e-12);
+  assert.ok(assemblyDistance > 3 * (.94 - .76) * 1.35, 'Assembly should be at least 35 percent slower than the previous version');
   for (let step = 0; step <= 1000; step++) {
     const progress = step / 1000;
     assert.ok(Math.abs(scrollToProgress(progressToScroll(progress)) - progress) < 1e-12);
@@ -119,49 +118,59 @@ test('all components enter together, remain visible, and complete assembly at on
   }
 });
 
-test('every component completes one full central Y-axis revolution before the shared assembly', () => {
+test('one continuous revolution extends through assembly instead of finishing before contraction', () => {
   const { flight, parts, camera } = fixture();
-  const angles = parts.map(() => []);
+  const start = progressToScroll(VORTEX_TIMING.arrivalEnd);
+  const end = progressToScroll(VORTEX_TIMING.assemblyEnd);
+  let previousRotation = 0;
+  let previousAssembly = 0;
+  let overlappingSamples = 0;
+  let previousCenters;
   for (let step = 0; step <= 80; step++) {
-    flight.apply(VORTEX_TIMING.arrivalEnd + (VORTEX_TIMING.vortexEnd - VORTEX_TIMING.arrivalEnd) * step / 80, camera);
-    parts.forEach((part, index) => {
-      const center = geometryCenter(part);
-      angles[index].push(Math.atan2(center.z, center.x));
-      assert.ok(center.y > 0 && center.y < 9);
-      assert.ok(Math.hypot(center.x, center.z) < 4.2, 'The wider upper funnel stays within the preview staging area');
-    });
-  }
-  for (const samples of angles) {
-    let revolution = 0;
-    for (let index = 1; index < samples.length; index++) {
-      const delta = forwardAngleDelta(samples[index - 1], samples[index]);
-      assert.ok(delta >= -1e-10, 'All parts follow a consistent vortex direction');
-      revolution += delta;
+    const state = flight.apply(scrollToProgress(start + (end - start) * step / 80), camera);
+    assert.ok(state.rotationProgress >= previousRotation);
+    assert.ok(state.assemblyProgress >= previousAssembly);
+    if (state.assemblyProgress > .05 && state.assemblyProgress < .95) {
+      assert.ok(state.rotationProgress > previousRotation, 'Components must still turn while joining');
+      assert.ok(state.assemblyProgress > previousAssembly, 'Contraction and rotation must advance in the same samples');
+      overlappingSamples++;
     }
-    assert.ok(Math.abs(revolution - Math.PI * 2) < 1e-8, 'Exactly one full revolution is required');
+    const centers = parts.map(geometryCenter);
+    if (previousCenters && state.assemblyProgress === 0) centers.forEach((point, index) => {
+      assert.ok(forwardAngleDelta(Math.atan2(previousCenters[index].z, previousCenters[index].x), Math.atan2(point.z, point.x)) >= -1e-10);
+    });
+    previousCenters = centers;
+    previousRotation = state.rotationProgress;
+    previousAssembly = state.assemblyProgress;
   }
+  assert.ok(overlappingSamples >= 20, 'Assembly must overlap a substantial part of the rotation');
+  assert.equal(previousRotation, 1, 'The complete motion includes exactly one turn');
+  assert.equal(previousAssembly, 1);
+  const state = flight.apply(VORTEX_TIMING.assemblyStart, camera);
+  assert.ok(state.rotationProgress > .15 && state.rotationProgress < .4, 'Most of the turn should remain when assembly starts');
+  assert.equal(state.assemblyProgress, 0);
 });
 
-test('equal scroll increments create an unmistakable slow-fast-slow single revolution', () => {
-  const { flight, parts, camera } = fixture();
-  const angles = [];
+test('equal physical scroll increments keep a clear but smooth slow-fast-slow turn through assembly', () => {
+  const { flight, camera } = fixture();
+  const start = progressToScroll(VORTEX_TIMING.arrivalEnd);
+  const end = progressToScroll(VORTEX_TIMING.assemblyEnd);
+  const turns = [];
   for (let step = 0; step <= 10; step++) {
-    flight.apply(VORTEX_TIMING.arrivalEnd + (VORTEX_TIMING.vortexEnd - VORTEX_TIMING.arrivalEnd) * step / 10, camera);
-    angles.push(parts.map((part) => {
-      const center = geometryCenter(part);
-      return Math.atan2(center.z, center.x);
-    }));
+    turns.push(flight.apply(scrollToProgress(start + (end - start) * step / 10), camera).rotationProgress * Math.PI * 2);
   }
-  const meanSteps = Array.from({ length: 10 }, (_, step) => parts.reduce((sum, _, index) =>
-    sum + forwardAngleDelta(angles[step][index], angles[step + 1][index]), 0) / parts.length);
-  for (let step = 1; step < 5; step++) assert.ok(meanSteps[step] > meanSteps[step - 1], 'The first half must visibly accelerate under constant scrolling');
-  for (let step = 6; step < 10; step++) assert.ok(meanSteps[step] < meanSteps[step - 1], 'The second half must progressively slow down');
-  const peak = Math.min(meanSteps[4], meanSteps[5]);
-  assert.ok(peak > meanSteps[0] * 200 && peak > meanSteps[9] * 200,
-    'Middle scroll steps must turn far more than the equal-sized first and last steps');
-  assert.ok(peak > Math.PI * .55, 'The fast middle tenth must cover over 99 degrees, making the acceleration clearly perceptible');
-  assert.ok(Math.abs(meanSteps.reduce((sum, angle) => sum + angle, 0) - Math.PI * 2) < 1e-8,
-    'Acceleration changes the pacing, never the total turn count');
+  const increments = turns.slice(1).map((value, index) => value - turns[index]);
+  for (let step = 1; step < 5; step++) assert.ok(increments[step] > increments[step - 1]);
+  for (let step = 6; step < 10; step++) assert.ok(increments[step] < increments[step - 1]);
+  assert.ok(increments[4] > increments[0] * 15, 'Slow-fast-slow should remain visible');
+  assert.ok(Math.max(...increments) < Math.PI * .4, 'No tenth should cram over 72 degrees into one scroll increment');
+  assert.ok(Math.abs(increments.reduce((sum, value) => sum + value, 0) - Math.PI * 2) < 1e-8);
+  // Match speeds across the old stopping point using physical scroll units.
+  const boundary = progressToScroll(VORTEX_TIMING.assemblyStart);
+  const samples = [-.0001, 0, .0001].map((offset) => flight.apply(scrollToProgress(boundary + offset), camera).rotationProgress);
+  const before = samples[1] - samples[0], after = samples[2] - samples[1];
+  assert.ok(before > 0 && after > 0);
+  assert.ok(Math.abs(before - after) / before < .01, 'Rotation must not pause or jerk when contraction starts');
 });
 
 test('real components form a broad upper funnel with complete angular coverage at multiple heights', () => {
@@ -169,7 +178,7 @@ test('real components form a broad upper funnel with complete angular coverage a
   const flight = createAssemblyFlight(model.parts);
   const camera = cameraFor();
   try {
-    for (const progress of [.24, .37, .50, .63, .76]) {
+    for (const progress of [.24, .33, .42, .52, .63]) {
       flight.apply(progress, camera);
       const centers = model.parts.map(geometryCenter);
       const minimum = Math.min(...centers.map((point) => point.y));
@@ -209,7 +218,7 @@ test('real components advance consistently with small independent orbital speed 
   const flight = createAssemblyFlight(model.parts);
   const camera = cameraFor();
   try {
-    for (const progress of [.30, .42, .55, .67]) {
+    for (const progress of [.42, .50, .56, .60]) {
       flight.apply(progress, camera);
       const before = model.parts.map((part) => {
         const point = geometryCenter(part);
@@ -399,6 +408,9 @@ test('invalid progress is bounded, empty scenes work and returned state is isola
   state.activeLabels.push('mutation');
   assert.ok(!flight.getState().activeLabels.includes('mutation'));
   const empty = createAssemblyFlight([]);
-  assert.deepEqual(empty.apply(.5, camera), { progress: .5, assembledCount: 0, activeLabels: [], phase: 2, stage: 'vortex', totalParts: 0 });
+  const emptyState = empty.apply(.5, camera);
+  assert.equal(emptyState.totalParts, 0);
+  assert.equal(emptyState.stage, 'vortex');
+  assert.deepEqual(emptyState.activeLabels, []);
   assert.throws(() => createAssemblyFlight([parts[0], parts[0]]), /unique/);
 });

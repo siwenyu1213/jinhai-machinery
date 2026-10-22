@@ -1,13 +1,15 @@
 import { Box3, Euler, Quaternion, Vector3 } from 'three';
 
-export const VORTEX_TIMING = Object.freeze({ arrivalEnd: .24, vortexEnd: .76, assemblyEnd: .94 });
+export const VORTEX_TIMING = Object.freeze({ arrivalEnd: .24, assemblyStart: .64, assemblyEnd: .94 });
 const TAU = Math.PI * 2;
 const Y_AXIS = new Vector3(0, 1, 0);
 const clamp = (value) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
 const smoother = (value) => value * value * value * (value * (value * 6 - 15) + 10);
-const ASSEMBLY_SCROLL_SCALE = 3;
-const EXTRA_ASSEMBLY_SCROLL = (VORTEX_TIMING.assemblyEnd - VORTEX_TIMING.vortexEnd) * (ASSEMBLY_SCROLL_SCALE - 1);
-const SCROLL_SPAN = 1 + EXTRA_ASSEMBLY_SCROLL;
+const ARRIVAL_SCROLL_SCALE = 1.5;
+const ASSEMBLY_SCROLL_SCALE = 2.5;
+const EXTRA_ARRIVAL_SCROLL = VORTEX_TIMING.arrivalEnd * (ARRIVAL_SCROLL_SCALE - 1);
+const EXTRA_ASSEMBLY_SCROLL = (VORTEX_TIMING.assemblyEnd - VORTEX_TIMING.assemblyStart) * (ASSEMBLY_SCROLL_SCALE - 1);
+const SCROLL_SPAN = 1 + EXTRA_ARRIVAL_SCROLL + EXTRA_ASSEMBLY_SCROLL;
 
 // Follow the physical scroll target with frame-rate-independent damping.
 // A small final snap lets the render loop sleep once the motion has settled.
@@ -19,29 +21,31 @@ export function followScroll(current, target, elapsed) {
   return Math.abs(end - next) < .0001 ? end : next;
 }
 
-// Stretch only the physical scroll allotted to the final assembly. Earlier
-// flight and rotation keep the same poses at the same scroll distances.
+// Give arrival and the overlapping assembly more physical scroll time.
 export function progressToScroll(value) {
   const progress = clamp(value);
-  const extra = Math.min(Math.max(0, progress - VORTEX_TIMING.vortexEnd),
-    VORTEX_TIMING.assemblyEnd - VORTEX_TIMING.vortexEnd) * (ASSEMBLY_SCROLL_SCALE - 1);
-  return (progress + extra) / SCROLL_SPAN;
+  const extra = Math.min(Math.max(0, progress - VORTEX_TIMING.assemblyStart),
+    VORTEX_TIMING.assemblyEnd - VORTEX_TIMING.assemblyStart) * (ASSEMBLY_SCROLL_SCALE - 1);
+  const arrivalExtra = Math.min(progress, VORTEX_TIMING.arrivalEnd) * (ARRIVAL_SCROLL_SCALE - 1);
+  return (progress + arrivalExtra + extra) / SCROLL_SPAN;
 }
 
 export function scrollToProgress(value) {
   const travel = clamp(value) * SCROLL_SPAN;
-  const assemblyTravelEnd = VORTEX_TIMING.assemblyEnd + EXTRA_ASSEMBLY_SCROLL;
-  if (travel <= VORTEX_TIMING.vortexEnd) return travel;
-  if (travel < assemblyTravelEnd) return VORTEX_TIMING.vortexEnd + (travel - VORTEX_TIMING.vortexEnd) / ASSEMBLY_SCROLL_SCALE;
-  return clamp(travel - EXTRA_ASSEMBLY_SCROLL);
+  const arrivalTravelEnd = VORTEX_TIMING.arrivalEnd + EXTRA_ARRIVAL_SCROLL;
+  const assemblyTravelStart = VORTEX_TIMING.assemblyStart + EXTRA_ARRIVAL_SCROLL;
+  const assemblyTravelEnd = VORTEX_TIMING.assemblyEnd + EXTRA_ARRIVAL_SCROLL + EXTRA_ASSEMBLY_SCROLL;
+  if (travel <= arrivalTravelEnd) return travel / ARRIVAL_SCROLL_SCALE;
+  if (travel <= assemblyTravelStart) return travel - EXTRA_ARRIVAL_SCROLL;
+  if (travel < assemblyTravelEnd) return VORTEX_TIMING.assemblyStart + (travel - assemblyTravelStart) / ASSEMBLY_SCROLL_SCALE;
+  return clamp(travel - EXTRA_ARRIVAL_SCROLL - EXTRA_ASSEMBLY_SCROLL);
 }
 
-// One revolution with a pronounced slow-fast-slow response to equal scroll
-// increments. Its symmetric velocity peaks at the middle and reaches zero at
-// both ends, so it joins the arrival and assembly poses without a speed jump.
+// A continuous acceleration curve avoids concentrating most of the turn into
+// a few wheel steps. Rotation and contraction share one physical scroll clock.
 function windTurn(value) {
   const t = clamp(value);
-  return t < .5 ? 8 * t ** 4 : 1 - 8 * (1 - t) ** 4;
+  return smoother(t);
 }
 
 function hash(value) {
@@ -67,7 +71,7 @@ export function getFlightSchedule(parts) {
 
 /**
  * All parts sweep in from the viewer's two sides, complete a single central
- * revolution, then assemble simultaneously. Geometry centers, rather than
+ * revolution while assembling simultaneously. Geometry centers, rather than
  * arbitrary modeling origins, orbit the Y axis so a tall casting stays readable.
  * Saved home poses are immutable; reversing or jumping the scrollbar is exact.
  */
@@ -147,12 +151,17 @@ export function createAssemblyFlight(parts, { stagger = true } = {}) {
   const startRotation = new Quaternion();
   const rotation = new Quaternion();
   const euler = new Euler();
-  let state = { progress: 0, assembledCount: 0, activeLabels: [], phase: 0, stage: 'arrival', totalParts: parts.length };
+  let state = { progress: 0, rotationProgress: 0, assemblyProgress: 0, assembledCount: 0, activeLabels: [], phase: 0, stage: 'arrival', totalParts: parts.length };
 
   function apply(value, camera) {
     const progress = clamp(value);
-    const stage = progress < VORTEX_TIMING.arrivalEnd ? 'arrival' : progress < VORTEX_TIMING.vortexEnd ? 'vortex' : progress < VORTEX_TIMING.assemblyEnd ? 'assembly' : 'complete';
+    const stage = progress < VORTEX_TIMING.arrivalEnd ? 'arrival' : progress < VORTEX_TIMING.assemblyStart ? 'vortex' : progress < VORTEX_TIMING.assemblyEnd ? 'assembly' : 'complete';
     const phase = { arrival: 0, vortex: 2, assembly: 4, complete: 5 }[stage];
+    const rotationClock = clamp((progressToScroll(progress) - progressToScroll(VORTEX_TIMING.arrivalEnd))
+      / (progressToScroll(VORTEX_TIMING.assemblyEnd) - progressToScroll(VORTEX_TIMING.arrivalEnd)));
+    const rotationProgress = windTurn(rotationClock);
+    const assemblyProgress = smoother(clamp((progress - VORTEX_TIMING.assemblyStart)
+      / (VORTEX_TIMING.assemblyEnd - VORTEX_TIMING.assemblyStart)));
     camera.updateWorldMatrix(true, false);
     camera.getWorldPosition(cameraPosition);
     right.setFromMatrixColumn(camera.matrixWorld, 0).normalize();
@@ -197,22 +206,26 @@ export function createAssemblyFlight(parts, { stagger = true } = {}) {
         startRotation.copy(orbitRotation).premultiply(spin);
         rotation.copy(startRotation).slerp(orbitRotation, t);
         size = 1 + (scale - 1) * t;
-      } else if (stage === 'vortex') {
-        const u = (progress - VORTEX_TIMING.arrivalEnd) / (VORTEX_TIMING.vortexEnd - VORTEX_TIMING.arrivalEnd);
-        const t = windTurn(u);
+      } else {
+        const u = rotationClock;
+        const t = rotationProgress;
         const envelope = Math.sin(Math.PI * u) ** 2;
         const phaseOffset = seed * TAU;
-        const angularDrift = .085 * Math.sin(TAU * u + phaseOffset) * envelope * envelope;
+        const angularDrift = .085 * Math.sin(TAU * u + phaseOffset) * envelope * envelope * (1 - assemblyProgress);
         const angle = entry.angle + TAU * t + angularDrift;
         const lift = (.20 + .16 * Math.sin(TAU * u + phaseOffset)) * envelope;
         const breathing = 1 + .035 * Math.sin(TAU * u * 1.3 + phaseOffset) * envelope;
         const orbitRadius = entry.orbitRadius * breathing + lift * .12;
         position.set(Math.cos(angle) * orbitRadius, entry.orbitY + lift, Math.sin(angle) * orbitRadius);
         turn.setFromAxisAngle(Y_AXIS, -(TAU * t + angularDrift));
-        rotation.copy(orbitRotation).premultiply(turn);
+        // Contract in the rotating frame so partially joined components keep
+        // turning together, then land at the exact saved home pose.
+        offset.copy(homeCenter).applyQuaternion(turn);
+        position.lerp(offset, assemblyProgress);
+        rotation.copy(orbitRotation).slerp(entry.rotation, assemblyProgress).premultiply(turn);
         // Independent small banks and tumbles read as entrained objects rather
         // than a rigid carousel. Heavy castings respond less than small rings.
-        const response = Math.max(.35, 1 - radius * .15);
+        const response = Math.max(.35, 1 - radius * .15) * (1 - assemblyProgress);
         euler.set(
           .24 * response * Math.sin(TAU * u * 1.2 + phaseOffset) * envelope,
           .14 * response * Math.sin(TAU * u * .8 + phaseOffset * 1.7) * envelope,
@@ -220,12 +233,7 @@ export function createAssemblyFlight(parts, { stagger = true } = {}) {
         );
         spin.setFromEuler(euler);
         rotation.premultiply(spin);
-        size = scale;
-      } else {
-        const t = smoother((progress - VORTEX_TIMING.vortexEnd) / (VORTEX_TIMING.assemblyEnd - VORTEX_TIMING.vortexEnd));
-        position.copy(orbitCenter).lerp(homeCenter, t);
-        rotation.copy(orbitRotation).slerp(entry.rotation, t);
-        size = scale + (1 - scale) * t;
+        size = scale + (1 - scale) * assemblyProgress;
       }
 
       // Keep rotated castings above the floor, accounting for offset origins.
@@ -239,7 +247,7 @@ export function createAssemblyFlight(parts, { stagger = true } = {}) {
     }
 
     const completed = stage === 'complete';
-    state = { progress, assembledCount: completed ? parts.length : 0,
+    state = { progress, rotationProgress, assemblyProgress, assembledCount: completed ? parts.length : 0,
       activeLabels: progress > 0 && !completed ? parts.map((part) => part.label) : [],
       phase, stage, totalParts: parts.length };
     return getState();

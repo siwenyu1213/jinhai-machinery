@@ -12,48 +12,48 @@ test('starts empty and real wheel scrolling advances and reverses the simultaneo
   await expect(page.locator('#first-hint')).toBeVisible();
   await page.mouse.move(300, 300);
   await page.mouse.wheel(0, 240);
-  await expect.poll(() => page.evaluate(() => window.__millDemo.getState().progress)).toBeGreaterThan(.15);
+  await expect.poll(() => page.evaluate(() => window.__millDemo.getState().progress)).toBeGreaterThan(.10);
   const forward = await page.evaluate(() => window.__millDemo.getState());
   expect(forward.assembledCount).toBe(0);
   expect(await page.evaluate(() => window.__millDemo.getParts().filter((part) => part.object.visible).length)).toBe(forward.totalParts);
   await page.mouse.wheel(0, -120);
-  await expect.poll(() => page.evaluate(() => window.__millDemo.getState().progress)).toBeLessThan(forward.progress - .05);
+  await expect.poll(() => page.evaluate(() => window.__millDemo.getState().progress)).toBeLessThan(forward.progress - .04);
   const backward = await page.evaluate(() => window.__millDemo.getState());
   expect(backward.assembledCount).toBe(0);
   await page.evaluate(() => window.__millDemo.setProgress(0));
   expect(await page.evaluate(() => window.__millDemo.getParts().filter((part) => part.object.visible).length)).toBe(0);
 });
 
-test('a short scroll path advances substantially per wheel step and finishes within fifteen steps', async ({ page }) => {
+test('a short scroll path advances substantially per wheel step and finishes within twenty steps', async ({ page }) => {
   await ready(page);
   const travel = await page.evaluate(() => ({ distance: document.documentElement.scrollHeight - innerHeight, height: innerHeight }));
-  expect(travel.distance).toBeLessThanOrEqual(travel.height * 1.92);
+  expect(travel.distance).toBeLessThanOrEqual(travel.height * 2.22);
   await page.mouse.move(200, 300);
   await page.mouse.wheel(0, 120);
-  await expect.poll(() => page.evaluate(() => window.__millDemo.getState().progress)).toBeGreaterThan(.07);
-  for (let step = 1; step < 15; step++) await page.mouse.wheel(0, 120);
+  await expect.poll(() => page.evaluate(() => window.__millDemo.getState().progress)).toBeGreaterThan(.05);
+  for (let step = 1; step < 20; step++) await page.mouse.wheel(0, 120);
   await expect(page.locator('#phase-name')).toHaveText('装配完成');
   const state = await page.evaluate(() => window.__millDemo.getState());
   expect(state.assembledCount).toBe(state.totalParts);
 });
 
-test('final assembly gets extra scroll time without slowing down the preceding vortex', async ({ page }) => {
+test('arrival and overlapping assembly receive extra physical scroll time', async ({ page }) => {
   await ready(page);
   const positions = [];
-  for (const progress of [.24, .76, .94]) {
+  for (const progress of [.24, .64, .94]) {
     await page.evaluate((value) => window.__millDemo.setProgress(value), progress);
     positions.push(await page.evaluate(() => scrollY / innerHeight));
   }
-  expect(positions[0]).toBeCloseTo(.24 * 1.4, 2);
-  expect(positions[1]).toBeCloseTo(.76 * 1.4, 2);
-  expect(positions[2] - positions[1]).toBeCloseTo((.94 - .76) * 1.4 * 3, 2);
+  expect(positions[0]).toBeCloseTo(.24 * 1.4 * 1.5, 2);
+  expect(positions[1] - positions[0]).toBeCloseTo((.64 - .24) * 1.4, 2);
+  expect(positions[2] - positions[1]).toBeCloseTo((.94 - .64) * 1.4 * 2.5, 2);
 });
 
 test('wheel release continues moving toward its target, supports reversal, and direct controls cancel the follow', async ({ page }) => {
   await ready(page);
   await page.mouse.move(200, 300);
   await page.mouse.wheel(0, 360);
-  await expect.poll(() => page.evaluate(() => window.__millDemo.getState().targetProgress)).toBeGreaterThan(.2);
+  await expect.poll(() => page.evaluate(() => window.__millDemo.getState().targetProgress)).toBeGreaterThan(.15);
   const samples = await page.evaluate(async () => {
     const entries = [];
     const start = performance.now();
@@ -92,7 +92,7 @@ test('wheel release continues moving toward its target, supports reversal, and d
 
 test('all components stay visible through the vortex and assemble together once', async ({ page }) => {
   await ready(page);
-  for (const [progress, label, stage] of [[.25, '中央旋绕', 'vortex'], [.6, '中央旋绕', 'vortex'], [.8, '同步组装', 'assembly']]) {
+  for (const [progress, label, stage] of [[.25, '中央旋绕', 'vortex'], [.6, '中央旋绕', 'vortex'], [.8, '旋转组装', 'assembly']]) {
     await page.evaluate((value) => window.__millDemo.setProgress(value), progress);
     await expect(page.locator('#phase-name')).toHaveText(label);
     const state = await page.evaluate(() => window.__millDemo.getState());
@@ -107,9 +107,31 @@ test('all components stay visible through the vortex and assemble together once'
   expect(final.exact).toBe(true);
 });
 
+test('components keep visibly rotating while simultaneously converging to their assembled sizes', async ({ page }) => {
+  await ready(page);
+  const samples = [];
+  for (const progress of [.72, .78, .84]) {
+    await page.evaluate((value) => window.__millDemo.setProgress(value), progress);
+    samples.push(await page.evaluate(() => {
+      const base = window.__millDemo.getParts().find((part) => part.id === 'base').object;
+      return { state: window.__millDemo.getState(), quaternion: base.quaternion.toArray(), scale: base.scale.x };
+    }));
+  }
+  for (let index = 1; index < samples.length; index++) {
+    const before = samples[index - 1], after = samples[index];
+    expect(after.state.stage).toBe('assembly');
+    expect(after.state.rotationProgress).toBeGreaterThan(before.state.rotationProgress);
+    expect(after.state.rotationProgress).toBeLessThan(1);
+    expect(after.state.assemblyProgress).toBeGreaterThan(before.state.assemblyProgress);
+    expect(after.scale).toBeGreaterThan(before.scale);
+    const dot = Math.abs(before.quaternion.reduce((sum, value, component) => sum + value * after.quaternion[component], 0));
+    expect(2 * Math.acos(Math.min(1, dot))).toBeGreaterThan(.15);
+  }
+});
+
 test('the vortex fills both sides at several heights and stays readable within the viewport', async ({ page }, testInfo) => {
   await ready(page);
-  for (const progress of [.24, .37, .5, .63, .76]) {
+  for (const progress of [.24, .33, .42, .52, .63]) {
     await page.evaluate((value) => window.__millDemo.setProgress(value), progress);
     const distribution = await page.evaluate(() => {
       const camera = window.__millDemo.getCamera();

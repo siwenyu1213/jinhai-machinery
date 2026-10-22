@@ -12,7 +12,7 @@ const phaseName = document.querySelector('#phase-name');
 const activePart = document.querySelector('#active-part');
 const firstHint = document.querySelector('#first-hint');
 const reducedQuery = matchMedia('(prefers-reduced-motion: reduce)');
-const stageNames = { arrival: '两侧飞入', vortex: '中央旋绕', assembly: '同步组装', complete: '装配完成' };
+const stageNames = { arrival: '两侧飞入', vortex: '中央旋绕', assembly: '旋转组装', complete: '装配完成' };
 const clamp = (value) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
 const smooth = (value) => { const t = clamp(value); return t * t * (3 - 2 * t); };
 const cameraTarget = new THREE.Vector3();
@@ -54,7 +54,7 @@ function describe() {
   const descriptions = {
     arrival: `${state.totalParts} 个组件同时从两侧飞入`,
     vortex: `${state.totalParts} 个组件在中央旋绕一圈`,
-    assembly: '所有组件一起对准安装位置',
+    assembly: '所有组件边旋转边收拢到安装位置',
     complete: inspection ? '外壳已透视，可观察内部组件' : '所有组件已就位',
   };
   activePart.textContent = progress === 0 ? '' : descriptions[state.stage];
@@ -171,7 +171,7 @@ function invalidate() {
 
 function updateCameraForProgress() {
   const entering = smooth((progress - .1) / (VORTEX_TIMING.arrivalEnd - .1));
-  const leaving = 1 - smooth((progress - VORTEX_TIMING.vortexEnd) / (VORTEX_TIMING.assemblyEnd - VORTEX_TIMING.vortexEnd));
+  const leaving = 1 - smooth((progress - VORTEX_TIMING.assemblyStart) / (VORTEX_TIMING.assemblyEnd - VORTEX_TIMING.assemblyStart));
   const pullback = host.clientWidth < 600 && !reducedQuery.matches ? .2 * entering * leaving : 0;
   const distance = completeCameraDistance * (1 + pullback);
   camera.position.copy(cameraTarget).addScaledVector(cameraEye, distance);
@@ -210,7 +210,7 @@ function fitCamera() {
   // Keep the machine untouched while the distant floor fades into the backdrop.
   // The mobile fit places the camera farther away, so anchor fog to that distance.
   updateCameraForProgress();
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
+  renderer.setPixelRatio(Math.min(devicePixelRatio, narrow ? 1.35 : 1.5));
   renderer.setSize(width, height, false);
   invalidate();
 }
@@ -242,7 +242,7 @@ try {
   const key = new THREE.DirectionalLight(0xffffff, 3.2);
   key.position.set(7, 15, 9);
   key.castShadow = true;
-  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.mapSize.set(1024, 1024);
   Object.assign(key.shadow.camera, { left: -12, right: 12, top: 13, bottom: -10, near: .5, far: 50 });
   key.shadow.normalBias = .025;
   key.shadow.bias = -.0002;
