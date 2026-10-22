@@ -50,6 +50,13 @@ function hash(value) {
   return (number >>> 0) / 4294967295;
 }
 
+// Stagger travel along the existing curve, never move its control points.
+// The bounded, monotonic time warp shares the same start and arrival instant.
+export function staggerArrival(value, id) {
+  const progress = clamp(value);
+  return progress + (hash(id + '-arrival') - .5) * .32 * Math.sin(Math.PI * progress) ** 2;
+}
+
 /** Every component shares one arrival, one revolution and one assembly window. */
 export function getFlightSchedule(parts) {
   return parts.map((part, index) => ({
@@ -64,7 +71,7 @@ export function getFlightSchedule(parts) {
  * arbitrary modeling origins, orbit the Y axis so a tall casting stays readable.
  * Saved home poses are immutable; reversing or jumping the scrollbar is exact.
  */
-export function createAssemblyFlight(parts) {
+export function createAssemblyFlight(parts, { stagger = true } = {}) {
   if (new Set(parts.map((part) => part.id)).size !== parts.length) throw new Error('Assembly part IDs must be unique.');
   const schedule = getFlightSchedule(parts);
   const entries = parts.map((part, index) => {
@@ -167,7 +174,8 @@ export function createAssemblyFlight(parts) {
 
       let size;
       if (stage === 'arrival') {
-        const t = smoother(progress / VORTEX_TIMING.arrivalEnd);
+        const arrival = progress / VORTEX_TIMING.arrivalEnd;
+        const t = smoother(stagger ? staggerArrival(arrival, part.id) : arrival);
         relative.copy(orbitCenter).sub(cameraPosition);
         const targetDepth = Math.max(camera.near * 12, relative.dot(forward));
         const nearDepth = Math.max(camera.near * 10, Math.min(targetDepth * .54, Math.max(targetDepth * .19, radius * 1.7)));

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Box3, BoxGeometry, Group, Mesh, MeshBasicMaterial, PerspectiveCamera, Vector3 } from 'three';
-import { createAssemblyFlight, getFlightSchedule, VORTEX_TIMING, progressToScroll, scrollToProgress, followScroll } from '../../demos/mill-assembly/motion.js';
+import { createAssemblyFlight, getFlightSchedule, VORTEX_TIMING, progressToScroll, scrollToProgress, followScroll, staggerArrival } from '../../demos/mill-assembly/motion.js';
 import { createMill } from '../../demos/mill-assembly/model.js';
 
 function cameraFor(aspect = 16 / 9) {
@@ -258,6 +258,86 @@ test('camera-relative arrivals follow rotated cameras and resized viewports', ()
       assert.ok(ndc.z > -1 && ndc.z < 1);
     });
   }
+});
+
+test('small arrival timing offsets remain monotonic and follow exactly the original spatial and rotation paths', () => {
+  const original = createMill();
+  const adjusted = createMill();
+  const reference = createAssemblyFlight(original.parts, { stagger: false });
+  const flight = createAssemblyFlight(adjusted.parts);
+  const camera = cameraFor();
+  try {
+    for (const part of adjusted.parts) {
+      assert.equal(staggerArrival(0, part.id), 0);
+      assert.equal(staggerArrival(1, part.id), 1);
+      let previous = 0;
+      for (let step = 1; step <= 100; step++) {
+        const travel = staggerArrival(step / 100, part.id);
+        assert.ok(travel > previous && travel <= 1);
+        assert.ok(Math.abs(travel - step / 100) <= .16);
+        previous = travel;
+      }
+    }
+    for (const progress of [.03, .06, .10, .14, .18, .22]) {
+      flight.apply(progress, camera);
+      adjusted.parts.forEach((part, index) => {
+        reference.apply(staggerArrival(progress / VORTEX_TIMING.arrivalEnd, part.id) * VORTEX_TIMING.arrivalEnd, camera);
+        const baseline = original.parts[index].object;
+        assert.ok(part.object.position.distanceTo(baseline.position) < 1e-10, part.id + ' must remain on the original path');
+        assert.ok(part.object.quaternion.angleTo(baseline.quaternion) < 1e-7);
+        assert.ok(part.object.scale.distanceTo(baseline.scale) < 1e-10);
+      });
+    }
+    for (const progress of [.24, .5, .76, .85, .94, 1]) {
+      flight.apply(progress, camera);
+      reference.apply(progress, camera);
+      assert.deepEqual(transforms(adjusted.parts), transforms(original.parts));
+    }
+  } finally { original.dispose(); adjusted.dispose(); }
+});
+
+test('staggering reduces substantial screen occlusion during the incoming flight without rerouting components', () => {
+  const model = createMill();
+  const flight = createAssemblyFlight(model.parts);
+  const reference = createMill();
+  const originalFlight = createAssemblyFlight(reference.parts, { stagger: false });
+  function overlaps(parts, camera) {
+    const point = new Vector3();
+    const boxes = parts.map(({ object }) => {
+      object.updateWorldMatrix(true, true);
+      const b = { x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity };
+      object.traverse((mesh) => {
+        if (!mesh.isMesh) return;
+        const vertices = mesh.geometry.attributes.position;
+        for (let index = 0; index < vertices.count; index++) {
+          point.fromBufferAttribute(vertices, index).applyMatrix4(mesh.matrixWorld).project(camera);
+          b.x0 = Math.min(b.x0, point.x); b.x1 = Math.max(b.x1, point.x);
+          b.y0 = Math.min(b.y0, point.y); b.y1 = Math.max(b.y1, point.y);
+        }
+      });
+      return { x0: Math.max(-1, b.x0), x1: Math.min(1, b.x1), y0: Math.max(-.75, b.y0), y1: Math.min(.8, b.y1) };
+    }).filter((b) => b.x1 > b.x0 && b.y1 > b.y0);
+    let count = 0;
+    for (let a = 0; a < boxes.length; a++) for (let b = a + 1; b < boxes.length; b++) {
+      const first = boxes[a], second = boxes[b];
+      const intersection = Math.max(0, Math.min(first.x1, second.x1) - Math.max(first.x0, second.x0))
+        * Math.max(0, Math.min(first.y1, second.y1) - Math.max(first.y0, second.y0));
+      const area = Math.min((first.x1 - first.x0) * (first.y1 - first.y0), (second.x1 - second.x0) * (second.y1 - second.y0));
+      if (intersection / area > .25) count++;
+    }
+    return count;
+  }
+  try {
+    let before = 0, after = 0;
+    for (const aspect of [1.6, 2.5, 375 / 812]) for (const progress of [.06, .08, .10, .12, .14, .16]) {
+      const camera = cameraFor(aspect);
+      originalFlight.apply(progress, camera);
+      flight.apply(progress, camera);
+      before += overlaps(reference.parts, camera);
+      after += overlaps(model.parts, camera);
+    }
+    assert.ok(after < before * .8, `Substantial overlap samples should decrease: ${before} -> ${after}`);
+  } finally { model.dispose(); reference.dispose(); }
 });
 
 test('stage boundaries are continuous and reversing or jumping never accumulates drift', () => {
