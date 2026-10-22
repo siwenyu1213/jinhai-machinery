@@ -1,10 +1,9 @@
 import { services, steps } from '../data/catalog.js';
 
-let manualStep = false;
+let currentStep = 0;
 
 export function showStep(index, announce = false) {
-  if (announce) manualStep = true;
-  else if (manualStep) return;
+  currentStep = index;
   const stage = document.querySelector('.process-visual');
   stage.dataset.processStep = String(index);
   document.querySelectorAll('[data-step]').forEach((button) => button.setAttribute('aria-pressed', String(Number(button.dataset.step) === index)));
@@ -22,13 +21,21 @@ export function showStep(index, announce = false) {
 }
 
 export function initWorkbench() {
-  const resumeScroll = () => { manualStep = false; };
-  window.addEventListener('wheel', resumeScroll, { passive: true });
-  window.addEventListener('touchmove', resumeScroll, { passive: true });
-  window.addEventListener('keydown', (event) => {
-    if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End', ' '].includes(event.key)
-      && !event.target.closest('button, input, textarea, select, dialog')) resumeScroll();
+  let playbackTimer;
+  let paused = false;
+  const playback = document.querySelector('#process-playback');
+  const restartPlayback = () => {
+    window.clearInterval(playbackTimer);
+    if (!paused && !document.hidden) {
+      playbackTimer = window.setInterval(() => showStep((currentStep + 1) % steps.length), 3000);
+    }
+  };
+  playback.addEventListener('click', () => {
+    paused = !paused;
+    playback.textContent = paused ? '继续播放' : '3 秒轮播 · 暂停';
+    restartPlayback();
   });
+  document.addEventListener('visibilitychange', restartPlayback);
   document.querySelectorAll('[data-service]').forEach((button) => button.addEventListener('click', () => {
     const service = services[button.dataset.service];
     document.querySelectorAll('[data-service]').forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
@@ -47,6 +54,10 @@ export function initWorkbench() {
     document.querySelectorAll('[data-equipment]').forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
     document.querySelectorAll('[data-kind]').forEach((row) => { row.hidden = button.dataset.equipment !== 'all' && row.dataset.kind !== button.dataset.equipment; });
   }));
-  document.querySelectorAll('[data-step]').forEach((button) => button.addEventListener('click', () => showStep(Number(button.dataset.step), true)));
+  document.querySelectorAll('[data-step]').forEach((button) => button.addEventListener('click', () => {
+    showStep(Number(button.dataset.step), true);
+    restartPlayback();
+  }));
   showStep(0);
+  restartPlayback();
 }

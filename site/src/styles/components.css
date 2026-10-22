@@ -22,6 +22,7 @@
 .process-steps button { border-color: #63736b; color: #e6ece8; }
 .process-steps button[aria-pressed=true] { background: var(--orange-light); border-color: var(--orange-light); color: var(--ink); }
 .filter-bar button[aria-pressed=true] { background: var(--blue); border-color: var(--blue); color: #fff; }
+.process-playback { min-height: 44px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 4px; }
 .process-description { font-size: 14px; min-height: 3.6em; }
 .process-photo-frame > img:not([hidden]) { animation: photo-arrive 260ms var(--ease) both; }
 @keyframes photo-arrive { from { opacity: .65; } to { opacity: 1; } }

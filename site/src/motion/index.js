@@ -1,7 +1,5 @@
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { showStep } from '../ui/workbench.js';
-import { steps } from '../data/catalog.js';
 import { attachAssemblyScroll } from '../ui/assembly.js';
 
 gsap.registerPlugin(ScrollTrigger);
@@ -15,11 +13,7 @@ export function createMotion() {
       gsap.from(heading, { scrollTrigger: { trigger: heading, start: 'top 92%', once: true }, y: 24, opacity: .4, duration: .7, ease: 'power2.out', clearProps: 'transform,opacity' });
     });
     const releaseAssembly = attachAssemblyScroll(ScrollTrigger);
-    const media = gsap.matchMedia();
-    media.add('(min-width: 900px)', () => {
-      ScrollTrigger.create({ trigger: '#process', start: 'top 45%', end: 'bottom 30%', onUpdate: (self) => showStep(Math.min(steps.length - 1, Math.floor(self.progress * steps.length))) });
-    });
-    return () => { releaseAssembly(); media.revert(); };
+    return () => { releaseAssembly(); };
   });
   const change = () => {
     gsap.killTweensOf('#service-image');

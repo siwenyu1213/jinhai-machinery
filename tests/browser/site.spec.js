@@ -193,3 +193,60 @@ test('animation chunk failure leaves functional UI available', async ({ page }) 
   await page.getByRole('button', { name: '拆解', exact: true }).click();
   await expect(page.locator('#assembly')).toHaveAttribute('data-spread', '1.000');
 });
+
+
+test('process autoplay advances every three seconds, wraps and resets after manual selection', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('./');
+  await expect(page.locator('html')).toHaveAttribute('data-ready', 'true');
+  await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now() + 5000)));
+  await page.locator('[data-step="0"]').evaluate((button) => button.click());
+  await page.clock.runFor(2999);
+  await expect(page.locator('#process-current')).toHaveText('01');
+  await page.clock.runFor(1);
+  await expect(page.locator('#process-current')).toHaveText('02');
+  await expect(page.locator('[data-step="1"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('[data-process-photo]:not([hidden])')).toHaveAttribute('data-process-photo', '1');
+  await expect(page.locator('#process-credit')).toHaveAttribute('href', /thdb7o0nLyc$/);
+  await expect(page.locator('#process-description')).toHaveAttribute('aria-live', 'off');
+  await page.clock.runFor(3000);
+  await expect(page.locator('#process-current')).toHaveText('03');
+  await page.clock.runFor(3000);
+  await expect(page.locator('#process-current')).toHaveText('01');
+  await page.clock.runFor(2000);
+  await page.locator('[data-step="2"]').evaluate((button) => button.click());
+  await page.clock.runFor(2999);
+  await expect(page.locator('#process-current')).toHaveText('03');
+  await page.clock.runFor(1);
+  await expect(page.locator('#process-current')).toHaveText('01');
+});
+
+test('process scrolling never selects images and playback can pause and resume', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.clock.install();
+  await page.goto('./');
+  await expect(page.locator('html')).toHaveAttribute('data-motion', 'full');
+  await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now() + 5000)));
+  await page.locator('[data-step="1"]').evaluate((button) => button.click());
+  // Trigger the former wheel/touch/key reset paths and traverse the old ScrollTrigger range.
+  await page.evaluate(() => {
+    window.dispatchEvent(new WheelEvent('wheel', { deltaY: 300 }));
+    window.dispatchEvent(new Event('touchmove'));
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'PageDown', bubbles: true }));
+    document.querySelector('#process').scrollIntoView({ behavior: 'instant', block: 'end' });
+  });
+  await page.clock.runFor(100);
+  await expect(page.locator('#process-current')).toHaveText('02');
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+  await page.clock.runFor(100);
+  await expect(page.locator('#process-current')).toHaveText('02');
+  await page.locator('#process-playback').evaluate((button) => button.click());
+  await expect(page.locator('#process-playback')).toHaveText('继续播放');
+  await page.clock.runFor(9000);
+  await expect(page.locator('#process-current')).toHaveText('02');
+  await page.locator('#process-playback').evaluate((button) => button.click());
+  await page.clock.runFor(2999);
+  await expect(page.locator('#process-current')).toHaveText('02');
+  await page.clock.runFor(1);
+  await expect(page.locator('#process-current')).toHaveText('03');
+});
