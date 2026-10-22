@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Box3, BoxGeometry, Group, Mesh, MeshBasicMaterial, PerspectiveCamera, Vector3 } from 'three';
-import { createAssemblyFlight, getFlightSchedule, VORTEX_TIMING } from '../../demos/mill-assembly/motion.js';
+import { createAssemblyFlight, getFlightSchedule, VORTEX_TIMING, progressToScroll, scrollToProgress } from '../../demos/mill-assembly/motion.js';
 import { createMill } from '../../demos/mill-assembly/model.js';
 
 function cameraFor(aspect = 16 / 9) {
@@ -53,6 +53,26 @@ function covarianceAxisRatio(points) {
   const discriminant = Math.hypot(xx - yy, 2 * xy);
   return (trace - discriminant) / Math.max(Number.EPSILON, trace + discriminant);
 }
+
+test('only the final assembly receives twice the physical scroll while input mappings stay reversible', () => {
+  const span = 1.18;
+  for (const progress of [0, .12, .24, .5, .76]) {
+    assert.ok(Math.abs(progressToScroll(progress) * span - progress) < 1e-12,
+      'The arrival and vortex must keep their previous physical scroll positions');
+  }
+  const assemblyDistance = (progressToScroll(.94) - progressToScroll(.76)) * span;
+  assert.ok(Math.abs(assemblyDistance - 2 * (.94 - .76)) < 1e-12);
+  for (let step = 0; step <= 1000; step++) {
+    const progress = step / 1000;
+    assert.ok(Math.abs(scrollToProgress(progressToScroll(progress)) - progress) < 1e-12);
+  }
+  assert.equal(progressToScroll(1), 1);
+  assert.equal(scrollToProgress(1), 1);
+  for (const value of [NaN, Infinity, -1]) {
+    assert.equal(progressToScroll(value), 0);
+    assert.equal(scrollToProgress(value), 0);
+  }
+});
 
 test('all components enter together, remain visible, and complete assembly at one shared instant', () => {
   const { flight, parts, camera } = fixture();

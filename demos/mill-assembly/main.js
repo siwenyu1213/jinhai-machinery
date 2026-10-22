@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createMill } from './model.js';
-import { createAssemblyFlight, VORTEX_TIMING } from './motion.js';
+import { createAssemblyFlight, VORTEX_TIMING, progressToScroll, scrollToProgress } from './motion.js';
 
 const stage = document.querySelector('#mill-stage');
 const host = document.querySelector('#scene');
@@ -30,7 +30,7 @@ function scrollLength() { return Math.max(1, document.documentElement.scrollHeig
 
 function setProgress(value) {
   progress = clamp(Number(value));
-  window.scrollTo({ top: progress * scrollLength(), behavior: 'instant' });
+  window.scrollTo({ top: progressToScroll(progress) * scrollLength(), behavior: 'instant' });
   draw();
 }
 
@@ -245,7 +245,7 @@ try {
   ready = true;
   stage.dataset.renderer = 'ready';
   fitCamera();
-  progress = clamp(window.scrollY / scrollLength());
+  progress = scrollToProgress(window.scrollY / scrollLength());
   draw();
   renderer.domElement.addEventListener('webglcontextlost', (event) => { event.preventDefault(); fallback(new Error('WebGL context lost')); });
 } catch (error) { fallback(error); }
@@ -265,7 +265,7 @@ slider.addEventListener('input', () => setProgress(Number(slider.value) / 1000))
 document.querySelector('#replay').addEventListener('click', () => setProgress(0));
 document.querySelector('#complete').addEventListener('click', () => setProgress(1));
 document.querySelector('#inspect').addEventListener('click', () => setInspection(!inspection));
-window.addEventListener('scroll', () => { progress = clamp(scrollY / scrollLength()); invalidate(); }, { passive: true });
+window.addEventListener('scroll', () => { progress = scrollToProgress(scrollY / scrollLength()); invalidate(); }, { passive: true });
 window.addEventListener('resize', fitCamera);
 function updateMotionPreference() {
   document.body.dataset.motion = reducedQuery.matches ? 'reduced' : 'full';

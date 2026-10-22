@@ -5,6 +5,26 @@ const TAU = Math.PI * 2;
 const Y_AXIS = new Vector3(0, 1, 0);
 const clamp = (value) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
 const smoother = (value) => value * value * value * (value * (value * 6 - 15) + 10);
+const ASSEMBLY_SCROLL_SCALE = 2;
+const EXTRA_ASSEMBLY_SCROLL = (VORTEX_TIMING.assemblyEnd - VORTEX_TIMING.vortexEnd) * (ASSEMBLY_SCROLL_SCALE - 1);
+const SCROLL_SPAN = 1 + EXTRA_ASSEMBLY_SCROLL;
+
+// Stretch only the physical scroll allotted to the final assembly. Earlier
+// flight and rotation keep the same poses at the same scroll distances.
+export function progressToScroll(value) {
+  const progress = clamp(value);
+  const extra = Math.min(Math.max(0, progress - VORTEX_TIMING.vortexEnd),
+    VORTEX_TIMING.assemblyEnd - VORTEX_TIMING.vortexEnd) * (ASSEMBLY_SCROLL_SCALE - 1);
+  return (progress + extra) / SCROLL_SPAN;
+}
+
+export function scrollToProgress(value) {
+  const travel = clamp(value) * SCROLL_SPAN;
+  const assemblyTravelEnd = VORTEX_TIMING.assemblyEnd + EXTRA_ASSEMBLY_SCROLL;
+  if (travel <= VORTEX_TIMING.vortexEnd) return travel;
+  if (travel < assemblyTravelEnd) return VORTEX_TIMING.vortexEnd + (travel - VORTEX_TIMING.vortexEnd) / ASSEMBLY_SCROLL_SCALE;
+  return clamp(travel - EXTRA_ASSEMBLY_SCROLL);
+}
 
 // One revolution with a pronounced slow-fast-slow response to equal scroll
 // increments. Its symmetric velocity peaks at the middle and reaches zero at

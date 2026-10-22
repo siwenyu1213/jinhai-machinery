@@ -45,7 +45,8 @@ h1 { font-size: 22px; font-weight: 600; line-height: 1.4; letter-spacing: -.035e
 .actions button:last-child { border-color: var(--line); }
 .actions button[aria-pressed="true"] { background: var(--surface); border-color: var(--line); }
 .actions button:hover { background: var(--surface); }
-.scroll-track { height: 240vh; height: 240svh; }
+/* 1.4 screens plus 0.252 screens dedicated to slower final assembly. */
+.scroll-track { height: 265.2vh; height: 265.2svh; }
 .fallback { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(520px, calc(100% - 48px)); max-height: calc(100% - 260px); overflow: auto; padding: 24px; background: var(--surface); }
 .fallback h2 { font-size: 20px; font-weight: 600; }
 .fallback p, .fallback ol { font-size: 14px; color: var(--muted); margin-top: 12px; }

@@ -27,7 +27,7 @@ test('starts empty and real wheel scrolling advances and reverses the simultaneo
 test('a short scroll path advances substantially per wheel step and finishes within twelve steps', async ({ page }) => {
   await ready(page);
   const travel = await page.evaluate(() => ({ distance: document.documentElement.scrollHeight - innerHeight, height: innerHeight }));
-  expect(travel.distance).toBeLessThanOrEqual(travel.height * 1.5);
+  expect(travel.distance).toBeLessThanOrEqual(travel.height * 1.7);
   await page.mouse.move(200, 300);
   await page.mouse.wheel(0, 120);
   await expect.poll(() => page.evaluate(() => window.__millDemo.getState().progress)).toBeGreaterThan(.07);
@@ -35,6 +35,18 @@ test('a short scroll path advances substantially per wheel step and finishes wit
   await expect(page.locator('#phase-name')).toHaveText('装配完成');
   const state = await page.evaluate(() => window.__millDemo.getState());
   expect(state.assembledCount).toBe(state.totalParts);
+});
+
+test('final assembly gets extra scroll time without slowing down the preceding vortex', async ({ page }) => {
+  await ready(page);
+  const positions = [];
+  for (const progress of [.24, .76, .94]) {
+    await page.evaluate((value) => window.__millDemo.setProgress(value), progress);
+    positions.push(await page.evaluate(() => scrollY / innerHeight));
+  }
+  expect(positions[0]).toBeCloseTo(.24 * 1.4, 2);
+  expect(positions[1]).toBeCloseTo(.76 * 1.4, 2);
+  expect(positions[2] - positions[1]).toBeCloseTo((.94 - .76) * 1.4 * 2, 2);
 });
 
 test('all components stay visible through the vortex and assemble together once', async ({ page }) => {
