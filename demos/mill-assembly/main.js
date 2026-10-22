@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createMill } from './model.js';
-import { createAssemblyFlight } from './motion.js';
+import { createAssemblyFlight, VORTEX_TIMING } from './motion.js';
 
 const stage = document.querySelector('#mill-stage');
 const host = document.querySelector('#scene');
@@ -12,12 +12,15 @@ const phaseName = document.querySelector('#phase-name');
 const activePart = document.querySelector('#active-part');
 const firstHint = document.querySelector('#first-hint');
 const reducedQuery = matchMedia('(prefers-reduced-motion: reduce)');
-const phases = ['床身与升降机构', '工作台与进给机构', '炮塔与滑枕', '主轴与轴承', '机头与动力传动', '手轮与刀具'];
+const stageNames = { arrival: '两侧飞入', vortex: '中央旋绕', assembly: '同步组装', complete: '装配完成' };
 const clamp = (value) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
 let renderer, scene, camera, model, flight, frame = 0, progress = 0;
 let state = { progress: 0, assembledCount: 0, activeLabels: [], phase: 0, totalParts: 0 };
 let ready = false;
 let disposed = false;
+let inspection = false;
+const covers = [];
+const inspectionMaterials = new Set();
 
 function scrollLength() { return Math.max(1, document.documentElement.scrollHeight - innerHeight); }
 
@@ -32,13 +35,20 @@ function describe() {
   stage.dataset.assembled = String(state.assembledCount);
   stage.dataset.phase = String(state.phase);
   slider.value = String(Math.round(progress * 1000));
-  slider.setAttribute('aria-valuetext', `${Math.round(progress * 100)}%，${progress === 1 ? '装配完成' : phases[state.phase]}`);
+  stage.dataset.stage = state.stage;
+  slider.setAttribute('aria-valuetext', `${Math.round(progress * 100)}%，${progress === 0 ? '等待滚动' : stageNames[state.stage]}`);
   output.value = `${Math.round(progress * 100)}%`;
   count.textContent = String(state.assembledCount);
   total.textContent = String(state.totalParts || '—');
-  phaseName.textContent = progress === 0 ? '等待第一件' : progress === 1 ? '装配完成' : phases[state.phase];
+  phaseName.textContent = progress === 0 ? '等待滚动' : stageNames[state.stage];
   firstHint.hidden = progress > .005 || !ready;
-  activePart.textContent = progress === 1 ? '所有组件已就位' : state.activeLabels.join(' / ');
+  const descriptions = {
+    arrival: `${state.totalParts} 个组件同时从两侧飞入`,
+    vortex: `${state.totalParts} 个组件在中央旋绕一圈`,
+    assembly: '所有组件一起对准安装位置',
+    complete: inspection ? '外壳已透视，可观察内部组件' : '所有组件已就位',
+  };
+  activePart.textContent = progress === 0 ? '' : descriptions[state.stage];
 }
 
 function draw() {
@@ -47,16 +57,88 @@ function draw() {
   flight.apply(progress, camera);
   state = flight.getState();
   if (reducedQuery.matches) {
-    // Reduced motion shows completed steps immediately, without near-camera flights.
+    // Reduced motion switches once into the complete assembly, skipping all flights.
     for (const part of model.parts) {
-      part.object.visible = part.object.visible && part.object.position.distanceToSquared(part.homePosition) < 1e-10
-        && part.object.quaternion.angleTo(part.homeQuaternion) < 1e-6;
+      part.object.visible = progress >= VORTEX_TIMING.assemblyEnd;
+      part.object.position.copy(part.homePosition);
+      part.object.quaternion.copy(part.homeQuaternion);
+      part.object.scale.set(1, 1, 1);
     }
     state = { ...state, activeLabels: [] };
   }
   model.root.updateMatrixWorld(true);
   renderer.render(scene, camera);
   describe();
+}
+
+function setInspection(value) {
+  inspection = Boolean(value);
+  for (const cover of covers) {
+    cover.object.material = inspection ? cover.transparent : cover.original;
+    cover.object.castShadow = inspection ? false : cover.castShadow;
+  }
+  const button = document.querySelector('#inspect');
+  button.setAttribute('aria-pressed', String(inspection));
+  button.textContent = inspection ? '恢复外壳' : '查看内部';
+  invalidate();
+}
+
+function prepareInspection() {
+  const cache = new Map();
+  const translucent = (material) => {
+    if (!cache.has(material)) {
+      const copy = material.clone();
+      copy.transparent = true;
+      copy.opacity = .16;
+      copy.depthWrite = false;
+      cache.set(material, copy);
+      inspectionMaterials.add(copy);
+    }
+    return cache.get(material);
+  };
+  for (const part of model.parts) {
+    if (!part.object.userData.isCover) continue;
+    part.object.traverse((object) => {
+      if (!object.isMesh) return;
+      const original = object.material;
+      covers.push({ object, original, castShadow: object.castShadow, transparent: Array.isArray(original) ? original.map(translucent) : translucent(original) });
+    });
+  }
+}
+
+function inspectPart(id) {
+  const part = model?.parts.find((candidate) => candidate.id === id);
+  if (!part || !camera) return null;
+  model.root.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(part.object);
+  const projected = [];
+  for (let x = 0; x < 2; x++) for (let y = 0; y < 2; y++) for (let z = 0; z < 2; z++) {
+    projected.push(new THREE.Vector3(x ? box.max.x : box.min.x, y ? box.max.y : box.min.y, z ? box.max.z : box.min.z).project(camera));
+  }
+  const minX = Math.min(...projected.map((point) => point.x));
+  const maxX = Math.max(...projected.map((point) => point.x));
+  const minY = Math.min(...projected.map((point) => point.y));
+  const maxY = Math.max(...projected.map((point) => point.y));
+  const ray = new THREE.Raycaster();
+  let exposedSamples = 0;
+  function owner(object) {
+    while (object && object.parent !== model.root) object = object.parent;
+    return object;
+  }
+  for (let x = 0; x < 9; x++) for (let y = 0; y < 15; y++) {
+    ray.setFromCamera(new THREE.Vector2(THREE.MathUtils.lerp(minX, maxX, (x + .5) / 9), THREE.MathUtils.lerp(minY, maxY, (y + .5) / 15)), camera);
+    const hit = ray.intersectObject(model.root, true).find((entry) => {
+      let current = entry.object;
+      while (current && current !== model.root) {
+        if (!current.visible) return false;
+        current = current.parent;
+      }
+      const material = entry.object.material;
+      return !(!Array.isArray(material) && material.transparent && material.opacity < .3);
+    });
+    if (hit && owner(hit.object) === part.object) exposedSamples++;
+  }
+  return { id, visible: part.object.visible, projectedBounds: { minX, maxX, minY, maxY }, exposedSamples };
 }
 
 function invalidate() { if (!frame && ready && !disposed) frame = requestAnimationFrame(draw); }
@@ -143,6 +225,7 @@ try {
   model = createMill();
   scene.add(model.root);
   model.root.traverse((object) => { if (object.isMesh) { object.castShadow = true; object.receiveShadow = true; } });
+  prepareInspection();
   bounds = new THREE.Box3().setFromObject(model.root);
   flight = createAssemblyFlight(model.parts);
   ready = true;
@@ -155,21 +238,24 @@ try {
 
 window.__millDemo = {
   setProgress,
-  getState: () => ({ ...state, activeLabels: [...state.activeLabels], progress, ready, renderer: stage.dataset.renderer, reducedMotion: reducedQuery.matches }),
+  getState: () => ({ ...state, activeLabels: [...state.activeLabels], progress, ready, renderer: stage.dataset.renderer, reducedMotion: reducedQuery.matches, inspection }),
   getParts: () => model?.parts,
   getCamera: () => camera,
   getBounds: () => bounds?.clone(),
   getScene: () => scene,
+  inspectPart,
+  setInspection,
 };
 
 slider.addEventListener('input', () => setProgress(Number(slider.value) / 1000));
 document.querySelector('#replay').addEventListener('click', () => setProgress(0));
 document.querySelector('#complete').addEventListener('click', () => setProgress(1));
+document.querySelector('#inspect').addEventListener('click', () => setInspection(!inspection));
 window.addEventListener('scroll', () => { progress = clamp(scrollY / scrollLength()); invalidate(); }, { passive: true });
 window.addEventListener('resize', fitCamera);
 function updateMotionPreference() {
   document.body.dataset.motion = reducedQuery.matches ? 'reduced' : 'full';
-  if (ready) document.querySelector('#interaction-hint').textContent = reducedQuery.matches ? '减少动效 · 拖动进度查看装配阶段' : '滚动，逐件组装';
+  if (ready) document.querySelector('#interaction-hint').textContent = reducedQuery.matches ? '减少动效 · 拖动进度查看完成状态' : '滚动，飞入、旋绕、一起组装';
   invalidate();
 }
 reducedQuery.addEventListener('change', updateMotionPreference);
@@ -179,6 +265,7 @@ window.addEventListener('pagehide', () => {
   cancelAnimationFrame(frame);
   model?.root.removeFromParent();
   model?.dispose();
+  for (const material of inspectionMaterials) material.dispose();
   scene?.traverse((object) => {
     if (object.isMesh) {
       object.geometry?.dispose();

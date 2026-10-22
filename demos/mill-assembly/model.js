@@ -1,5 +1,5 @@
 import {
-  Box3, CylinderGeometry, ExtrudeGeometry, Group, Mesh, MeshStandardMaterial,
+  Box3, BufferGeometry, CylinderGeometry, ExtrudeGeometry, Float32BufferAttribute, Group, Mesh, MeshStandardMaterial,
   Shape, TorusGeometry,
 } from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
@@ -173,6 +173,7 @@ export function createMill() {
   });
   part('upper-bearing', '主轴上轴承组', 3, [0, 6.11, 2.12], (g) => ring(g, .22, .055, [0, 0, 0], materials.dark));
   part('quill', '主轴套筒', 3, [0, 5.70, 2.12], (g) => {
+    g.userData.isCover = true;
     const shape = new Shape();
     shape.absarc(0, 0, .29, 0, Math.PI * 2, false);
     const hole = new Shape();
@@ -190,6 +191,7 @@ export function createMill() {
   });
 
   part('head-shell', '铣头主体壳', 4, [0, 5.92, 2.09], (g) => {
+    g.userData.isCover = true;
     castProfile(g, [[-.47, -.67], [.36, -.67], [.49, -.42], [.55, .55], [.34, .84], [-.43, .84], [-.58, .30]], 1.03, materials.bodyLight, .07);
     cylinder(g, .34, .10, [0, -.75, .04], materials.dark);
     block(g, [.50, .24, .035], [0, .17, .58], materials.dark, .025);
@@ -197,6 +199,7 @@ export function createMill() {
     for (const x of [-.38, .38]) for (const y of [-.43, .54]) bolt(g, [x, y, .54], 'z', .055);
   });
   part('belt-housing', '上部传动壳体', 4, [0, 7.17, 2.0], (g) => {
+    g.userData.isCover = true;
     block(g, [1.26, .58, 1.36], [0, 0, 0], materials.body, .13);
     cylinder(g, .46, .16, [0, -.34, .08], materials.bodyLight);
     block(g, [.75, .16, .10], [0, -.03, .70], materials.dark, .025);
@@ -227,6 +230,7 @@ export function createMill() {
     block(g, [.35, .36, .23], [.36, -.04, .35], materials.dark, .045);
   });
   part('belt-cover', '传动防护上罩', 4, [0, 7.77, 2.05], (g) => {
+    g.userData.isCover = true;
     block(g, [1.28, .16, 1.35], [0, 0, 0], materials.bodyLight, .065);
     for (const x of [-.48, .48]) bolt(g, [x, .10, .38], 'y', .055);
   });
@@ -256,12 +260,47 @@ export function createMill() {
       block(g, [.018, .17, .035], [Math.cos(angle) * .145, -.04, Math.sin(angle) * .145], materials.steel, .003);
     }
   });
-  part('endmill', '立铣刀', 5, [0, 4.51, 2.12], (g) => {
-    cylinder(g, .075, .43, [0, 0, 0], materials.steel);
-    for (let index = 0; index < 4; index++) {
-      const blade = block(g, [.055, .21, .075], [Math.cos(index * Math.PI / 2) * .065, -.14, Math.sin(index * Math.PI / 2) * .065], materials.dark, .01);
-      blade.rotation.y = index * Math.PI / 2 + .3;
+  part('endmill', '立铣刀', 5, [0, 4.47, 2.12], (g) => {
+    // The shank enters the collet by .215 units; the cutting end remains below
+    // its mouth and above the table. A helical silhouette is readable at the
+    // final overview scale without bypassing depth tests or moving the tool out.
+    const shank = cylinder(g, .115, .50, [0, .21, 0], materials.steel);
+    shank.userData.toolSection = 'shank';
+    const positions = [];
+    const indices = [];
+    const radialSegments = 64;
+    const lengthSegments = 20;
+    for (let row = 0; row <= lengthSegments; row++) {
+      const amount = row / lengthSegments;
+      const twist = amount * Math.PI * .55;
+      for (let segment = 0; segment <= radialSegments; segment++) {
+        const angle = segment / radialSegments * Math.PI * 2;
+        const tooth = Math.pow(Math.max(0, Math.cos((angle - twist) * 4)), 3);
+        const radius = .105 + tooth * .065;
+        positions.push(Math.sin(angle) * radius, -.31 + amount * .42, Math.cos(angle) * radius);
+        if (row < lengthSegments && segment < radialSegments) {
+          const a = row * (radialSegments + 1) + segment;
+          const b = a + 1;
+          const c = a + radialSegments + 1;
+          indices.push(a, b, c, b, c + 1, c);
+        }
+      }
     }
+    for (const row of [0, lengthSegments]) {
+      const center = positions.length / 3;
+      positions.push(0, row === 0 ? -.31 : .11, 0);
+      for (let segment = 0; segment < radialSegments; segment++) {
+        const a = row * (radialSegments + 1) + segment;
+        if (row === 0) indices.push(center, a + 1, a);
+        else indices.push(center, a, a + 1);
+      }
+    }
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    const cuttingEnd = mesh(g, geometry, materials.dark);
+    cuttingEnd.userData.toolSection = 'cutting-end';
   });
   part('head-locks', '铣头锁紧件', 5, [0, 6.65, 2.03], (g) => {
     for (const x of [-.46, .46]) {

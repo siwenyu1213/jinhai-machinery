@@ -43,8 +43,9 @@ h1 { font-size: 22px; font-weight: 600; line-height: 1.4; letter-spacing: -.035e
 .actions { display: flex; gap: 8px; }
 .actions button { background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 8px 16px; min-height: 44px; font-size: 13px; }
 .actions button:last-child { border-color: var(--line); }
+.actions button[aria-pressed="true"] { background: var(--surface); border-color: var(--line); }
 .actions button:hover { background: var(--surface); }
-.scroll-track { height: 1100vh; height: 1100svh; }
+.scroll-track { height: 600vh; height: 600svh; }
 .fallback { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(520px, calc(100% - 48px)); max-height: calc(100% - 260px); overflow: auto; padding: 24px; background: var(--surface); }
 .fallback h2 { font-size: 20px; font-weight: 600; }
 .fallback p, .fallback ol { font-size: 14px; color: var(--muted); margin-top: 12px; }
@@ -59,7 +60,8 @@ h1 { font-size: 22px; font-weight: 600; line-height: 1.4; letter-spacing: -.035e
   .controls { left: 20px; right: 20px; bottom: max(16px, env(safe-area-inset-bottom)); padding-top: 8px; }
   .scrub-row { gap: 12px; font-size: 12px; grid-template-columns: auto 1fr 34px; }
   .control-bottom { gap: 8px; margin-top: 4px; }
-  .disclaimer { font-size: 10px; }
+  .disclaimer { display: none; }
+  .control-bottom { justify-content: flex-end; }
   .actions { gap: 0; }
   .actions button { font-size: 12px; padding: 8px 12px; }
   .active-part { left: 20px; bottom: 128px; font-size: 11px; max-width: calc(100% - 40px); }

@@ -1,9 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BoxGeometry, Group, Mesh, MeshBasicMaterial, PerspectiveCamera, Vector3 } from 'three';
-import { createAssemblyFlight, getFlightSchedule } from '../../demos/mill-assembly/motion.js';
+import { Box3, BoxGeometry, Group, Mesh, MeshBasicMaterial, PerspectiveCamera, Vector3 } from 'three';
+import { createAssemblyFlight, getFlightSchedule, VORTEX_TIMING } from '../../demos/mill-assembly/motion.js';
+import { createMill } from '../../demos/mill-assembly/model.js';
 
-function fixture(count = 30, aspect = 16 / 9) {
+function cameraFor(aspect = 16 / 9) {
+  const camera = new PerspectiveCamera(38, aspect, .1, 100);
+  camera.position.set(11, 8, 18);
+  camera.lookAt(0, 4.3, 0);
+  camera.updateProjectionMatrix();
+  camera.updateMatrixWorld();
+  return camera;
+}
+function fixture(count = 34, aspect = 16 / 9) {
   const root = new Group();
   const parts = Array.from({ length: count }, (_, index) => {
     const object = new Mesh(new BoxGeometry(.8, 1.2, .8), new MeshBasicMaterial());
@@ -13,108 +22,142 @@ function fixture(count = 30, aspect = 16 / 9) {
     return { id: 'part-' + index, label: '组件' + index, phase: Math.floor(index * 6 / count), object,
       homePosition: object.position.clone(), homeQuaternion: object.quaternion.clone() };
   });
-  const camera = new PerspectiveCamera(38, aspect, .1, 100);
-  camera.position.set(11, 8, 18);
-  camera.lookAt(0, 4.3, 0);
-  camera.updateProjectionMatrix();
-  camera.updateMatrixWorld();
-  return { root, parts, camera, flight: createAssemblyFlight(parts) };
+  return { root, parts, camera: cameraFor(aspect), flight: createAssemblyFlight(parts) };
+}
+const transforms = (parts) => parts.map(({ object }) => ({ position: object.position.toArray(), quaternion: object.quaternion.toArray(), scale: object.scale.toArray(), visible: object.visible }));
+function geometryCenter(part) {
+  part.object.updateWorldMatrix(true, true);
+  return new Box3().setFromObject(part.object).getCenter(new Vector3());
 }
 
-function transforms(parts) {
-  return parts.map(({ object }) => ({ position: object.position.toArray(), quaternion: object.quaternion.toArray(), scale: object.scale.toArray(), visible: object.visible }));
-}
-
-test('flight starts empty, assembles exactly and restores immutable home transforms after arbitrary scrubbing', () => {
+test('all components enter together, remain visible, and complete assembly at one shared instant', () => {
   const { flight, parts, camera } = fixture();
   flight.apply(0, camera);
   assert.ok(parts.every(({ object }) => !object.visible));
-  assert.equal(flight.getState().assembledCount, 0);
-  flight.apply(.47, camera);
-  const middle = transforms(parts);
-  for (const progress of [1, .93, .12, .66, 0, .47]) flight.apply(progress, camera);
-  assert.deepEqual(transforms(parts), middle, 'Pose must depend only on the current progress and camera');
-  flight.apply(1, camera);
-  assert.equal(flight.getState().assembledCount, parts.length);
-  assert.equal(flight.getState().phase, 5);
-  assert.deepEqual(flight.getState().activeLabels, []);
-  for (const part of parts) {
-    assert.ok(part.object.visible);
-    assert.deepEqual(part.object.position.toArray(), part.homePosition.toArray());
-    assert.deepEqual(part.object.quaternion.toArray(), part.homeQuaternion.toArray());
-    assert.deepEqual(part.object.scale.toArray(), [1, 1, 1]);
+  assert.ok(getFlightSchedule(parts).every((item) => item.start === 0 && item.end === VORTEX_TIMING.assemblyEnd));
+  for (const progress of [.00001, .06, .24, .4, .76, .85, .939999]) {
+    const state = flight.apply(progress, camera);
+    assert.ok(parts.every(({ object }) => object.visible), 'No component may blink out during flight or orbit');
+    assert.equal(state.assembledCount, 0, 'No component may complete ahead of the others');
+    assert.equal(state.activeLabels.length, parts.length);
   }
-});
-
-test('entries originate beyond alternating camera left/right edges, in front of the lens, at genuinely closer depth', () => {
-  for (const aspect of [16 / 9, 375 / 812]) {
-    const { flight, parts, camera } = fixture(30, aspect);
-    for (const timing of getFlightSchedule(parts).slice(0, 6)) {
-      const part = parts.find(({ id }) => id === timing.id);
-      flight.apply(timing.start + 1e-7, camera);
-      const projected = part.object.position.clone().project(camera);
-      assert.ok(projected.x * timing.side > 1.1, 'Entry should begin outside the visible side edge');
-      const entryDepth = -part.object.position.clone().applyMatrix4(camera.matrixWorldInverse).z;
-      const homeDepth = -part.homePosition.clone().applyMatrix4(camera.matrixWorldInverse).z;
-      assert.ok(entryDepth > camera.near, 'Entry cannot begin behind or through the camera');
-      assert.ok(entryDepth < homeDepth * .6, 'Near entry must be larger through perspective');
-      assert.deepEqual(part.object.scale.toArray(), [1, 1, 1], 'Perspective supplies the visual size change');
+  for (const progress of [VORTEX_TIMING.assemblyEnd, 1]) {
+    const state = flight.apply(progress, camera);
+    assert.equal(state.assembledCount, parts.length);
+    assert.equal(state.stage, 'complete');
+    assert.deepEqual(state.activeLabels, []);
+    for (const part of parts) {
+      assert.deepEqual(part.object.position.toArray(), part.homePosition.toArray());
+      assert.deepEqual(part.object.quaternion.toArray(), part.homeQuaternion.toArray());
+      assert.deepEqual(part.object.scale.toArray(), [1, 1, 1]);
     }
   }
 });
 
-test('flight rotates during approach, moves into depth, and slows down into an exact unscaled final position', () => {
+test('every component completes one full central Y-axis revolution before the shared assembly', () => {
   const { flight, parts, camera } = fixture();
-  const timing = getFlightSchedule(parts)[9];
-  const part = parts.find(({ id }) => id === timing.id);
-  const poseAt = (fraction) => {
-    flight.apply(timing.start + (timing.end - timing.start) * fraction, camera);
-    return { position: part.object.position.clone(), rotation: part.object.quaternion.clone() };
-  };
-  const early = poseAt(.1);
-  const middle = poseAt(.5);
-  const late = poseAt(.9);
-  const nearEnd = poseAt(.99);
-  assert.ok(early.rotation.angleTo(middle.rotation) > .2, 'The part must visibly rotate while flying');
-  assert.ok(late.rotation.angleTo(part.homeQuaternion) < middle.rotation.angleTo(part.homeQuaternion));
-  const depth = (position) => -position.clone().applyMatrix4(camera.matrixWorldInverse).z;
-  assert.ok(depth(early.position) < depth(middle.position));
-  assert.ok(depth(middle.position) < depth(late.position));
-  assert.ok(nearEnd.position.distanceTo(part.homePosition) < .005);
-  assert.ok(late.position.distanceTo(nearEnd.position) < early.position.distanceTo(middle.position) * .1);
+  const angles = parts.map(() => []);
+  for (let step = 0; step <= 80; step++) {
+    flight.apply(VORTEX_TIMING.arrivalEnd + (VORTEX_TIMING.vortexEnd - VORTEX_TIMING.arrivalEnd) * step / 80, camera);
+    parts.forEach((part, index) => {
+      const center = geometryCenter(part);
+      angles[index].push(Math.atan2(center.z, center.x));
+      assert.ok(center.y > 0 && center.y < 9);
+      assert.ok(Math.hypot(center.x, center.z) < 3.5, 'The vortex stays around the machine');
+    });
+  }
+  for (const samples of angles) {
+    let revolution = 0;
+    for (let index = 1; index < samples.length; index++) {
+      let delta = samples[index] - samples[index - 1];
+      if (delta < -Math.PI) delta += Math.PI * 2;
+      if (delta > Math.PI) delta -= Math.PI * 2;
+      assert.ok(delta >= -1e-10, 'All parts follow a consistent vortex direction');
+      revolution += delta;
+    }
+    assert.ok(Math.abs(revolution - Math.PI * 2) < 1e-8, 'Exactly one full revolution is required');
+  }
 });
 
-test('camera-relative entry follows rotated cameras and resized viewports', () => {
+test('entries start at both camera edges and are nearer and larger through perspective', () => {
+  for (const aspect of [16 / 9, 375 / 812]) {
+    const { flight, parts, camera } = fixture(34, aspect);
+    flight.apply(.00000001, camera);
+    for (const [index, part] of parts.entries()) {
+      const center = geometryCenter(part);
+      const projected = center.clone().project(camera);
+      const side = index % 2 === 0 ? -1 : 1;
+      assert.ok(projected.x * side > 1.1, 'All arrivals begin outside their left/right edge');
+      const entryDepth = -center.clone().applyMatrix4(camera.matrixWorldInverse).z;
+      const homeDepth = -part.homePosition.clone().applyMatrix4(camera.matrixWorldInverse).z;
+      assert.ok(entryDepth > camera.near && entryDepth < homeDepth * .65);
+      assert.ok(part.object.scale.x > .99, 'Early large appearance primarily comes from near-camera placement');
+    }
+  }
+});
+
+test('camera-relative arrivals follow rotated cameras and resized viewports', () => {
   const { flight, parts, camera } = fixture();
-  const timing = getFlightSchedule(parts)[2];
-  const part = parts.find(({ id }) => id === timing.id);
-  const progress = timing.start + .000001;
   for (const [x, z, aspect] of [[-15, 10, .5], [18, -12, 2.4], [0, 24, 1]]) {
     camera.position.set(x, 8, z);
     camera.aspect = aspect;
     camera.lookAt(0, 4, 0);
     camera.updateProjectionMatrix();
-    flight.apply(progress, camera);
-    const ndc = part.object.position.clone().project(camera);
-    assert.ok(ndc.x * timing.side > 1.1);
-    assert.ok(ndc.z > -1 && ndc.z < 1);
+    flight.apply(.00000001, camera);
+    parts.forEach((part, index) => {
+      const ndc = geometryCenter(part).project(camera);
+      assert.ok(ndc.x * (index % 2 === 0 ? -1 : 1) > 1.1);
+      assert.ok(ndc.z > -1 && ndc.z < 1);
+    });
   }
 });
 
-test('phase order is stable, overlapping arrivals stay readable, and future parts remain hidden', () => {
-  const { flight, parts, camera } = fixture(36);
-  const timing = getFlightSchedule([...parts].reverse());
-  assert.equal(timing.length, parts.length);
-  assert.ok(timing.every((entry, index) => index === 0 || entry.phase >= timing[index - 1].phase));
-  for (let step = 0; step <= 1000; step++) {
-    flight.apply(step / 1000, camera);
-    const state = flight.getState();
-    assert.ok(state.activeLabels.length <= 4);
-    assert.equal(parts.filter(({ object }) => object.visible).length, state.assembledCount + state.activeLabels.length);
+test('stage boundaries are continuous and reversing or jumping never accumulates drift', () => {
+  const { flight, parts, camera } = fixture();
+  for (const boundary of Object.values(VORTEX_TIMING)) {
+    flight.apply(boundary - 1e-7, camera);
+    const before = parts.map(({ object }) => ({ position: object.position.clone(), quaternion: object.quaternion.clone(), scale: object.scale.clone() }));
+    flight.apply(boundary + 1e-7, camera);
+    parts.forEach(({ object }, index) => {
+      assert.ok(object.position.distanceTo(before[index].position) < 1e-4);
+      assert.ok(object.quaternion.angleTo(before[index].quaternion) < 1e-4);
+      assert.ok(object.scale.distanceTo(before[index].scale) < 1e-4);
+    });
+  }
+  for (const target of [.11, .4, .65, .82]) {
+    flight.apply(target, camera);
+    const expected = transforms(parts);
+    for (const progress of [1, .93, .12, .66, 0, target]) flight.apply(progress, camera);
+    assert.deepEqual(transforms(parts), expected);
   }
 });
 
-test('invalid progress is bounded, empty scenes work, and returned state cannot mutate the controller', () => {
+test('real castings remain above the floor in a layered vortex and all 34 install together', () => {
+  const model = createMill();
+  const flight = createAssemblyFlight(model.parts);
+  const camera = cameraFor();
+  try {
+    assert.equal(model.parts.length, 34);
+    const orbitHeights = [];
+    for (const progress of [.001, .06, .12, .23, .24, .36, .5, .64, .76, .82, .9, .9399]) {
+      flight.apply(progress, camera);
+      assert.equal(flight.getState().assembledCount, 0);
+      for (const { object } of model.parts) {
+        object.updateWorldMatrix(true, true);
+        const box = new Box3().setFromObject(object);
+        assert.ok(box.min.y >= -.00001, object.name + ' must not cut through the floor');
+        assert.ok([...object.position.toArray(), ...object.quaternion.toArray(), ...object.scale.toArray()].every(Number.isFinite));
+        assert.ok(object.visible);
+      }
+      if (progress === .5) orbitHeights.push(...model.parts.map((part) => geometryCenter(part).y));
+    }
+    assert.ok(Math.max(...orbitHeights) - Math.min(...orbitHeights) > 3, 'The vortex needs distinct vertical layers');
+    flight.apply(.94, camera);
+    assert.equal(flight.getState().assembledCount, 34);
+  } finally { model.dispose(); }
+});
+
+test('invalid progress is bounded, empty scenes work and returned state is isolated', () => {
   const { flight, parts, camera } = fixture();
   for (const value of [NaN, Infinity, -Infinity, -4, undefined]) {
     flight.apply(value, camera);
@@ -127,10 +170,7 @@ test('invalid progress is bounded, empty scenes work, and returned state cannot 
   const state = flight.getState();
   state.activeLabels.push('mutation');
   assert.ok(!flight.getState().activeLabels.includes('mutation'));
-  for (const { object } of parts) {
-    assert.ok([...object.position.toArray(), ...object.quaternion.toArray()].every(Number.isFinite));
-  }
   const empty = createAssemblyFlight([]);
-  assert.deepEqual(empty.apply(.5, camera), { progress: .5, assembledCount: 0, activeLabels: [], phase: 0, totalParts: 0 });
+  assert.deepEqual(empty.apply(.5, camera), { progress: .5, assembledCount: 0, activeLabels: [], phase: 2, stage: 'vortex', totalParts: 0 });
   assert.throws(() => createAssemblyFlight([parts[0], parts[0]]), /unique/);
 });
