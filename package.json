@@ -10,11 +10,16 @@
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "npm run test:model && playwright test",
+    "test": "npm run test:model && playwright test && npm run test:demo",
     "test:model": "node --test tests/model/*.test.mjs",
     "test:docs": "python -X utf8 -m unittest discover -s tests -v",
     "capture": "node scripts/capture.mjs",
-    "capture:assembly": "node scripts/capture-assembly.mjs"
+    "capture:assembly": "node scripts/capture-assembly.mjs",
+    "demo:dev": "vite --config vite.demo.config.js --host 127.0.0.1",
+    "demo:build": "vite build --config vite.demo.config.js",
+    "demo:preview": "vite preview --config vite.demo.config.js --host 127.0.0.1",
+    "test:demo": "npm run demo:build && playwright test --config playwright.demo.config.js",
+    "capture:mill": "node scripts/capture-mill-demo.mjs"
   },
   "dependencies": {
     "gsap": "3.15.0",

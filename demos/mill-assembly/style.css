@@ -1,0 +1,70 @@
+:root {
+  --ink: #252c2e;
+  --muted: #566264;
+  --paper: #f8f9f6;
+  --surface: #e9edeb;
+  --line: #cdd3d0;
+  --accent: #deb66b;
+  font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+  font-synthesis: none;
+  line-height: 1.6;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: auto; }
+body { margin: 0; }
+h1, h2, p { margin: 0; }
+button, input { font: inherit; }
+button { color: inherit; cursor: pointer; touch-action: manipulation; }
+button:focus-visible, input:focus-visible { outline: 3px solid #79591e; outline-offset: 4px; }
+[hidden] { display: none !important; }
+.stage { position: fixed; inset: 0; overflow: hidden; background: var(--paper); }
+.scene { position: absolute; inset: 0; }
+.scene canvas { display: block; width: 100%; height: 100%; }
+.heading { position: absolute; top: 32px; left: 32px; right: 32px; display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; pointer-events: none; }
+h1 { font-size: 22px; font-weight: 600; line-height: 1.4; letter-spacing: -.035em; }
+.heading p { color: var(--muted); font-size: 13px; margin-top: 4px; }
+.assembly-status { text-align: right; }
+.assembly-status #phase-name { color: var(--ink); font-weight: 600; margin-top: 0; }
+.status-separator { display: inline-block; padding: 0 5px; color: var(--muted); }
+.first-hint { position: absolute; left: 50%; top: 45%; width: min(300px, 85vw); transform: translate(-50%, -50%); text-align: center; pointer-events: none; }
+.first-hint p { font-size: 22px; font-weight: 500; margin-top: 16px; }
+.first-hint > span:last-child { display: block; font-size: 13px; color: var(--muted); margin-top: 8px; }
+.scroll-mark { display: block; width: 24px; height: 38px; border: 1.5px solid #8a9695; border-radius: 13px; margin: auto; position: relative; }
+.scroll-mark::after { content: ""; position: absolute; left: 9px; top: 8px; width: 3px; height: 8px; border-radius: 3px; background: var(--ink); }
+.active-part { position: absolute; left: 32px; bottom: 142px; max-width: calc(100% - 64px); color: var(--muted); font-size: 13px; pointer-events: none; }
+.controls { position: absolute; bottom: max(24px, env(safe-area-inset-bottom)); left: 32px; right: 32px; padding-top: 16px; border-top: 1px solid var(--line); background: var(--paper); }
+.scrub-row { display: grid; grid-template-columns: auto 1fr 42px; align-items: center; gap: 24px; font-size: 13px; }
+.scrub-row input { width: 100%; margin: 0; height: 32px; accent-color: #79591e; cursor: pointer; }
+.scrub-row output { text-align: right; font-variant-numeric: tabular-nums; }
+.control-bottom { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 8px; }
+.disclaimer { color: var(--muted); font-size: 12px; }
+.actions { display: flex; gap: 8px; }
+.actions button { background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 8px 16px; min-height: 44px; font-size: 13px; }
+.actions button:last-child { border-color: var(--line); }
+.actions button:hover { background: var(--surface); }
+.scroll-track { height: 1100vh; height: 1100svh; }
+.fallback { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(520px, calc(100% - 48px)); max-height: calc(100% - 260px); overflow: auto; padding: 24px; background: var(--surface); }
+.fallback h2 { font-size: 20px; font-weight: 600; }
+.fallback p, .fallback ol { font-size: 14px; color: var(--muted); margin-top: 12px; }
+.fallback ol { padding-left: 22px; }
+.stage[data-renderer="fallback"] .first-hint, .stage[data-renderer="fallback"] .active-part { display: none; }
+.stage[data-renderer="fallback"] .controls { display: none; }
+.noscript { position: absolute; top: 35%; left: 24px; right: 24px; padding: 24px; background: var(--surface); }
+@media (max-width: 600px) {
+  .heading { top: max(20px, env(safe-area-inset-top)); left: 20px; right: 20px; gap: 16px; }
+  h1 { font-size: 18px; }
+  .heading p { font-size: 11px; }
+  .controls { left: 20px; right: 20px; bottom: max(16px, env(safe-area-inset-bottom)); padding-top: 8px; }
+  .scrub-row { gap: 12px; font-size: 12px; grid-template-columns: auto 1fr 34px; }
+  .control-bottom { gap: 8px; margin-top: 4px; }
+  .disclaimer { font-size: 10px; }
+  .actions { gap: 0; }
+  .actions button { font-size: 12px; padding: 8px 12px; }
+  .active-part { left: 20px; bottom: 128px; font-size: 11px; max-width: calc(100% - 40px); }
+  .first-hint p { font-size: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
