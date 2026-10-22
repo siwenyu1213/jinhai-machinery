@@ -74,6 +74,14 @@ def table_width_errors(text):
 
 
 class DocumentationIntegrityTests(unittest.TestCase):
+    def test_remote_actions_require_explicit_user_request_in_project_guidance(self):
+        for filename in ['AGENTS.md', '交接.md']:
+            guidance = (ROOT / filename).read_text(encoding='utf-8')
+            self.assertIn('只有用户明确要求', guidance, filename)
+            self.assertIn('上传／推送／发布', guidance, filename)
+            self.assertIn('本地', guidance, filename)
+
+
     def test_repository_text_is_valid_utf8(self):
         files = [
             path for path in project_files()
