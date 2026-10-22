@@ -54,13 +54,12 @@ function hash(value) {
 export function getFlightSchedule(parts) {
   return parts.map((part, index) => ({
     id: part.id, phase: part.phase, side: index % 2 === 0 ? -1 : 1,
-    vertical: (Math.floor(index / 2) % 6 - 2.5) / 2.5,
     start: 0, end: VORTEX_TIMING.assemblyEnd,
   }));
 }
 
 /**
- * All parts sweep in through the viewer's left and right edges, complete a single central
+ * All parts sweep in from the viewer's two sides, complete a single central
  * revolution, then assemble simultaneously. Geometry centers, rather than
  * arbitrary modeling origins, orbit the Y axis so a tall casting stays readable.
  * Saved home poses are immutable; reversing or jumping the scrollbar is exact.
@@ -84,13 +83,7 @@ export function createAssemblyFlight(parts) {
     for (let x = 0; x < 2; x++) for (let y = 0; y < 2; y++) for (let z = 0; z < 2; z++) {
       corners.push(new Vector3(x ? localBox.max.x : localBox.min.x, y ? localBox.max.y : localBox.min.y, z ? localBox.max.z : localBox.min.z).sub(center));
     }
-    const timing = schedule[index];
-    const column = Math.floor(index / 12);
-    const laneX = timing.side * (.18 + column * .32);
-    // Layout & spacing §3.1: reserve the upper/lower center as quiet space.
-    // Six rows per side stay wider near the edges and narrow toward the axis.
-    const laneY = timing.vertical * (.30 + .19 * Math.abs(laneX)) + Math.sin(laneX * 7.3) * .008;
-    return { part, timing, laneX, laneY, home, homeCenter, rotation, center, corners, radius, dimensions, seed, scale };
+    return { part, timing: schedule[index], home, homeCenter, rotation, center, corners, radius, dimensions, seed, scale };
   });
 
   // Independent rings break the old angle/height correlation. In particular,
@@ -147,55 +140,7 @@ export function createAssemblyFlight(parts) {
   const startRotation = new Quaternion();
   const rotation = new Quaternion();
   const euler = new Euler();
-  const projected = new Vector3();
-  const screenCenter = new Vector3();
-  const separation = entries.map(() => ({ x: 0, y: 0, halfX: 0, halfY: 0, depth: 0 }));
   let state = { progress: 0, assembledCount: 0, activeLabels: [], phase: 0, stage: 'arrival', totalParts: parts.length };
-
-  function screenBounds(entry, box, camera) {
-    const object = entry.part.object;
-    screenCenter.copy(entry.center).multiplyScalar(object.scale.x).applyQuaternion(object.quaternion).add(object.position);
-    box.depth = relative.copy(screenCenter).sub(cameraPosition).dot(forward);
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (const localCorner of entry.corners) {
-      projected.copy(localCorner).multiplyScalar(object.scale.x).applyQuaternion(object.quaternion).add(screenCenter).project(camera);
-      minX = Math.min(minX, projected.x); maxX = Math.max(maxX, projected.x);
-      minY = Math.min(minY, projected.y); maxY = Math.max(maxY, projected.y);
-    }
-    box.x = (minX + maxX) / 2; box.y = (minY + maxY) / 2;
-    box.halfX = (maxX - minX) / 2; box.halfY = (maxY - minY) / 2;
-  }
-
-  function spreadArrival(progress, camera, halfFov, aspect) {
-    const strength = 1 - smoother(clamp((progress - .16) / .08));
-    if (strength === 0) return;
-    const spread = 1 + 7 * (1 - progress / VORTEX_TIMING.arrivalEnd) ** 5;
-    entries.forEach((entry, index) => {
-      const box = separation[index];
-      screenBounds(entry, box, camera);
-      const targetX = box.x + (entry.laneX * spread - box.x) * strength;
-      // Only horizontal distance expands offscreen. Expanding Y as well would
-      // turn side entries into top/bottom entries in tall viewports.
-      const targetY = box.y + (entry.laneY - box.y) * strength;
-      const width = Math.min(.60, .27 * Math.sqrt(spread));
-      const height = .105 + .05 * clamp((spread - 1) / 7);
-      const object = entry.part.object;
-      const limitX = width + (box.halfX * 2 - width) * (1 - strength);
-      const limitY = height + (box.halfY * 2 - height) * (1 - strength);
-      // Fixed corridors preserve each part's ordering through the entire
-      // flight. Iterations refine perspective fit, never swap nearby lanes.
-      for (let iteration = 0; iteration < 4; iteration++) {
-        const fit = Math.min(1, limitX / (box.halfX * 2), limitY / (box.halfY * 2));
-        screenCenter.copy(entry.center).multiplyScalar(object.scale.x).applyQuaternion(object.quaternion).add(object.position);
-        object.scale.multiplyScalar(fit);
-        offset.copy(entry.center).multiplyScalar(object.scale.x).applyQuaternion(object.quaternion);
-        object.position.copy(screenCenter).sub(offset)
-          .addScaledVector(right, (targetX - box.x) * box.depth * halfFov * aspect)
-          .addScaledVector(up, (targetY - box.y) * box.depth * halfFov);
-        screenBounds(entry, box, camera);
-      }
-    });
-  }
 
   function apply(value, camera) {
     const progress = clamp(value);
@@ -227,8 +172,8 @@ export function createAssemblyFlight(parts) {
         const targetDepth = Math.max(camera.near * 12, relative.dot(forward));
         const nearDepth = Math.max(camera.near * 10, Math.min(targetDepth * .54, Math.max(targetDepth * .19, radius * 1.7)));
         const halfHeight = halfFov * nearDepth;
-        const lateral = timing.side * (halfHeight * aspect * (1.25 + seed * .45) + radius * 1.45 + .25);
-        const vertical = timing.vertical * halfHeight * .45;
+        const lateral = timing.side * (halfHeight * aspect + radius * 1.45 + .25);
+        const vertical = halfHeight * ((seed - .5) * 1.6 + (timing.side < 0 ? -.18 : .18));
         start.copy(cameraPosition).addScaledVector(forward, nearDepth)
           .addScaledVector(right, lateral).addScaledVector(up, vertical);
         start.y = Math.max(start.y, radius + .2);
@@ -284,8 +229,6 @@ export function createAssemblyFlight(parts) {
       offset.copy(entry.center).multiplyScalar(size).applyQuaternion(rotation);
       object.position.copy(position).sub(offset);
     }
-
-    if (stage === 'arrival' && progress > 0) spreadArrival(progress, camera, halfFov, aspect);
 
     const completed = stage === 'complete';
     state = { progress, assembledCount: completed ? parts.length : 0,
