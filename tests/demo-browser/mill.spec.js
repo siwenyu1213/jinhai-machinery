@@ -11,17 +11,30 @@ test('starts empty and real wheel scrolling advances and reverses the simultaneo
   await expect(stage).toHaveAttribute('data-progress', '0.00000');
   await expect(page.locator('#first-hint')).toBeVisible();
   await page.mouse.move(300, 300);
-  await page.mouse.wheel(0, 1600);
+  await page.mouse.wheel(0, 240);
   await expect.poll(() => page.evaluate(() => window.__millDemo.getState().progress)).toBeGreaterThan(.15);
   const forward = await page.evaluate(() => window.__millDemo.getState());
   expect(forward.assembledCount).toBe(0);
   expect(await page.evaluate(() => window.__millDemo.getParts().filter((part) => part.object.visible).length)).toBe(forward.totalParts);
-  await page.mouse.wheel(0, -1000);
+  await page.mouse.wheel(0, -120);
   await expect.poll(() => page.evaluate(() => window.__millDemo.getState().progress)).toBeLessThan(forward.progress - .05);
   const backward = await page.evaluate(() => window.__millDemo.getState());
   expect(backward.assembledCount).toBe(0);
   await page.evaluate(() => window.__millDemo.setProgress(0));
   expect(await page.evaluate(() => window.__millDemo.getParts().filter((part) => part.object.visible).length)).toBe(0);
+});
+
+test('a short scroll path advances substantially per wheel step and finishes within twelve steps', async ({ page }) => {
+  await ready(page);
+  const travel = await page.evaluate(() => ({ distance: document.documentElement.scrollHeight - innerHeight, height: innerHeight }));
+  expect(travel.distance).toBeLessThanOrEqual(travel.height * 1.5);
+  await page.mouse.move(200, 300);
+  await page.mouse.wheel(0, 120);
+  await expect.poll(() => page.evaluate(() => window.__millDemo.getState().progress)).toBeGreaterThan(.07);
+  for (let step = 1; step < 12; step++) await page.mouse.wheel(0, 120);
+  await expect(page.locator('#phase-name')).toHaveText('装配完成');
+  const state = await page.evaluate(() => window.__millDemo.getState());
+  expect(state.assembledCount).toBe(state.totalParts);
 });
 
 test('all components stay visible through the vortex and assemble together once', async ({ page }) => {

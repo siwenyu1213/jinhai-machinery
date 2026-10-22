@@ -116,8 +116,9 @@ test('equal scroll increments create an unmistakable slow-fast-slow single revol
   for (let step = 1; step < 5; step++) assert.ok(meanSteps[step] > meanSteps[step - 1], 'The first half must visibly accelerate under constant scrolling');
   for (let step = 6; step < 10; step++) assert.ok(meanSteps[step] < meanSteps[step - 1], 'The second half must progressively slow down');
   const peak = Math.min(meanSteps[4], meanSteps[5]);
-  assert.ok(peak > meanSteps[0] * 35 && peak > meanSteps[9] * 35,
+  assert.ok(peak > meanSteps[0] * 200 && peak > meanSteps[9] * 200,
     'Middle scroll steps must turn far more than the equal-sized first and last steps');
+  assert.ok(peak > Math.PI * .55, 'The fast middle tenth must cover over 99 degrees, making the acceleration clearly perceptible');
   assert.ok(Math.abs(meanSteps.reduce((sum, angle) => sum + angle, 0) - Math.PI * 2) < 1e-8,
     'Acceleration changes the pacing, never the total turn count');
 });

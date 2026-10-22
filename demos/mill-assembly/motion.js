@@ -11,7 +11,7 @@ const smoother = (value) => value * value * value * (value * (value * 6 - 15) + 
 // both ends, so it joins the arrival and assembly poses without a speed jump.
 function windTurn(value) {
   const t = clamp(value);
-  return t ** 4 * (35 + t * (-84 + t * (70 - 20 * t)));
+  return t < .5 ? 8 * t ** 4 : 1 - 8 * (1 - t) ** 4;
 }
 
 function hash(value) {
