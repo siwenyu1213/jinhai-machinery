@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createMill } from './model.js';
-import { createAssemblyFlight, VORTEX_TIMING, progressToScroll, scrollToProgress } from './motion.js';
+import { createAssemblyFlight, VORTEX_TIMING, progressToScroll, scrollToProgress, followScroll } from './motion.js';
 
 const stage = document.querySelector('#mill-stage');
 const host = document.querySelector('#scene');
@@ -19,6 +19,7 @@ const cameraTarget = new THREE.Vector3();
 const cameraEye = new THREE.Vector3(11, 4.5, 14).normalize();
 let completeCameraDistance = 20;
 let renderer, scene, camera, model, flight, frame = 0, progress = 0;
+let renderedScroll = 0, targetScroll = 0, lastFrameTime = 0, manualScrollY = null;
 let state = { progress: 0, assembledCount: 0, activeLabels: [], phase: 0, totalParts: 0 };
 let ready = false;
 let disposed = false;
@@ -29,8 +30,12 @@ const inspectionMaterials = new Set();
 function scrollLength() { return Math.max(1, document.documentElement.scrollHeight - innerHeight); }
 
 function setProgress(value) {
+  cancelAnimationFrame(frame);
+  frame = 0;
   progress = clamp(Number(value));
-  window.scrollTo({ top: progressToScroll(progress) * scrollLength(), behavior: 'instant' });
+  renderedScroll = targetScroll = progressToScroll(progress);
+  window.scrollTo({ top: targetScroll * scrollLength(), behavior: 'instant' });
+  manualScrollY = scrollY;
   draw();
 }
 
@@ -56,7 +61,6 @@ function describe() {
 }
 
 function draw() {
-  frame = 0;
   if (!ready || disposed) return;
   updateCameraForProgress();
   flight.apply(progress, camera);
@@ -146,7 +150,24 @@ function inspectPart(id) {
   return { id, visible: part.object.visible, projectedBounds: { minX, maxX, minY, maxY }, exposedSamples };
 }
 
-function invalidate() { if (!frame && ready && !disposed) frame = requestAnimationFrame(draw); }
+function tick(now) {
+  frame = 0;
+  if (!ready || disposed) return;
+  if (renderedScroll !== targetScroll) {
+    renderedScroll = reducedQuery.matches ? targetScroll : followScroll(renderedScroll, targetScroll, (now - lastFrameTime) / 1000);
+    progress = scrollToProgress(renderedScroll);
+  }
+  lastFrameTime = now;
+  draw();
+  if (renderedScroll !== targetScroll) frame = requestAnimationFrame(tick);
+}
+
+function invalidate() {
+  if (!frame && ready && !disposed) {
+    lastFrameTime = performance.now();
+    frame = requestAnimationFrame(tick);
+  }
+}
 
 function updateCameraForProgress() {
   const entering = smooth((progress - .1) / (VORTEX_TIMING.arrivalEnd - .1));
@@ -245,14 +266,15 @@ try {
   ready = true;
   stage.dataset.renderer = 'ready';
   fitCamera();
-  progress = scrollToProgress(window.scrollY / scrollLength());
+  renderedScroll = targetScroll = clamp(window.scrollY / scrollLength());
+  progress = scrollToProgress(renderedScroll);
   draw();
   renderer.domElement.addEventListener('webglcontextlost', (event) => { event.preventDefault(); fallback(new Error('WebGL context lost')); });
 } catch (error) { fallback(error); }
 
 window.__millDemo = {
   setProgress,
-  getState: () => ({ ...state, activeLabels: [...state.activeLabels], progress, ready, renderer: stage.dataset.renderer, reducedMotion: reducedQuery.matches, inspection }),
+  getState: () => ({ ...state, activeLabels: [...state.activeLabels], progress, targetProgress: scrollToProgress(targetScroll), settling: renderedScroll !== targetScroll, ready, renderer: stage.dataset.renderer, reducedMotion: reducedQuery.matches, inspection }),
   getParts: () => model?.parts,
   getCamera: () => camera,
   getBounds: () => bounds?.clone(),
@@ -265,7 +287,14 @@ slider.addEventListener('input', () => setProgress(Number(slider.value) / 1000))
 document.querySelector('#replay').addEventListener('click', () => setProgress(0));
 document.querySelector('#complete').addEventListener('click', () => setProgress(1));
 document.querySelector('#inspect').addEventListener('click', () => setInspection(!inspection));
-window.addEventListener('scroll', () => { progress = scrollToProgress(scrollY / scrollLength()); invalidate(); }, { passive: true });
+window.addEventListener('scroll', () => {
+  // Direct controls already render the exact requested pose; ignore their
+  // rounded native scroll echo so they also cancel an in-flight follow.
+  if (scrollY === manualScrollY) return;
+  manualScrollY = null;
+  targetScroll = clamp(scrollY / scrollLength());
+  invalidate();
+}, { passive: true });
 window.addEventListener('resize', fitCamera);
 function updateMotionPreference() {
   document.body.dataset.motion = reducedQuery.matches ? 'reduced' : 'full';

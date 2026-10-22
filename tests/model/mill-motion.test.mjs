@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Box3, BoxGeometry, Group, Mesh, MeshBasicMaterial, PerspectiveCamera, Vector3 } from 'three';
-import { createAssemblyFlight, getFlightSchedule, VORTEX_TIMING, progressToScroll, scrollToProgress } from '../../demos/mill-assembly/motion.js';
+import { createAssemblyFlight, getFlightSchedule, VORTEX_TIMING, progressToScroll, scrollToProgress, followScroll } from '../../demos/mill-assembly/motion.js';
 import { createMill } from '../../demos/mill-assembly/model.js';
 
 function cameraFor(aspect = 16 / 9) {
@@ -54,14 +54,14 @@ function covarianceAxisRatio(points) {
   return (trace - discriminant) / Math.max(Number.EPSILON, trace + discriminant);
 }
 
-test('only the final assembly receives twice the physical scroll while input mappings stay reversible', () => {
-  const span = 1.18;
+test('only the final assembly receives triple the physical scroll while input mappings stay reversible', () => {
+  const span = 1.36;
   for (const progress of [0, .12, .24, .5, .76]) {
     assert.ok(Math.abs(progressToScroll(progress) * span - progress) < 1e-12,
       'The arrival and vortex must keep their previous physical scroll positions');
   }
   const assemblyDistance = (progressToScroll(.94) - progressToScroll(.76)) * span;
-  assert.ok(Math.abs(assemblyDistance - 2 * (.94 - .76)) < 1e-12);
+  assert.ok(Math.abs(assemblyDistance - 3 * (.94 - .76)) < 1e-12);
   for (let step = 0; step <= 1000; step++) {
     const progress = step / 1000;
     assert.ok(Math.abs(scrollToProgress(progressToScroll(progress)) - progress) < 1e-12);
@@ -72,6 +72,27 @@ test('only the final assembly receives twice the physical scroll while input map
     assert.equal(progressToScroll(value), 0);
     assert.equal(scrollToProgress(value), 0);
   }
+});
+
+test('scroll follow keeps moving after input ends, decelerates without overshoot, and settles exactly', () => {
+  let progress = 0;
+  let previousStep = Infinity;
+  for (let frame = 0; frame < 300; frame++) {
+    const next = followScroll(progress, .7, 1 / 60);
+    assert.ok(next >= progress && next <= .7);
+    assert.ok(next - progress <= previousStep + .0001);
+    previousStep = next - progress;
+    progress = next;
+  }
+  assert.equal(progress, .7);
+  const reversed = followScroll(progress, .2, .1);
+  assert.ok(reversed > .2 && reversed < progress);
+  assert.equal(followScroll(.4, .8, 0), .4);
+  assert.equal(followScroll(.4, .8, NaN), .4);
+  const single = followScroll(.1, .9, .2);
+  let subdivided = .1;
+  for (let frame = 0; frame < 24; frame++) subdivided = followScroll(subdivided, .9, .2 / 24);
+  assert.ok(Math.abs(single - subdivided) < 1e-12, 'Damping must follow elapsed time, not frame count');
 });
 
 test('all components enter together, remain visible, and complete assembly at one shared instant', () => {

@@ -24,14 +24,14 @@ test('starts empty and real wheel scrolling advances and reverses the simultaneo
   expect(await page.evaluate(() => window.__millDemo.getParts().filter((part) => part.object.visible).length)).toBe(0);
 });
 
-test('a short scroll path advances substantially per wheel step and finishes within twelve steps', async ({ page }) => {
+test('a short scroll path advances substantially per wheel step and finishes within fifteen steps', async ({ page }) => {
   await ready(page);
   const travel = await page.evaluate(() => ({ distance: document.documentElement.scrollHeight - innerHeight, height: innerHeight }));
-  expect(travel.distance).toBeLessThanOrEqual(travel.height * 1.7);
+  expect(travel.distance).toBeLessThanOrEqual(travel.height * 1.92);
   await page.mouse.move(200, 300);
   await page.mouse.wheel(0, 120);
   await expect.poll(() => page.evaluate(() => window.__millDemo.getState().progress)).toBeGreaterThan(.07);
-  for (let step = 1; step < 12; step++) await page.mouse.wheel(0, 120);
+  for (let step = 1; step < 15; step++) await page.mouse.wheel(0, 120);
   await expect(page.locator('#phase-name')).toHaveText('装配完成');
   const state = await page.evaluate(() => window.__millDemo.getState());
   expect(state.assembledCount).toBe(state.totalParts);
@@ -46,7 +46,48 @@ test('final assembly gets extra scroll time without slowing down the preceding v
   }
   expect(positions[0]).toBeCloseTo(.24 * 1.4, 2);
   expect(positions[1]).toBeCloseTo(.76 * 1.4, 2);
-  expect(positions[2] - positions[1]).toBeCloseTo((.94 - .76) * 1.4 * 2, 2);
+  expect(positions[2] - positions[1]).toBeCloseTo((.94 - .76) * 1.4 * 3, 2);
+});
+
+test('wheel release continues moving toward its target, supports reversal, and direct controls cancel the follow', async ({ page }) => {
+  await ready(page);
+  await page.mouse.move(200, 300);
+  await page.mouse.wheel(0, 360);
+  await expect.poll(() => page.evaluate(() => window.__millDemo.getState().targetProgress)).toBeGreaterThan(.2);
+  const samples = await page.evaluate(async () => {
+    const entries = [];
+    const start = performance.now();
+    await new Promise((resolve) => {
+      function sample(now) {
+        if (entries.length === 0 || (entries.length === 1 && now - start >= 150)) {
+          const state = window.__millDemo.getState();
+          entries.push({ ...state, scrollY, position: window.__millDemo.getParts()[0].object.position.toArray() });
+        }
+        if (entries.length === 2) resolve(); else requestAnimationFrame(sample);
+      }
+      requestAnimationFrame(sample);
+    });
+    return entries;
+  });
+  expect(samples[0].settling).toBe(true);
+  expect(samples[1].scrollY).toBe(samples[0].scrollY);
+  expect(samples[1].targetProgress).toBe(samples[0].targetProgress);
+  expect(samples[1].progress).toBeGreaterThan(samples[0].progress);
+  expect(samples[1].progress).toBeLessThan(samples[1].targetProgress);
+  expect(samples[1].position).not.toEqual(samples[0].position);
+  await expect.poll(() => page.evaluate(() => window.__millDemo.getState().settling)).toBe(false);
+  const forward = await page.evaluate(() => window.__millDemo.getState().progress);
+  await page.mouse.wheel(0, -120);
+  await expect.poll(() => page.evaluate(() => window.__millDemo.getState().progress)).toBeLessThan(forward - .03);
+  await page.getByRole('button', { name: '重播' }).click();
+  await page.evaluate(() => new Promise((resolve) => {
+    let count = 0;
+    function check() { if (++count === 6) resolve(); else requestAnimationFrame(check); }
+    requestAnimationFrame(check);
+  }));
+  const replayed = await page.evaluate(() => window.__millDemo.getState());
+  expect(replayed.progress).toBe(0);
+  expect(replayed.settling).toBe(false);
 });
 
 test('all components stay visible through the vortex and assemble together once', async ({ page }) => {
@@ -245,6 +286,10 @@ test('reduced motion keeps controls usable without near-camera flying pieces', a
   await page.getByRole('button', { name: '查看完成' }).click();
   await expect(page.locator('#phase-name')).toHaveText('装配完成');
   expect(await page.evaluate(() => window.__millDemo.getParts().filter((part) => part.object.visible).length)).toBe(state.totalParts);
+  await page.mouse.move(200, 300);
+  await page.mouse.wheel(0, -240);
+  await expect.poll(() => page.evaluate(() => window.__millDemo.getState().progress)).toBeLessThan(.94);
+  expect(await page.evaluate(() => window.__millDemo.getState().settling)).toBe(false);
 });
 
 test('WebGL failure gives a readable component summary', async ({ page }) => {

@@ -5,9 +5,19 @@ const TAU = Math.PI * 2;
 const Y_AXIS = new Vector3(0, 1, 0);
 const clamp = (value) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
 const smoother = (value) => value * value * value * (value * (value * 6 - 15) + 10);
-const ASSEMBLY_SCROLL_SCALE = 2;
+const ASSEMBLY_SCROLL_SCALE = 3;
 const EXTRA_ASSEMBLY_SCROLL = (VORTEX_TIMING.assemblyEnd - VORTEX_TIMING.vortexEnd) * (ASSEMBLY_SCROLL_SCALE - 1);
 const SCROLL_SPAN = 1 + EXTRA_ASSEMBLY_SCROLL;
+
+// Follow the physical scroll target with frame-rate-independent damping.
+// A small final snap lets the render loop sleep once the motion has settled.
+export function followScroll(current, target, elapsed) {
+  const start = clamp(current);
+  const end = clamp(target);
+  const seconds = Number.isFinite(elapsed) ? Math.max(0, elapsed) : 0;
+  const next = start + (end - start) * -Math.expm1(-seconds / .24);
+  return Math.abs(end - next) < .0001 ? end : next;
+}
 
 // Stretch only the physical scroll allotted to the final assembly. Earlier
 // flight and rotation keep the same poses at the same scroll distances.
