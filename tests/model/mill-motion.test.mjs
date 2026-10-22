@@ -227,30 +227,56 @@ test('real components advance consistently with small independent orbital speed 
   } finally { model.dispose(); }
 });
 
-test('entries start beyond the sides and all four corners with bounded near-camera footprints', () => {
+test('entries start only beyond the two side edges while keeping their full outlines away from top and bottom', () => {
   for (const aspect of [16 / 9, 375 / 812]) {
     const { flight, parts, camera } = fixture(34, aspect);
     flight.apply(.00000001, camera);
-    const corners = new Map();
+    const sides = [0, 0];
     for (const [index, part] of parts.entries()) {
       const center = geometryCenter(part);
       const projected = center.clone().project(camera);
       const side = index % 2 === 0 ? -1 : 1;
       assert.ok(projected.x * side > 1.1, 'All arrivals begin outside their left/right edge');
+      sides[index % 2]++;
       const entryDepth = -center.clone().applyMatrix4(camera.matrixWorldInverse).z;
       const homeDepth = -part.homePosition.clone().applyMatrix4(camera.matrixWorldInverse).z;
       assert.ok(entryDepth > camera.near && entryDepth < homeDepth * .65);
       assert.ok(part.object.scale.x > 0 && part.object.scale.x <= 1);
-      const vertical = getFlightSchedule(parts)[index].vertical;
-      if (vertical !== 0) {
-        assert.ok(projected.y * vertical > 1.05, 'Diagonal arrivals begin above or below the screen');
-        const key = `${side},${vertical}`;
-        corners.set(key, (corners.get(key) || 0) + 1);
+      const bounds = new Box3().setFromObject(part.object);
+      for (const x of [bounds.min.x, bounds.max.x]) for (const y of [bounds.min.y, bounds.max.y]) for (const z of [bounds.min.z, bounds.max.z]) {
+        const point = new Vector3(x, y, z).project(camera);
+        assert.ok(Math.abs(point.y) < .7, 'Rotated outlines must start within the side corridor, never above or below the viewport');
       }
     }
-    assert.equal(corners.size, 4);
-    assert.ok([...corners.values()].every((count) => count >= 5));
+    assert.deepEqual(sides, [17, 17]);
   }
+});
+
+test('real rotating outlines stay inside the side corridor throughout arrival, including the central handoff', () => {
+  const model = createMill();
+  const flight = createAssemblyFlight(model.parts);
+  const point = new Vector3();
+  try {
+    for (const aspect of [1.6, 2.5, 375 / 812]) {
+      const camera = cameraFor(aspect);
+      for (const progress of [.001, .03, .06, .10, .14, .18, .20, .22, .239999]) {
+        flight.apply(progress, camera);
+        for (const part of model.parts) {
+          part.object.updateWorldMatrix(true, true);
+          part.object.traverse((object) => {
+            if (!object.isMesh) return;
+            const vertices = object.geometry.attributes.position;
+            for (let index = 0; index < vertices.count; index++) {
+              point.fromBufferAttribute(vertices, index).applyMatrix4(object.matrixWorld).project(camera);
+              const halfHeight = .50 + .20 * Math.min(1, Math.abs(point.x)) ** 2;
+              assert.ok(Math.abs(point.y) < halfHeight,
+                `${aspect}, ${progress}: ${part.id} enters the reserved upper/lower space at ${point.x}, ${point.y}`);
+            }
+          });
+        }
+      }
+    }
+  } finally { model.dispose(); }
 });
 
 test('incoming real castings keep separate projected silhouettes instead of hiding small components', () => {

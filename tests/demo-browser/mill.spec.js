@@ -107,21 +107,21 @@ test('all components stay visible through the vortex and assemble together once'
   expect(final.exact).toBe(true);
 });
 
-test('incoming parts use all four corners and avoid silhouette occlusion on wide and narrow screens', async ({ page }, testInfo) => {
+test('incoming parts use only the side edges, preserve upper and lower clear space, and avoid silhouette occlusion', async ({ page }, testInfo) => {
   await ready(page);
   if (testInfo.project.name === 'demo-desktop') await page.setViewportSize({ width: 1600, height: 640 });
   await page.evaluate(() => window.__millDemo.setProgress(.00000001));
   const directions = await page.evaluate(() => {
     const camera = window.__millDemo.getCamera();
     const Box3 = window.__millDemo.getBounds().constructor;
-    const groups = [0, 0, 0, 0];
+    const groups = [0, 0];
     for (const part of window.__millDemo.getParts()) {
       const center = new Box3().setFromObject(part.object).getCenter(part.object.position.clone()).project(camera);
-      if (Math.abs(center.x) > 1 && Math.abs(center.y) > 1) groups[(center.x > 0 ? 1 : 0) + (center.y > 0 ? 2 : 0)]++;
+      if (Math.abs(center.x) > 1 && Math.abs(center.y) < .65) groups[center.x > 0 ? 1 : 0]++;
     }
     return groups;
   });
-  expect(directions.every((count) => count >= 3)).toBe(true);
+  expect(directions).toEqual([17, 17]);
   for (const progress of [.08, .10, .14, .17]) {
     await page.evaluate((value) => window.__millDemo.setProgress(value), progress);
     const worstOverlap = await page.evaluate(() => {
@@ -151,7 +151,31 @@ test('incoming parts use all four corners and avoid silhouette occlusion on wide
     });
     expect(worstOverlap).toBeLessThan(.03);
   }
-  await testInfo.attach('separated-diagonal-arrivals', { body: await page.screenshot(), contentType: 'image/png' });
+  await testInfo.attach('separated-side-arrivals', { body: await page.screenshot(), contentType: 'image/png' });
+});
+
+test('actual camera keeps rotating arrival silhouettes out of the upper and lower reserved areas', async ({ page }, testInfo) => {
+  await ready(page);
+  for (const progress of [.001, .03, .06, .10, .14, .18, .20, .22, .239999]) {
+    await page.evaluate((value) => window.__millDemo.setProgress(value), progress);
+    const worstIntrusion = await page.evaluate(() => {
+      const camera = window.__millDemo.getCamera();
+      const point = camera.position.clone();
+      let worst = -Infinity;
+      for (const part of window.__millDemo.getParts()) part.object.traverse((object) => {
+        if (!object.isMesh) return;
+        const vertices = object.geometry.attributes.position;
+        for (let index = 0; index < vertices.count; index++) {
+          point.fromBufferAttribute(vertices, index).applyMatrix4(object.matrixWorld).project(camera);
+          worst = Math.max(worst, Math.abs(point.y) - (.50 + .20 * Math.min(1, Math.abs(point.x)) ** 2));
+        }
+      });
+      return worst;
+    });
+    expect(worstIntrusion, `arrival ${progress}: rotating outlines must stay in the side corridor`).toBeLessThan(0);
+  }
+  await page.evaluate(() => window.__millDemo.setProgress(.14));
+  await testInfo.attach('upper-and-lower-clear-space', { body: await page.screenshot(), contentType: 'image/png' });
 });
 
 test('the vortex fills both sides at several heights and stays readable within the viewport', async ({ page }, testInfo) => {

@@ -12,7 +12,7 @@ const phaseName = document.querySelector('#phase-name');
 const activePart = document.querySelector('#active-part');
 const firstHint = document.querySelector('#first-hint');
 const reducedQuery = matchMedia('(prefers-reduced-motion: reduce)');
-const stageNames = { arrival: '多向飞入', vortex: '中央旋绕', assembly: '同步组装', complete: '装配完成' };
+const stageNames = { arrival: '两侧飞入', vortex: '中央旋绕', assembly: '同步组装', complete: '装配完成' };
 const clamp = (value) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
 const smooth = (value) => { const t = clamp(value); return t * t * (3 - 2 * t); };
 const cameraTarget = new THREE.Vector3();
@@ -52,7 +52,7 @@ function describe() {
   phaseName.textContent = progress === 0 ? '等待滚动' : stageNames[state.stage];
   firstHint.hidden = progress > .005 || !ready;
   const descriptions = {
-    arrival: `${state.totalParts} 个组件从四角与两侧同时飞入`,
+    arrival: `${state.totalParts} 个组件从左右两侧同时飞入`,
     vortex: `${state.totalParts} 个组件在中央旋绕一圈`,
     assembly: '所有组件一起对准安装位置',
     complete: inspection ? '外壳已透视，可观察内部组件' : '所有组件已就位',
@@ -65,7 +65,7 @@ function draw() {
   updateCameraForProgress();
   flight.apply(progress, camera);
   state = flight.getState();
-  // Lower-corner arrivals may pass below the eventual machine floor. Reveal
+  // Keep the incoming components clear of the distant floor. Reveal
   // the floor only as the scattered parts rise into the central vortex.
   floor.visible = progress > .20;
   floor.material.opacity = smooth((progress - .20) / .04);

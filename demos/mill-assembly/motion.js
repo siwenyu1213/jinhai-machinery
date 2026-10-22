@@ -54,13 +54,13 @@ function hash(value) {
 export function getFlightSchedule(parts) {
   return parts.map((part, index) => ({
     id: part.id, phase: part.phase, side: index % 2 === 0 ? -1 : 1,
-    vertical: [1, -1, 0][Math.floor(index / 2) % 3],
+    vertical: (Math.floor(index / 2) % 6 - 2.5) / 2.5,
     start: 0, end: VORTEX_TIMING.assemblyEnd,
   }));
 }
 
 /**
- * All parts sweep in from the viewer's four corners and two sides, complete a single central
+ * All parts sweep in through the viewer's left and right edges, complete a single central
  * revolution, then assemble simultaneously. Geometry centers, rather than
  * arbitrary modeling origins, orbit the Y axis so a tall casting stays readable.
  * Saved home poses are immutable; reversing or jumping the scrollbar is exact.
@@ -85,11 +85,11 @@ export function createAssemblyFlight(parts) {
       corners.push(new Vector3(x ? localBox.max.x : localBox.min.x, y ? localBox.max.y : localBox.min.y, z ? localBox.max.z : localBox.min.z).sub(center));
     }
     const timing = schedule[index];
-    const lane = Math.floor(index / 6);
-    const laneX = timing.side * (.16 + (lane % 3) * .32);
-    const row = Math.floor(lane / 3);
-    const laneY = (timing.vertical === 0 ? (row % 2 === 0 ? -.13 : .13)
-      : timing.vertical * (.39 + row * .26)) + Math.sin(laneX * 7.3) * .085;
+    const column = Math.floor(index / 12);
+    const laneX = timing.side * (.18 + column * .32);
+    // Layout & spacing §3.1: reserve the upper/lower center as quiet space.
+    // Six rows per side stay wider near the edges and narrow toward the axis.
+    const laneY = timing.vertical * (.30 + .19 * Math.abs(laneX)) + Math.sin(laneX * 7.3) * .008;
     return { part, timing, laneX, laneY, home, homeCenter, rotation, center, corners, radius, dimensions, seed, scale };
   });
 
@@ -174,9 +174,11 @@ export function createAssemblyFlight(parts) {
       const box = separation[index];
       screenBounds(entry, box, camera);
       const targetX = box.x + (entry.laneX * spread - box.x) * strength;
-      const targetY = box.y + (entry.laneY * spread - box.y) * strength;
+      // Only horizontal distance expands offscreen. Expanding Y as well would
+      // turn side entries into top/bottom entries in tall viewports.
+      const targetY = box.y + (entry.laneY - box.y) * strength;
       const width = Math.min(.60, .27 * Math.sqrt(spread));
-      const height = Math.min(.48, .21 * Math.sqrt(spread));
+      const height = .105 + .05 * clamp((spread - 1) / 7);
       const object = entry.part.object;
       const limitX = width + (box.halfX * 2 - width) * (1 - strength);
       const limitY = height + (box.halfY * 2 - height) * (1 - strength);
@@ -226,8 +228,7 @@ export function createAssemblyFlight(parts) {
         const nearDepth = Math.max(camera.near * 10, Math.min(targetDepth * .54, Math.max(targetDepth * .19, radius * 1.7)));
         const halfHeight = halfFov * nearDepth;
         const lateral = timing.side * (halfHeight * aspect * (1.25 + seed * .45) + radius * 1.45 + .25);
-        const vertical = timing.vertical === 0 ? halfHeight * (seed - .5) * 1.1
-          : timing.vertical * (halfHeight * (1.25 + seed * .55) + radius * .8);
+        const vertical = timing.vertical * halfHeight * .45;
         start.copy(cameraPosition).addScaledVector(forward, nearDepth)
           .addScaledVector(right, lateral).addScaledVector(up, vertical);
         start.y = Math.max(start.y, radius + .2);
