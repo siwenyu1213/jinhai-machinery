@@ -5,7 +5,7 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   root: 'demos/mill-assembly',
   base: './',
-  build: { outDir: 'dist', emptyOutDir: true },
+  build: { outDir: 'dist', emptyOutDir: true, assetsInlineLimit: 0 },
   server: { port: 5175, strictPort: true },
   preview: { port: 4175, strictPort: true },
 });

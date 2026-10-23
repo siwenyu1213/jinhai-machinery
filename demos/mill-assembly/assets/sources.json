@@ -1,0 +1,49 @@
+{
+  "retrieved": "2026-10-23",
+  "licenseLinks": [
+    "https://docs.ambientcg.com/license/",
+    "https://polyhaven.com/license"
+  ],
+  "assets": [
+    {
+      "file": "Metal012_1K-JPG_Color.jpg",
+      "source": "https://ambientcg.com/view?id=Metal012",
+      "download": "https://ambientcg.com/get?file=Metal012_1K-JPG.zip",
+      "author": "ambientCG",
+      "role": "Color",
+      "license": "CC0-1.0",
+      "bytes": 412556,
+      "sha256": "9d32b9bbcf071433a3ed69f0409cc11886bb3c554300acaf0da93a92a2059e5b"
+    },
+    {
+      "file": "Metal012_1K-JPG_NormalGL.jpg",
+      "source": "https://ambientcg.com/view?id=Metal012",
+      "download": "https://ambientcg.com/get?file=Metal012_1K-JPG.zip",
+      "author": "ambientCG",
+      "role": "NormalGL",
+      "license": "CC0-1.0",
+      "bytes": 580484,
+      "sha256": "6ea43f0b48f5fc7d1d11ead571c22f11233053e2a1926c5e21ea27de7d3a4287"
+    },
+    {
+      "file": "Metal012_1K-JPG_Roughness.jpg",
+      "source": "https://ambientcg.com/view?id=Metal012",
+      "download": "https://ambientcg.com/get?file=Metal012_1K-JPG.zip",
+      "author": "ambientCG",
+      "role": "Roughness",
+      "license": "CC0-1.0",
+      "bytes": 452778,
+      "sha256": "d808a07ffe8786a8b410dfa29f19b0a31492e450256dd9191bb9731e110dba40"
+    },
+    {
+      "file": "studio_small_09_1k.hdr",
+      "source": "https://polyhaven.com/a/studio_small_09",
+      "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/studio_small_09_1k.hdr",
+      "author": "Sergej Majboroda / Poly Haven",
+      "role": "HDR environment",
+      "license": "CC0-1.0",
+      "bytes": 1615248,
+      "sha256": "e7cfda5f4e98e623db12b8bfd0184e048488e4855d9c83e2751fb44a32e80c45"
+    }
+  ]
+}

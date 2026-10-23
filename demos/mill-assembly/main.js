@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createMill } from './model.js';
+import { loadMillSurfaceAssets } from './surface-assets.js';
 import { createAssemblyFlight, VORTEX_TIMING, progressToScroll, scrollToProgress, followScroll } from './motion.js';
 
 const stage = document.querySelector('#mill-stage');
@@ -241,19 +242,29 @@ try {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   host.append(renderer.domElement);
   scene = new THREE.Scene();
-  // A prefiltered studio reflection gives steel readable highlights while
-  // keeping the page background unchanged. It is generated once, locally.
-  const room = new RoomEnvironment();
+  // Real HDR softboxes and dark areas create moving, contrasting reflections
+  // on bare metal. Load once from our build, prefilter once, then free the HDR.
+  const surfaceAssets = await loadMillSurfaceAssets();
   const pmrem = new THREE.PMREMGenerator(renderer);
-  environmentTarget = pmrem.fromScene(room, .04);
+  if (surfaceAssets.environment) {
+    environmentTarget = pmrem.fromEquirectangular(surfaceAssets.environment);
+    surfaceAssets.environment.dispose();
+    stage.dataset.environment = 'hdr';
+  } else {
+    const room = new RoomEnvironment();
+    environmentTarget = pmrem.fromScene(room, .02);
+    room.dispose();
+    stage.dataset.environment = 'fallback';
+  }
   scene.environment = environmentTarget.texture;
-  scene.environmentIntensity = .8;
-  room.dispose();
+  scene.environmentIntensity = 1.1;
+  scene.environmentRotation.y = 2.6;
+  stage.dataset.surfaces = surfaceAssets.missing.length === 0 ? 'mapped' : 'fallback';
   pmrem.dispose();
   scene.fog = new THREE.Fog(0xf8f9f6, 30, 65);
   camera = new THREE.PerspectiveCamera(36, 1, .08, 200);
-  scene.add(new THREE.HemisphereLight(0xffffff, 0xa3afab, .85));
-  const key = new THREE.DirectionalLight(0xffffff, 2.7);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x74736e, .35));
+  const key = new THREE.DirectionalLight(0xffffff, 2.4);
   key.position.set(7, 15, 9);
   key.castShadow = true;
   key.shadow.mapSize.set(1024, 1024);
@@ -263,7 +274,7 @@ try {
   key.shadow.radius = 4;
   key.target.position.set(0, 3.5, 0);
   scene.add(key, key.target);
-  const fill = new THREE.DirectionalLight(0xe1edff, 1.1);
+  const fill = new THREE.DirectionalLight(0xf1f3ff, .65);
   fill.position.set(-8, 7, -5);
   scene.add(fill);
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: 0xf8f9f6, roughness: 1, metalness: 0 }));
@@ -271,7 +282,7 @@ try {
   floor.position.y = -.025;
   floor.receiveShadow = true;
   scene.add(floor);
-  model = createMill();
+  model = createMill({ surfaceMaps: surfaceAssets.surfaceMaps });
   for (const texture of model.textures || []) {
     texture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
   }

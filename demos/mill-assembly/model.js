@@ -1,19 +1,20 @@
 import {
-  Box3, BufferGeometry, CylinderGeometry, ExtrudeGeometry, Float32BufferAttribute, Group, Mesh,
-  PlaneGeometry, Shape, TorusGeometry,
+  Box3, BufferGeometry, CapsuleGeometry, CylinderGeometry, ExtrudeGeometry, Float32BufferAttribute, Group, Mesh,
+  PlaneGeometry, Shape, SphereGeometry, TorusGeometry,
 } from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { mergeGeometries, toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createMillMaterials } from './materials.js';
 
 // A generic turret knee mill, built locally for a visual assembly study.
 // All dimensions are illustrative. +Z faces the operator; every moving part
 // is a direct child of the identity root so its saved home pose is unambiguous.
-export function createMill() {
+export function createMill(options = {}) {
   const root = new Group();
   root.name = '炮塔铣床装配演示';
   const parts = [];
   const geometries = new Set();
-  const assets = createMillMaterials();
+  const assets = createMillMaterials(options);
   const materials = assets.materials;
 
   function mesh(parent, geometry, material, position = [0, 0, 0], rotation = [0, 0, 0]) {
@@ -29,17 +30,25 @@ export function createMill() {
 
   function block(parent, size, position, material = materials.body, radius = .04) {
     const bevel = Math.min(radius, ...size.map((value) => value / 3));
-    return mesh(parent, new RoundedBoxGeometry(...size, 2, bevel), material, position);
+    const segments = material === materials.aluminum ? 4 : 2;
+    return mesh(parent, new RoundedBoxGeometry(...size, segments, bevel), material, position);
   }
 
   function cylinder(parent, radius, height, position, material = materials.steel, axis = 'y', bottom = radius, segments = 32) {
+    if (segments === 32 && material === materials.chrome) segments = 64;
     const rotation = axis === 'x' ? [0, 0, Math.PI / 2] : axis === 'z' ? [Math.PI / 2, 0, 0] : [0, 0, 0];
     return mesh(parent, new CylinderGeometry(radius, bottom, height, segments), material, position, rotation);
   }
 
   function ring(parent, radius, tube, position, material = materials.steel, axis = 'y') {
     const rotation = axis === 'y' ? [Math.PI / 2, 0, 0] : axis === 'x' ? [0, Math.PI / 2, 0] : [0, 0, 0];
-    return mesh(parent, new TorusGeometry(radius, tube, 8, 40), material, position, rotation);
+    const polished = material === materials.chrome;
+    return mesh(parent, new TorusGeometry(radius, tube, polished ? 16 : 8, polished ? 64 : 40), material, position, rotation);
+  }
+
+  function grip(parent, radius, length, position, axis = 'z') {
+    const rotation = axis === 'x' ? [0, 0, Math.PI / 2] : axis === 'z' ? [Math.PI / 2, 0, 0] : [0, 0, 0];
+    return mesh(parent, new CapsuleGeometry(radius, Math.max(0, length - 2 * radius), 4, 16), materials.rubber, position, rotation);
   }
 
   function castProfile(parent, points, width, material = materials.body, bevel = .06) {
@@ -53,6 +62,9 @@ export function createMill() {
     });
     geometry.rotateY(-Math.PI / 2);
     geometry.translate(width / 2, 0, 0);
+    // Smooth the small bevels without rounding the broad milled/cast faces.
+    // Facet-to-facet normal jumps were especially conspicuous under glossy paint.
+    if (material.userData.materialRole === 'painted-cast-iron') toCreasedNormals(geometry, Math.PI / 3);
     return mesh(parent, geometry, material);
   }
 
@@ -96,19 +108,19 @@ export function createMill() {
     if (axis === 'x') hub.rotation.y = Math.PI / 2;
     if (axis === 'y') hub.rotation.x = -Math.PI / 2;
     parent.add(hub);
-    ring(hub, radius, .055, [0, 0, 0], materials.dark, 'z');
-    cylinder(hub, .12, .22, [0, 0, 0], materials.steel, 'z');
+    ring(hub, radius, .055, [0, 0, 0], materials.chrome, 'z');
+    cylinder(hub, .12, .22, [0, 0, 0], materials.chrome, 'z');
     for (let index = 0; index < 3; index++) {
-      const spoke = block(hub, [radius, .065, .07], [radius / 2, 0, 0], materials.steel, .02);
+      const spoke = block(hub, [radius, .065, .07], [radius / 2, 0, 0], materials.chrome, .02);
       const angle = index * Math.PI * 2 / 3;
       spoke.position.set(Math.cos(angle) * radius / 2, Math.sin(angle) * radius / 2, 0);
       spoke.rotation.z = angle;
     }
-    cylinder(hub, .07, .29, [radius * .83, 0, .17], materials.rubber, 'z');
+    grip(hub, .07, .29, [radius * .83, 0, .17]);
   }
 
   function screw(parent, length, axis) {
-    cylinder(parent, .075, length, [0, 0, 0], materials.dark, axis);
+    cylinder(parent, .075, length, [0, 0, 0], materials.machined, axis);
     // A continuous trapezoidal lead thread replaces 25 disconnected rings.
     // One mesh per screw is more accurate in close-up and saves 72 meshes.
     const turns = 25, steps = turns * 32, pitch = length * .9 / turns;
@@ -133,8 +145,33 @@ export function createMill() {
     thread.computeVertexNormals();
     if (axis === 'x') thread.rotateZ(Math.PI / 2);
     else if (axis === 'z') thread.rotateX(Math.PI / 2);
-    mesh(parent, thread, materials.steel).userData.surfaceDetail = 'continuous-lead-thread';
+    mesh(parent, thread, materials.chrome).userData.surfaceDetail = 'continuous-lead-thread';
     block(parent, axis === 'x' ? [.25, .29, .29] : axis === 'z' ? [.29, .29, .25] : [.29, .25, .29], [0, 0, 0], materials.bronze, .04);
+  }
+
+  function bearing(parent, y) {
+    for (const [outer, inner] of [[.273, .235], [.202, .165]]) {
+      const outline = new Shape();
+      outline.absarc(0, 0, outer, 0, Math.PI * 2, false);
+      const hole = new Shape();
+      hole.absarc(0, 0, inner, 0, Math.PI * 2, true);
+      outline.holes.push(hole);
+      const geometry = new ExtrudeGeometry(outline, { depth: .07, bevelEnabled: true, bevelSize: .002, bevelThickness: .002, bevelSegments: 2, curveSegments: 24 });
+      geometry.rotateX(Math.PI / 2);
+      geometry.translate(0, .035, 0);
+      toCreasedNormals(geometry, Math.PI / 3);
+      mesh(parent, geometry, materials.machined, [0, y, 0]).userData.surfaceDetail = 'bearing-race';
+    }
+    // Merge balls into one draw instead of creating a mesh for every ball.
+    const balls = Array.from({ length: 12 }, (_, index) => {
+      const angle = index * Math.PI / 6;
+      const geometry = new SphereGeometry(.018, 12, 8);
+      geometry.translate(Math.cos(angle) * .2185, 0, Math.sin(angle) * .2185);
+      return geometry;
+    });
+    const geometry = mergeGeometries(balls);
+    balls.forEach(ball => ball.dispose());
+    mesh(parent, geometry, materials.chrome, [0, y, 0]).userData.surfaceDetail = 'bearing-balls';
   }
 
   function part(id, label, phase, position, build) {
@@ -202,14 +239,14 @@ export function createMill() {
     castProfile(g, profile, 6.20, materials.steel, .012);
     block(g, [5.94, .12, .07], [0, -.08, .88], materials.dark, .02);
     for (let index = -15; index <= 15; index++) block(g, [.015, index % 5 === 0 ? .075 : .035, .018], [index * .18, -.07, .924], materials.steel, .002);
-    for (const x of [-3.20, 3.20]) block(g, [.16, .37, 1.69], [x, -.03, 0], materials.bodyLight, .035);
+    for (const x of [-3.20, 3.20]) block(g, [.16, .37, 1.69], [x, -.03, 0], materials.dark, .035);
   });
   part('table-left-bearing', '左进给轴承座', 1, [-3.35, 3.62, 1.40], (g) => {
-    cylinder(g, .19, .27, [0, 0, 0], materials.bodyLight, 'x');
+    cylinder(g, .19, .27, [0, 0, 0], materials.dark, 'x');
     for (const y of [-.09, .09]) greaseNipple(g, [0, y, .19], 'z');
   });
   part('table-right-bearing', '右进给轴承座', 1, [3.35, 3.62, 1.40], (g) => {
-    cylinder(g, .19, .27, [0, 0, 0], materials.bodyLight, 'x');
+    cylinder(g, .19, .27, [0, 0, 0], materials.dark, 'x');
     for (const y of [-.09, .09]) greaseNipple(g, [0, y, .19], 'z');
     // Seep on the +X end face, kept inside the R.19 cylinder.
     oilFilm(g, .12, .12, [.137, -.04, 0], false, 'x');
@@ -234,14 +271,14 @@ export function createMill() {
   });
 
   part('spindle', '精加工主轴', 3, [0, 5.63, 2.12], (g) => {
-    cylinder(g, .17, 1.33, [0, 0, 0]);
-    cylinder(g, .24, .29, [0, -.65, 0]);
+    cylinder(g, .17, 1.33, [0, 0, 0], materials.machined);
+    cylinder(g, .24, .29, [0, -.65, 0], materials.chrome);
     cylinder(g, .13, .30, [0, .74, 0], materials.dark);
   });
   part('lower-bearing', '主轴下轴承组', 3, [0, 5.25, 2.12], (g) => {
-    for (const y of [-.06, .06]) ring(g, .22, .055, [0, y, 0], materials.dark);
+    for (const y of [-.06, .06]) bearing(g, y);
   });
-  part('upper-bearing', '主轴上轴承组', 3, [0, 6.11, 2.12], (g) => ring(g, .22, .055, [0, 0, 0], materials.dark));
+  part('upper-bearing', '主轴上轴承组', 3, [0, 6.11, 2.12], (g) => bearing(g, 0));
   part('quill', '主轴套筒', 3, [0, 5.70, 2.12], (g) => {
     g.userData.isCover = true;
     const shape = new Shape();
@@ -252,7 +289,7 @@ export function createMill() {
     const geo = new ExtrudeGeometry(shape, { depth: 1.15, bevelEnabled: false, curveSegments: 32 });
     geo.rotateX(Math.PI / 2);
     geo.translate(0, .575, 0);
-    mesh(g, geo, materials.steel);
+    mesh(g, geo, materials.chrome);
     for (let index = 0; index < 9; index++) block(g, [.18, .025, .06], [0, -.36 + index * .08, -.29], materials.dark, .006);
     // Seep on the exposed lower end of the R.29 sleeve (normal +Z), above its y=-.575 end.
     oilFilm(g, .08, .09, [0, -.51, .292]);
@@ -260,8 +297,8 @@ export function createMill() {
     for (const z of [-.2, .22]) bolt(g, [-.245, .40, z], 'x', .04);
   });
   part('drawbar', '刀具拉杆', 3, [0, 6.75, 2.12], (g) => {
-    cylinder(g, .06, 2.38, [0, 0, 0], materials.dark);
-    cylinder(g, .12, .15, [0, 1.16, 0], materials.steel, 'y', .12, 6);
+    cylinder(g, .06, 2.38, [0, 0, 0], materials.machined);
+    cylinder(g, .12, .15, [0, 1.16, 0], materials.chrome, 'y', .12, 6);
   });
 
   part('head-shell', '铣头主体壳', 4, [0, 5.92, 2.09], (g) => {
@@ -273,44 +310,52 @@ export function createMill() {
     for (const x of [-.38, .38]) for (const y of [-.43, .54]) bolt(g, [x, y, .54], 'z', .055);
     // Front casting cover seam around the quill bore.
     block(g, [.72, .012, .02], [0, -.585, .54], materials.dark, .003);
+    // Quill depth stop and engraved ruler, following the reference head's
+    // exposed chrome rod / silver scale. These stay within the same component.
+    cylinder(g, .022, 1.16, [-.36, .01, .69], materials.chrome);
+    for (const y of [-.55, .57]) block(g, [.11, .07, .18], [-.36, y, .64], materials.bodyLight, .018);
+    cylinder(g, .065, .07, [-.36, -.40, .69], materials.machined);
+    const scale = mesh(g, new PlaneGeometry(.125, 1.04), materials.scalePlate, [-.225, .015, .656]);
+    scale.userData.surfaceDetail = 'quill-depth-scale';
+    scale.castShadow = false;
     // Seep on the +X right-side flat cover, with a very short fine tail.
     oilFilm(g, .19, .17, [.587, -.02, 0], false, 'x');
     oilFilm(g, .03, .09, [.587, -.12, 0], true, 'x');
   });
   part('belt-housing', '上部传动壳体', 4, [0, 7.17, 2.0], (g) => {
     g.userData.isCover = true;
-    block(g, [1.26, .58, 1.36], [0, 0, 0], materials.body, .13);
+    block(g, [1.26, .58, 1.36], [0, 0, 0], materials.aluminum, .13);
     cylinder(g, .46, .16, [0, -.34, .08], materials.bodyLight);
     block(g, [.75, .16, .10], [0, -.03, .70], materials.dark, .025);
   });
   part('driven-pulley', '主轴传动带轮', 4, [0, 7.51, 2.10], (g) => {
-    cylinder(g, .42, .18, [0, 0, 0], materials.dark);
-    cylinder(g, .36, .22, [0, .04, 0]);
+    cylinder(g, .42, .18, [0, 0, 0], materials.aluminum);
+    cylinder(g, .36, .22, [0, .04, 0], materials.machined);
   });
   part('drive-pulley', '电机传动带轮', 4, [0, 7.51, 1.25], (g) => {
-    cylinder(g, .29, .19, [0, 0, 0], materials.dark);
-    cylinder(g, .23, .23, [0, .02, 0]);
+    cylinder(g, .29, .19, [0, 0, 0], materials.aluminum);
+    cylinder(g, .23, .23, [0, .02, 0], materials.machined);
   });
   part('belt', '传动皮带', 4, [0, 7.51, 1.68], (g) => {
     // A closed racetrack, held as one flexible visual assembly.
-    ring(g, .32, .032, [0, 0, -.40], materials.rubber);
-    ring(g, .40, .032, [0, 0, .40], materials.rubber);
-    for (const x of [-.355, .355]) block(g, [.055, .065, .84], [x, 0, 0], materials.rubber, .02);
+    ring(g, .32, .032, [0, 0, -.40], materials.beltRubber);
+    ring(g, .40, .032, [0, 0, .40], materials.beltRubber);
+    for (const x of [-.355, .355]) block(g, [.055, .065, .84], [x, 0, 0], materials.beltRubber, .02);
   });
   part('motor', '主轴驱动电机', 4, [0, 8.07, 1.22], (g) => {
-    cylinder(g, .45, 1.08, [0, 0, 0], materials.dark);
-    cylinder(g, .48, .12, [0, -.52, 0], materials.bodyLight);
-    cylinder(g, .42, .16, [0, .59, 0], materials.bodyLight);
+    cylinder(g, .45, 1.08, [0, 0, 0], materials.motorPaint);
+    cylinder(g, .48, .12, [0, -.52, 0], materials.motorPaint);
+    cylinder(g, .42, .16, [0, .59, 0], materials.motorPaint);
     for (let index = 0; index < 16; index++) {
       const angle = index * Math.PI * 2 / 16;
-      const fin = block(g, [.055, .81, .12], [Math.cos(angle) * .44, .02, Math.sin(angle) * .44], materials.bodyLight, .012);
+      const fin = block(g, [.055, .81, .12], [Math.cos(angle) * .44, .02, Math.sin(angle) * .44], materials.motorPaint, .012);
       fin.rotation.y = -angle;
     }
     block(g, [.35, .36, .23], [.36, -.04, .35], materials.dark, .045);
   });
   part('belt-cover', '传动防护上罩', 4, [0, 7.77, 2.05], (g) => {
     g.userData.isCover = true;
-    block(g, [1.28, .16, 1.35], [0, 0, 0], materials.bodyLight, .065);
+    block(g, [1.28, .16, 1.35], [0, 0, 0], materials.aluminum, .065);
     for (const x of [-.48, .48]) bolt(g, [x, .10, .38], 'y', .055);
   });
 
@@ -318,25 +363,25 @@ export function createMill() {
   part('right-handwheel', '工作台右手轮', 5, [3.65, 3.62, 1.40], (g) => wheel(g, .35, 'x'));
   part('cross-handwheel', '鞍座进给手轮', 5, [0, 3.30, 2.38], (g) => wheel(g, .32));
   part('lift-crank', '升降台摇柄', 5, [1.05, 2.76, .78], (g) => {
-    cylinder(g, .11, .30, [0, 0, 0], materials.steel, 'x');
-    block(g, [.10, .57, .10], [.14, -.22, 0], materials.steel, .035);
-    cylinder(g, .07, .31, [.27, -.48, 0], materials.rubber, 'x');
+    cylinder(g, .11, .30, [0, 0, 0], materials.chrome, 'x');
+    block(g, [.10, .57, .10], [.14, -.22, 0], materials.chrome, .035);
+    grip(g, .07, .31, [.27, -.48, 0], 'x');
   });
   part('quill-lever', '主轴套筒进给手柄', 5, [.67, 6.02, 2.09], (g) => {
-    cylinder(g, .15, .30, [0, 0, 0], materials.steel, 'x');
+    cylinder(g, .15, .30, [0, 0, 0], materials.chrome, 'x');
     for (let index = 0; index < 3; index++) {
       const angle = index * Math.PI * 2 / 3 + .3;
-      const arm = cylinder(g, .025, .52, [.18, Math.cos(angle) * .26, Math.sin(angle) * .26], materials.steel);
+      const arm = cylinder(g, .025, .52, [.18, Math.cos(angle) * .26, Math.sin(angle) * .26], materials.chrome);
       arm.rotation.x = angle;
-      cylinder(g, .075, .13, [.18, Math.cos(angle) * .55, Math.sin(angle) * .55], materials.rubber, 'x');
+      grip(g, .075, .15, [.18, Math.cos(angle) * .55, Math.sin(angle) * .55], 'x');
     }
   });
   part('fine-feed-wheel', '主轴微调手轮', 5, [-.69, 5.83, 2.09], (g) => wheel(g, .25, 'x'));
   part('collet', '刀具夹持套', 5, [0, 4.84, 2.12], (g) => {
-    cylinder(g, .17, .25, [0, 0, 0], materials.dark, 'y', .12);
+    cylinder(g, .17, .25, [0, 0, 0], materials.machined, 'y', .12);
     for (let index = 0; index < 6; index++) {
       const angle = index * Math.PI / 3;
-      block(g, [.018, .17, .035], [Math.cos(angle) * .145, -.04, Math.sin(angle) * .145], materials.steel, .003);
+      block(g, [.018, .17, .035], [Math.cos(angle) * .145, -.04, Math.sin(angle) * .145], materials.dark, .003);
     }
   });
   part('endmill', '立铣刀', 5, [0, 4.47, 2.12], (g) => {

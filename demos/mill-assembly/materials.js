@@ -1,10 +1,10 @@
 import {
-  ClampToEdgeWrapping, DataTexture, DoubleSide, LinearFilter, LinearMipmapLinearFilter, MeshStandardMaterial, RepeatWrapping, RGBAFormat, SRGBColorSpace,
+  ClampToEdgeWrapping, DataTexture, DoubleSide, LinearFilter, LinearMipmapLinearFilter, MeshPhysicalMaterial, MeshStandardMaterial, RepeatWrapping, RGBAFormat, SRGBColorSpace, Vector2,
 } from 'three';
 
-// Deterministic, CPU-generated tileable textures for the mill. All sources are
-// DataTextures driven by a seeded PRNG, so Node (no DOM/canvas) and repeated
-// createMill() calls produce identical pixels with zero network access.
+// Deterministic CPU textures keep the model usable in Node and when local PBR
+// images fail. The browser may supply bundled maps; this factory owns them and
+// releases shared resources once. No DOM or network work happens in the factory.
 const SIZE = 128;
 
 function rng(seed) {
@@ -78,7 +78,7 @@ function createTexture(name, fill, { colorSpace = null, role = 'detail', wrap = 
 const clamp255 = (value) => Math.max(0, Math.min(255, Math.round(value)));
 const grayscale = (value) => [clamp255(value), clamp255(value), clamp255(value), 255];
 
-export function createMillMaterials() {
+export function createMillMaterials({ surfaceMaps = {} } = {}) {
   const textures = new Set();
 
   // 1. Poured-cast iron: broad mottling plus a fine pinhole grain (bump only).
@@ -87,19 +87,19 @@ export function createMillMaterials() {
   const roughness = fractal(37, [5, 11, 29]);
   const castBump = createTexture('painted-cast-bump', (u, v) => {
     const grain = (pinhole(u, v) - .5) * .5;
-    return grayscale(128 + (cast(u, v) - .5) * 30 + grain * 115);
+    return grayscale(128 + (cast(u, v) - .5) * 18 + grain * 60);
   }, { role: 'cast-bump' });
-  // 2. Paint roughness lives in green: fine orange-peel, mostly in [.8, 1].
+  // Enamel is a dielectric with a semi-gloss binder over fine cast relief.
   const paintRoughness = createTexture('paint-roughness', (u, v) => {
     const peel = .5 + (pinhole(u, v) - .5) * .32 + (cast(u, v) - .5) * .18;
-    const value = 205 + (roughness(u, v) - .5) * 24 + (peel - .5) * 22;
+    const value = 216 + (roughness(u, v) - .5) * 18 + (peel - .5) * 16;
     const g = clamp255(value);
     return [g, g, g, 255];
   }, { role: 'paint-roughness' });
   // A small albedo variation keeps the cast grain readable under broad light;
   // the bump still supplies its relief. There is no baked directional shading.
   const paintTone = createTexture('paint-tone', (u, v) => {
-    return grayscale(242 + (pinhole(u, v) - .5) * 28 + (cast(u, v) - .5) * 8);
+    return grayscale(246 + (pinhole(u, v) - .5) * 18 + (cast(u, v) - .5) * 3);
   }, { colorSpace: SRGBColorSpace, role: 'paint-tone' });
   // 3. Fine directional machining: light streak along U, micro scrub across V.
   const scrub = fractal(41, [32, 64]);
@@ -153,54 +153,72 @@ export function createMillMaterials() {
   textures.add(wayBump);
   textures.add(oil);
   textures.add(oilRun);
+  Object.values(surfaceMaps).forEach(texture => textures.add(texture));
 
   const paint = (name, color) => {
-    const material = new MeshStandardMaterial({
-      color, map: paintTone, roughness: .92, metalness: .02, bumpMap: castBump, bumpScale: .13, roughnessMap: paintRoughness,
+    const material = new MeshPhysicalMaterial({
+      color, map: paintTone, roughness: .38, metalness: 0, bumpMap: castBump, bumpScale: .008, roughnessMap: paintRoughness,
+      clearcoat: .32, clearcoatRoughness: .25, envMapIntensity: 1,
     });
     material.name = name;
     material.userData = { materialRole: 'painted-cast-iron', surfaceDetail: 'cast-texture' };
     return material;
   };
 
-  castBump.repeat.set(4, 4);
-  paintRoughness.repeat.set(2, 2);
-  paintTone.repeat.set(4, 4);
+  castBump.repeat.set(9, 9);
+  paintRoughness.repeat.set(9, 9);
+  paintTone.repeat.set(9, 9);
 
-  const machined = new MeshStandardMaterial({
-    color: '#cdd2cf', roughness: .34, metalness: .9, bumpMap: machinedBump, bumpScale: .03,
+  const metalMaps = {
+    ...(surfaceMaps.metalColor ? { map: surfaceMaps.metalColor } : {}),
+    ...(surfaceMaps.metalNormal ? { normalMap: surfaceMaps.metalNormal, normalScale: new Vector2(.12, .12) } : {}),
+    ...(surfaceMaps.metalRoughness ? { roughnessMap: surfaceMaps.metalRoughness } : {}),
+  };
+  const machined = new MeshPhysicalMaterial({
+    color: '#c8cac8', roughness: .23, metalness: 1, bumpMap: machinedBump, bumpScale: .0012,
+    anisotropy: .55, ...metalMaps,
   });
   machined.name = 'machined';
   machined.userData = { materialRole: 'machined-steel', surfaceDetail: 'machined-streaks' };
 
-  const way = new MeshStandardMaterial({
-    color: '#b9bfbd', roughness: .32, metalness: .85, bumpMap: wayBump, bumpScale: .035,
+  const way = new MeshPhysicalMaterial({
+    color: '#aeb2b1', roughness: .25, metalness: 1, bumpMap: wayBump, bumpScale: .0015,
+    anisotropy: .65, ...metalMaps,
   });
   way.name = 'steel';
   way.userData = { materialRole: 'bare-steel', surfaceDetail: 'way-grind' };
 
   const materialSet = {
-    body: paint('body', '#74868a'),
-    bodyLight: paint('bodyLight', '#9da8a6'),
+    body: paint('body', '#565c59'),
+    bodyLight: paint('bodyLight', '#626864'),
     steel: way,
-    dark: new MeshStandardMaterial({ color: '#35494f', roughness: .74, metalness: .08 }),
-    rubber: new MeshStandardMaterial({ color: '#252c2e', roughness: .92, metalness: 0 }),
-    accent: new MeshStandardMaterial({ color: '#deb66b', roughness: .6, metalness: .05 }),
+    dark: new MeshStandardMaterial({ color: '#202321', roughness: .36, metalness: .65 }),
+    rubber: new MeshPhysicalMaterial({ color: '#141514', roughness: .36, metalness: 0, clearcoat: .28, clearcoatRoughness: .27 }),
+    beltRubber: new MeshStandardMaterial({ color: '#121311', roughness: .88, metalness: 0 }),
+    motorPaint: paint('motorPaint', '#363a36'),
+    accent: new MeshStandardMaterial({ color: '#d2d4d1', roughness: .27, metalness: 1 }),
     machined,
-    fastener: new MeshStandardMaterial({ color: '#5c676b', roughness: .48, metalness: .55 }),
-    toolSteel: new MeshStandardMaterial({ color: '#67747a', roughness: .3, metalness: .92 }),
-    bronze: new MeshStandardMaterial({ color: '#a88a4b', roughness: .38, metalness: .8 }),
-    oil: new MeshStandardMaterial({
-      name: 'oil', map: oil, transparent: true, opacity: .48, roughness: .2, metalness: .05,
+    chrome: new MeshPhysicalMaterial({ color: '#e0e2e0', roughness: .115, metalness: 1, anisotropy: .28, bumpMap: machinedBump, bumpScale: .00035 }),
+    aluminum: new MeshPhysicalMaterial({ color: '#d1d3d1', roughness: .19, metalness: 1, anisotropy: .4, ...metalMaps }),
+    scalePlate: new MeshStandardMaterial({ color: '#d2d4d2', map: surfaceMaps.quillScale ?? null, roughness: .32, metalness: .8 }),
+    fastener: new MeshStandardMaterial({ color: '#575b58', roughness: .25, metalness: 1 }),
+    toolSteel: new MeshStandardMaterial({ color: '#929793', roughness: .19, metalness: 1 }),
+    bronze: new MeshStandardMaterial({ color: '#b48c48', roughness: .27, metalness: 1, bumpMap: machinedBump, bumpScale: .0005 }),
+    oil: new MeshPhysicalMaterial({
+      name: 'oil', map: oil, transparent: true, opacity: .25, roughness: .12, metalness: 0,
+      clearcoat: .9, clearcoatRoughness: .08,
       depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, side: DoubleSide,
     }),
-    oilRun: new MeshStandardMaterial({
-      name: 'oilRun', map: oilRun, transparent: true, opacity: .52, roughness: .22, metalness: .05,
+    oilRun: new MeshPhysicalMaterial({
+      name: 'oilRun', map: oilRun, transparent: true, opacity: .28, roughness: .14, metalness: 0,
+      clearcoat: .9, clearcoatRoughness: .08,
       depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3, side: DoubleSide,
     }),
   };
   materialSet.oil.userData = { materialRole: 'oil-film', surfaceDetail: 'oil-seep' };
   materialSet.oilRun.userData = { materialRole: 'oil-run', surfaceDetail: 'oil-drip' };
+  materialSet.chrome.userData = { materialRole: 'chromed-steel', surfaceDetail: 'polished-reflection' };
+  materialSet.aluminum.userData = { materialRole: 'polished-aluminum', surfaceDetail: 'brushed-reflection' };
   for (const [key, value] of Object.entries(materialSet)) {
     if (!value.userData || !value.userData.materialRole) {
       value.userData = { ...(value.userData || {}), materialRole: key, surfaceDetail: 'plain' };

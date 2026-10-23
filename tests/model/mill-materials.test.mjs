@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ClampToEdgeWrapping, LinearFilter, LinearMipmapLinearFilter, NoColorSpace, SRGBColorSpace, Vector3, Raycaster } from 'three';
+import { ClampToEdgeWrapping, DataTexture, LinearFilter, LinearMipmapLinearFilter, NoColorSpace, SRGBColorSpace, Vector3, Raycaster } from 'three';
 import { createMillMaterials } from '../../demos/mill-assembly/materials.js';
 import { createMill } from '../../demos/mill-assembly/model.js';
 
@@ -28,15 +28,73 @@ test('mill texture factory is deterministic, bounded, mipmapped and usable witho
     }
     for (const name of ['body','bodyLight']) {
       const m=first.materials[name];
-      assert.ok(m.metalness<.1 && m.roughness>.6, 'paint remains dielectric and rough');
+      assert.equal(m.metalness,0, 'an enamel coating is dielectric');
+      assert.ok(m.isMeshPhysicalMaterial && m.roughness>=.3 && m.roughness<=.5, 'factory enamel has a semi-gloss binder');
+      assert.ok(m.clearcoat>=.2 && m.clearcoatRoughness>=.2);
+      assert.ok(m.bumpScale<=.01, 'cast grain must be fine, not concrete-sized relief');
       assert.ok(m.bumpMap && m.roughnessMap);
       assert.equal(m.bumpMap.colorSpace, NoColorSpace);
       assert.equal(m.roughnessMap.colorSpace, NoColorSpace);
     }
     assert.ok(first.materials.steel.metalness>=.8);
     assert.ok(first.materials.machined.metalness>=.8);
+    assert.equal(first.materials.chrome.metalness,1);
+    assert.ok(first.materials.chrome.roughness<.15);
+    assert.ok(first.materials.steel.anisotropy>.4);
     assert.equal(first.materials.rubber.metalness,0);
+    assert.ok(first.materials.beltRubber.roughness>first.materials.rubber.roughness);
   } finally { first.dispose(); second.dispose(); }
+});
+
+test('local PBR maps attach to bare metal without staining enamel or chrome and are owned once', () => {
+  const surfaceMaps = Object.fromEntries(['metalColor','metalNormal','metalRoughness'].map(key=>[key,new DataTexture(new Uint8Array([128,128,255,255]),1,1)]));
+  const assets=createMillMaterials({surfaceMaps});
+  const disposed=new Map(Object.values(surfaceMaps).map(t=>[t,0]));
+  for(const texture of disposed.keys()) texture.addEventListener('dispose',()=>disposed.set(texture,disposed.get(texture)+1));
+  for(const name of ['steel','machined','aluminum']) {
+    assert.equal(assets.materials[name].map,surfaceMaps.metalColor);
+    assert.equal(assets.materials[name].normalMap,surfaceMaps.metalNormal);
+    assert.equal(assets.materials[name].roughnessMap,surfaceMaps.metalRoughness);
+    assert.ok(assets.materials[name].normalScale.x<=.2,'fine scuffs must not dent the whole surface');
+  }
+  assert.notEqual(assets.materials.body.map,surfaceMaps.metalColor);
+  assert.equal(assets.materials.chrome.map,null,'polished chrome must not inherit dark brushed-steel albedo');
+  assert.equal(assets.textures.size,10);
+  assets.dispose();assets.dispose();
+  assert.deepEqual([...disposed.values()],[1,1,1]);
+});
+
+test('reference surface roles distinguish paint, chromed controls, bare table and aluminum cover', () => {
+  const mill=createMill();
+  try {
+    const materialsFor=id=>{const result=[];mill.parts.find(p=>p.id===id).object.traverse(o=>{if(o.isMesh)result.push(o.material);});return result;};
+    assert.ok(materialsFor('head-shell').includes(mill.materials.bodyLight));
+    assert.ok(materialsFor('quill').includes(mill.materials.chrome));
+    assert.ok(materialsFor('belt-cover').includes(mill.materials.aluminum));
+    assert.ok(materialsFor('table').includes(mill.materials.steel));
+    assert.ok(materialsFor('table-right-bearing').includes(mill.materials.dark));
+    for(const id of ['left-handwheel','right-handwheel','fine-feed-wheel','quill-lever']) {
+      assert.ok(materialsFor(id).includes(mill.materials.chrome),id);
+      assert.ok(materialsFor(id).includes(mill.materials.rubber),id);
+    }
+    assert.ok(materialsFor('motor').includes(mill.materials.motorPaint));
+    assert.ok(materialsFor('belt').every(m=>m===mill.materials.beltRubber));
+  } finally {mill.dispose();}
+});
+
+test('spindle bearings have silver inner and outer races, visible balls and an open bore', () => {
+  const mill=createMill();
+  try {
+    for(const [id,count] of [['lower-bearing',2],['upper-bearing',1]]) {
+      const group=mill.parts.find(p=>p.id===id).object;
+      assert.equal(group.children.filter(o=>o.userData.surfaceDetail==='bearing-race').length,count*2);
+      assert.equal(group.children.filter(o=>o.userData.surfaceDetail==='bearing-balls').length,count);
+      assert.ok(group.children.every(o=>o.material.metalness===1));
+      const center=group.getWorldPosition(new Vector3());
+      const ray=new Raycaster(center.clone().add(new Vector3(0,1,0)),new Vector3(0,-1,0),0,2);
+      assert.equal(ray.intersectObject(group,true).length,0,'a bearing must not be a solid decorative puck');
+    }
+  } finally {mill.dispose();}
 });
 
 test('oil films have soft transparent borders, wet highlights and no opaque shadow/depth shortcuts', () => {

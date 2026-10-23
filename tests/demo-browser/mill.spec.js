@@ -5,24 +5,32 @@ async function ready(page) {
   await expect(page.locator('#mill-stage')).toHaveAttribute('data-renderer', 'ready');
 }
 
-test('procedural paint, metal and oil use a baked local environment and keep GPU resources stable while scrubbing', async ({ page }) => {
+test('local PBR metal maps and real HDR reflections remain stable while scrubbing', async ({ page }) => {
   await ready(page);
+  await expect(page.locator('#mill-stage')).toHaveAttribute('data-surfaces', 'mapped');
+  await expect(page.locator('#mill-stage')).toHaveAttribute('data-environment', 'hdr');
   const result=await page.evaluate(() => {
     const api=window.__millDemo;
     api.setProgress(.94);api.setInspection(true);api.setInspection(false);
     const before=api.getRenderStats(), textures=new Set(), oils=[];
     for(const part of api.getParts()) part.object.traverse(o=>{
       if(!o.isMesh)return;
-      for(const key of ['map','bumpMap','roughnessMap']) if(o.material[key]) textures.add(o.material[key]);
+      for(const key of ['map','normalMap','bumpMap','roughnessMap']) if(o.material[key]) textures.add(o.material[key]);
       if(o.material.userData.materialRole?.startsWith('oil-')) oils.push({shadow:o.castShadow,depth:o.material.depthTest});
     });
     for(let i=0;i<30;i++)api.setProgress((i%10)/10*.94);
     api.setProgress(.94);
     return {before,after:api.getRenderStats(), environment:api.getScene().environment?.isTexture,
-      textureCount:textures.size,anisotropy:[...textures].map(t=>t.anisotropy),oils,state:api.getState()};
+      textureCount:textures.size, fileMaps:[...textures].filter(t=>!t.isDataTexture).map(t=>({width:t.image.width,colorSpace:t.colorSpace,name:t.name})),
+      anisotropy:[...textures].map(t=>t.anisotropy),oils,state:api.getState()};
   });
   expect(result.environment).toBe(true);
-  expect(result.textureCount).toBe(7);
+  expect(result.textureCount).toBe(11);
+  expect(result.fileMaps).toHaveLength(4);
+  expect(result.fileMaps.filter(t=>t.name.startsWith('ambientcg-')).every(t=>t.width===1024)).toBe(true);
+  expect(result.fileMaps.find(t=>t.name==='illustrated-quill-scale').width).toBe(128);
+  expect(result.fileMaps.find(t=>t.name==='ambientcg-metalColor').colorSpace).toBe('srgb');
+  expect(result.fileMaps.find(t=>t.name==='ambientcg-metalNormal').colorSpace).toBe('');
   expect(result.anisotropy.every(n=>n>=1&&n<=4)).toBe(true);
   expect(result.oils).toHaveLength(6);
   expect(result.oils.every(o=>!o.shadow&&o.depth)).toBe(true);
@@ -32,6 +40,16 @@ test('procedural paint, metal and oil use a baked local environment and keep GPU
   expect(result.after.triangles).toBeLessThan(194674);
   expect(result.state.assembledCount).toBe(34);
   expect(result.state.displayProgress).toBe(1);
+});
+
+test('missing local HDR and surface images fall back to a usable procedural machine', async ({ page }) => {
+  await page.route(/\.(?:hdr|jpg)(?:\?|$)/, route=>route.abort());
+  await ready(page);
+  await expect(page.locator('#mill-stage')).toHaveAttribute('data-surfaces','fallback');
+  await expect(page.locator('#mill-stage')).toHaveAttribute('data-environment','fallback');
+  await page.getByRole('button',{name:'查看完成'}).click();
+  expect(await page.evaluate(()=>window.__millDemo.getState().assembledCount)).toBe(34);
+  expect(await page.evaluate(()=>window.__millDemo.getScene().environment?.isTexture)).toBe(true);
 });
 
 test('starts empty and real wheel scrolling advances and reverses the simultaneous flight', async ({ page }) => {
