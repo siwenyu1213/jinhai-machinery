@@ -11,7 +11,8 @@ const ASSEMBLY_SCROLL_SCALE = 2.5;
 const EXTRA_ARRIVAL_SCROLL = VORTEX_TIMING.arrivalEnd * (ARRIVAL_SCROLL_SCALE - 1);
 const EXTRA_VORTEX_SCROLL = (VORTEX_TIMING.assemblyStart - VORTEX_TIMING.arrivalEnd) * (VORTEX_SCROLL_SCALE - 1);
 const EXTRA_ASSEMBLY_SCROLL = (VORTEX_TIMING.assemblyEnd - VORTEX_TIMING.assemblyStart) * (ASSEMBLY_SCROLL_SCALE - 1);
-const SCROLL_SPAN = 1 + EXTRA_ARRIVAL_SCROLL + EXTRA_VORTEX_SCROLL + EXTRA_ASSEMBLY_SCROLL;
+// Stop physical travel at the assembled pose; there is no post-assembly tail.
+const SCROLL_SPAN = VORTEX_TIMING.assemblyEnd + EXTRA_ARRIVAL_SCROLL + EXTRA_VORTEX_SCROLL + EXTRA_ASSEMBLY_SCROLL;
 
 // Follow the physical scroll target with frame-rate-independent damping.
 // A small final snap lets the render loop sleep once the motion has settled.
@@ -25,7 +26,7 @@ export function followScroll(current, target, elapsed) {
 
 // Give arrival and the overlapping assembly more physical scroll time.
 export function progressToScroll(value) {
-  const progress = clamp(value);
+  const progress = Math.min(clamp(value), VORTEX_TIMING.assemblyEnd);
   const extra = Math.min(Math.max(0, progress - VORTEX_TIMING.assemblyStart),
     VORTEX_TIMING.assemblyEnd - VORTEX_TIMING.assemblyStart) * (ASSEMBLY_SCROLL_SCALE - 1);
   const arrivalExtra = Math.min(progress, VORTEX_TIMING.arrivalEnd) * (ARRIVAL_SCROLL_SCALE - 1);
@@ -43,7 +44,7 @@ export function scrollToProgress(value) {
   if (travel <= arrivalTravelEnd) return travel / ARRIVAL_SCROLL_SCALE;
   if (travel <= assemblyTravelStart) return VORTEX_TIMING.arrivalEnd + (travel - arrivalTravelEnd) / VORTEX_SCROLL_SCALE;
   if (travel < assemblyTravelEnd) return VORTEX_TIMING.assemblyStart + (travel - assemblyTravelStart) / ASSEMBLY_SCROLL_SCALE;
-  return clamp(travel - EXTRA_ARRIVAL_SCROLL - EXTRA_VORTEX_SCROLL - EXTRA_ASSEMBLY_SCROLL);
+  return VORTEX_TIMING.assemblyEnd;
 }
 
 // A continuous acceleration curve avoids concentrating most of the turn into

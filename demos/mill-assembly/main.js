@@ -32,7 +32,7 @@ function scrollLength() { return Math.max(1, document.documentElement.scrollHeig
 function setProgress(value) {
   cancelAnimationFrame(frame);
   frame = 0;
-  progress = clamp(Number(value));
+  progress = Math.min(clamp(Number(value)), VORTEX_TIMING.assemblyEnd);
   renderedScroll = targetScroll = progressToScroll(progress);
   window.scrollTo({ top: targetScroll * scrollLength(), behavior: 'instant' });
   manualScrollY = scrollY;
@@ -40,13 +40,16 @@ function setProgress(value) {
 }
 
 function describe() {
+  const displayed = clamp(progress / VORTEX_TIMING.assemblyEnd);
+  const completed = state.stage === 'complete';
+  const percent = completed ? 100 : Math.min(99, Math.round(displayed * 100));
   stage.dataset.progress = progress.toFixed(5);
   stage.dataset.assembled = String(state.assembledCount);
   stage.dataset.phase = String(state.phase);
-  slider.value = String(Math.round(progress * 1000));
+  slider.value = String(completed ? 1000 : Math.min(999, Math.round(displayed * 1000)));
   stage.dataset.stage = state.stage;
-  slider.setAttribute('aria-valuetext', `${Math.round(progress * 100)}%，${progress === 0 ? '等待滚动' : stageNames[state.stage]}`);
-  output.value = `${Math.round(progress * 100)}%`;
+  slider.setAttribute('aria-valuetext', `${percent}%，${progress === 0 ? '等待滚动' : stageNames[state.stage]}`);
+  output.value = `${percent}%`;
   count.textContent = String(state.assembledCount);
   total.textContent = String(state.totalParts || '—');
   phaseName.textContent = progress === 0 ? '等待滚动' : stageNames[state.stage];
@@ -274,7 +277,7 @@ try {
 
 window.__millDemo = {
   setProgress,
-  getState: () => ({ ...state, activeLabels: [...state.activeLabels], progress, targetProgress: scrollToProgress(targetScroll), settling: renderedScroll !== targetScroll, ready, renderer: stage.dataset.renderer, reducedMotion: reducedQuery.matches, inspection }),
+  getState: () => ({ ...state, activeLabels: [...state.activeLabels], progress, displayProgress: clamp(progress / VORTEX_TIMING.assemblyEnd), targetProgress: scrollToProgress(targetScroll), settling: renderedScroll !== targetScroll, ready, renderer: stage.dataset.renderer, reducedMotion: reducedQuery.matches, inspection }),
   getParts: () => model?.parts,
   getCamera: () => camera,
   getBounds: () => bounds?.clone(),
@@ -283,7 +286,7 @@ window.__millDemo = {
   setInspection,
 };
 
-slider.addEventListener('input', () => setProgress(Number(slider.value) / 1000));
+slider.addEventListener('input', () => setProgress(Number(slider.value) / 1000 * VORTEX_TIMING.assemblyEnd));
 document.querySelector('#replay').addEventListener('click', () => setProgress(0));
 document.querySelector('#complete').addEventListener('click', () => setProgress(1));
 document.querySelector('#inspect').addEventListener('click', () => setInspection(!inspection));

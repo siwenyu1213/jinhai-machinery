@@ -55,7 +55,7 @@ function covarianceAxisRatio(points) {
 }
 
 test('arrival is slower and rotating assembly gets more scroll time with reversible input mappings', () => {
-  const span = 1.594;
+  const span = 1.534;
   assert.ok(Math.abs(progressToScroll(.24) * span - .24 * 2.1) < 1e-12);
   assert.ok(Math.abs((progressToScroll(.64) - progressToScroll(.24)) * span - (.64 - .24) * .7) < 1e-12);
   const assemblyDistance = (progressToScroll(.94) - progressToScroll(.64)) * span;
@@ -63,10 +63,12 @@ test('arrival is slower and rotating assembly gets more scroll time with reversi
   assert.ok(assemblyDistance > 3 * (.94 - .76) * 1.35, 'Assembly should be at least 35 percent slower than the previous version');
   for (let step = 0; step <= 1000; step++) {
     const progress = step / 1000;
-    assert.ok(Math.abs(scrollToProgress(progressToScroll(progress)) - progress) < 1e-12);
+    assert.ok(Math.abs(scrollToProgress(progressToScroll(progress)) - Math.min(progress, VORTEX_TIMING.assemblyEnd)) < 1e-12);
   }
   assert.equal(progressToScroll(1), 1);
-  assert.equal(scrollToProgress(1), 1);
+  assert.equal(progressToScroll(VORTEX_TIMING.assemblyEnd), 1);
+  assert.equal(progressToScroll(.96), 1);
+  assert.equal(scrollToProgress(1), VORTEX_TIMING.assemblyEnd);
   for (const value of [NaN, Infinity, -1]) {
     assert.equal(progressToScroll(value), 0);
     assert.equal(scrollToProgress(value), 0);

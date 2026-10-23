@@ -49,6 +49,37 @@ test('arrival and overlapping assembly receive extra physical scroll time', asyn
   expect(positions[2] - positions[1]).toBeCloseTo((.94 - .64) * 1.4 * 2.5, 2);
 });
 
+test('the progress bar reaches 100 percent exactly at assembly and has no static scroll tail', async ({ page }) => {
+  await ready(page);
+  const slider = page.getByRole('slider', { name: '装配进度' });
+  await slider.fill('940');
+  await expect(page.locator('#phase-name')).toHaveText('旋转组装');
+  await expect(page.locator('#assembled-count')).toHaveText('0');
+  await slider.fill('999');
+  await expect(page.locator('#progress-value')).toHaveText('99%');
+  await slider.fill('1000');
+  await expect(page.locator('#progress-value')).toHaveText('100%');
+  await expect(page.locator('#phase-name')).toHaveText('装配完成');
+  const endpoint = await page.evaluate(() => ({
+    state: window.__millDemo.getState(), scroll: scrollY,
+    maximum: document.documentElement.scrollHeight - innerHeight, height: innerHeight,
+  }));
+  expect(endpoint.state.displayProgress).toBe(1);
+  expect(endpoint.state.assembledCount).toBe(34);
+  expect(endpoint.state.settling).toBe(false);
+  expect(Math.abs(endpoint.scroll - endpoint.maximum)).toBeLessThanOrEqual(1);
+  expect(endpoint.maximum / endpoint.height).toBeCloseTo(2.1476, 2);
+  await page.mouse.move(300, 300);
+  await page.mouse.wheel(0, 240);
+  const after = await page.evaluate(async () => {
+    for (let frame = 0; frame < 6; frame++) await new Promise(requestAnimationFrame);
+    return { state: window.__millDemo.getState(), scroll: scrollY };
+  });
+  expect(after.scroll).toBe(endpoint.scroll);
+  expect(after.state.progress).toBe(endpoint.state.progress);
+  expect(after.state.settling).toBe(false);
+});
+
 test('wheel release continues moving toward its target, supports reversal, and direct controls cancel the follow', async ({ page }) => {
   await ready(page);
   await page.mouse.move(200, 300);
@@ -315,7 +346,7 @@ test('scroll scene loads entirely from the local preview origin without runtime 
   await ready(page);
   for (const progress of [.12, .36, .58, .79, 1, .36]) {
     await page.evaluate((value) => window.__millDemo.setProgress(value), progress);
-    await expect.poll(() => page.evaluate(() => window.__millDemo.getState().progress)).toBeCloseTo(progress, 2);
+    await expect.poll(() => page.evaluate(() => window.__millDemo.getState().progress)).toBeCloseTo(Math.min(progress, .94), 2);
   }
   expect(errors).toEqual([]);
   expect(external).toEqual([]);

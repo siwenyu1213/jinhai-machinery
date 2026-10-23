@@ -45,8 +45,8 @@ h1 { font-size: 22px; font-weight: 600; line-height: 1.4; letter-spacing: -.035e
 .actions button:last-child { border-color: var(--line); }
 .actions button[aria-pressed="true"] { background: var(--surface); border-color: var(--line); }
 .actions button:hover { background: var(--surface); }
-/* Slower arrival and a shorter middle rotation keep total travel near 2.23 screens. */
-.scroll-track { height: 323.16vh; height: 323.16svh; }
+/* End at the assembled pose: 1.534 * 1.4 screens, with no static scroll tail. */
+.scroll-track { height: 314.76vh; height: 314.76svh; }
 .fallback { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(520px, calc(100% - 48px)); max-height: calc(100% - 260px); overflow: auto; padding: 24px; background: var(--surface); }
 .fallback h2 { font-size: 20px; font-weight: 600; }
 .fallback p, .fallback ol { font-size: 14px; color: var(--muted); margin-top: 12px; }
