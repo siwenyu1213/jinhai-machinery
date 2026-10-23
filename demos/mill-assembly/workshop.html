@@ -1,9 +1,12 @@
 <!doctype html>
 <!--
-Design brief: the shared vortex of three machines is primary; phase and component
-count are secondary; the structure note is tertiary. One action: scroll / scrub.
-Plain HTML/CSS + Three.js, no UI library, no dark variant. Tokens come from
-style.css (ink, paper, surface, line, accent); 44px controls and visible focus.
+Design brief: the shared vortex of three machines is primary through assembly;
+once finished, the triangle showcase (select a machine to bring it to the front,
+drag to rotate it around the fixed camera) becomes primary; the per-machine
+labels are the secondary selection; the structure note is tertiary. One action:
+scroll / scrub. Plain HTML/CSS + Three.js, no UI library, no dark variant.
+Tokens come from style.css (ink, paper, surface, line, accent); 44px controls
+and visible focus.
 -->
 <html lang="zh-CN">
 <head>
@@ -32,7 +35,7 @@ style.css (ink, paper, surface, line, accent); 44px controls and visible focus.
       <p>全部零件汇入同一个旋涡</p>
       <span>向下滚动：三台设备共用一条时间轴</span>
     </div>
-    <ul id="machine-labels" class="machine-labels" aria-label="已就位的设备" hidden></ul>
+    <ul id="machine-labels" class="machine-labels" aria-label="已就位的设备，可移到前方" hidden></ul>
     <p id="active-part" class="active-part" aria-hidden="true"></p>
     <section id="fallback" class="fallback" hidden aria-labelledby="fallback-title">
       <h2 id="fallback-title">当前浏览器无法显示三维画面</h2>
@@ -53,6 +56,7 @@ style.css (ink, paper, surface, line, accent); 44px controls and visible focus.
         <p id="structure-note" class="disclaimer">通用结构演示 · 非实物复刻</p>
         <div class="actions">
           <button id="replay" type="button">重播</button>
+          <button id="toggle-showcase" type="button" aria-pressed="false" hidden>暂停轮换</button>
           <button id="inspect" type="button" aria-pressed="false">查看内部</button>
           <button id="complete" type="button">查看完成</button>
         </div>

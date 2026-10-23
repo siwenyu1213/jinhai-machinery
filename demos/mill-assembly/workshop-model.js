@@ -17,7 +17,17 @@ export const RIGHT = new Vector3(14, 0, -11).normalize();
 // right, all at ground level. "compact" is kept as a compatible name for the
 // same single row; the old two-row arrangement is gone.
 const ROW_OFFSETS = Object.freeze({ mill: Object.freeze([0, 0]), lathe: Object.freeze([-9, 0]), laser: Object.freeze([9, 0]) });
-export const LAYOUT_OFFSETS = Object.freeze({ wide: ROW_OFFSETS, compact: ROW_OFFSETS });
+// The finished showcase layout: a triangle around the vertical axis through the
+// scene centre, on the same XZ eye/right plane. "front" closes in on the camera,
+// "left"/"right" sit further back at +-sqrt(3)/2 of the radius.
+export const TRIANGLE_RADIUS = 9;
+export const TRIANGLE_OFFSETS = Object.freeze({
+  front: Object.freeze([0, TRIANGLE_RADIUS]),
+  left: Object.freeze([-Math.sqrt(3) / 2 * TRIANGLE_RADIUS, -TRIANGLE_RADIUS / 2]),
+  right: Object.freeze([Math.sqrt(3) / 2 * TRIANGLE_RADIUS, -TRIANGLE_RADIUS / 2]),
+});
+export const TRIANGLE_HOMES = Object.freeze({ mill: 'front', lathe: 'left', laser: 'right' });
+export const LAYOUT_OFFSETS = Object.freeze({ wide: ROW_OFFSETS, compact: ROW_OFFSETS, triangle: TRIANGLE_OFFSETS });
 const MACHINE_LABELS = { mill: '铣床', lathe: '车床', laser: '激光切割机' };
 
 export function createWorkshop(options = {}) {
@@ -158,14 +168,29 @@ export function createWorkshop(options = {}) {
   }
   const materialsRegistry = Object.freeze(registry);
 
+  const measureMachine = (machine, target = new Box3()) => {
+    target.makeEmpty();
+    for (const part of machine.parts) target.union(new Box3().setFromObject(part.object));
+    return target;
+  };
+
   function place() {
     const offsets = LAYOUT_OFFSETS[layout];
+    const triangle = layout === 'triangle';
     for (const machine of machines) {
-      const [alongRight, alongEye] = offsets[machine.id];
+      // Triangle homes are addressed by slot (front/left/right); every other
+      // layout keeps the historical per-machine row offset.
+      const [alongRight, alongEye] = triangle ? offsets[TRIANGLE_HOMES[machine.id]] : offsets[machine.id];
       const offset = new Vector3()
         .addScaledVector(RIGHT, alongRight)
         .addScaledVector(EYE, alongEye);
       offset.y += machine.groundOffset;
+      const applyOffset = (delta) => {
+        for (const part of machine.parts) {
+          part.homePosition.add(delta);
+          part.object.position.add(delta);
+        }
+      };
       for (const part of machine.parts) {
         part.homePosition.copy(part.originalHome.position).multiplyScalar(part.scale).add(offset);
         part.homeQuaternion.copy(part.originalHome.quaternion);
@@ -173,6 +198,17 @@ export function createWorkshop(options = {}) {
         part.object.quaternion.copy(part.homeQuaternion);
         // Clear any animation disturbance of the group scale.
         part.object.scale.set(1, 1, 1);
+      }
+      if (triangle) {
+        // Slot offsets apply to the bbox centre: measure, then shift every home
+        // and the live pose horizontally so the centre lands on the slot. Y is
+        // untouched, so the machines keep standing on the ground.
+        root.updateMatrixWorld(true);
+        const center = measureMachine(machine).getCenter(new Vector3());
+        const slot = new Vector3().addScaledVector(RIGHT, offsets[TRIANGLE_HOMES[machine.id]][0])
+          .addScaledVector(EYE, offsets[TRIANGLE_HOMES[machine.id]][1]);
+        const shift = new Vector3(slot.x - center.x, 0, slot.z - center.z);
+        if (shift.lengthSq() > 1e-12) applyOffset(shift);
       }
     }
     root.updateMatrixWorld(true);
@@ -186,7 +222,7 @@ export function createWorkshop(options = {}) {
   }
 
   function setLayout(next) {
-    if (next !== 'wide' && next !== 'compact') throw new Error(`workshop: unknown layout ${next}`);
+    if (!Object.hasOwn(LAYOUT_OFFSETS, next)) throw new Error(`workshop: unknown layout ${next}`);
     if (disposed) throw new Error('workshop: cannot set a layout after dispose');
     layout = next;
     place();

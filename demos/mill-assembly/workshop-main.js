@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { createWorkshop } from './workshop-model.js';
+import { createWorkshop, TRIANGLE_HOMES } from './workshop-model.js';
 import { createWorkshopFlight } from './workshop-motion.js';
+import { createShowcase, orbitOffset, SLOT_ANGLES } from './workshop-showcase.js';
 import { loadMillSurfaceAssets } from './surface-assets.js';
 import { VORTEX_TIMING, progressToScroll, scrollToProgress, followScroll } from './motion.js';
 
@@ -27,8 +28,8 @@ const ENVELOPE_SAMPLES = [.24, .42, .55, .64, .72, .80, .88];
 const FINAL_HOLD = .78;
 const clamp = (value) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
 const smoother = (value) => { const t = clamp(value); return t * t * t * (t * (t * 6 - 15) + 10); };
-// The three machines always stand in one horizontal row; no breakpoint remaps homes.
-const layoutFor = () => 'wide';
+// The final triangle stays the same on every screen; only the camera refits.
+const layoutFor = () => 'triangle';
 
 let renderer, scene, camera, model, flight, frame = 0, progress = 0;
 let environmentTarget, floor, keyLight;
@@ -38,6 +39,14 @@ let ready = false, disposed = false, inspection = false, layout = layoutFor();
 let completeBounds, motionEnvelope, finalShot, motionShot;
 let completePoints = [], motionPoints = [];
 let freezeProgress = false;
+let showcase, completionLatch = false, wakeTimer = null, wakeAt = null, drag = null;
+const toggleShowcase = document.querySelector('#toggle-showcase');
+const eventScope = new AbortController();
+const machineTemplates = new Map();
+const raycaster = new THREE.Raycaster();
+const pointerNdc = new THREE.Vector2();
+const SHOT_SAMPLES = 96;
+let showcaseShots = [];
 const labelEntries = [];
 const labelCenter = new THREE.Vector3();
 const labelPoint = new THREE.Vector3();
@@ -130,16 +139,17 @@ function fitCamera() {
   const eye = CAMERA_EYE;
   const fillY = narrow ? .74 : .80;
   // Measure a single pristine state: flight only writes poses, never homes.
-  const homes = model.parts.map((part) => ({ part, position: part.object.position.clone(), quaternion: part.object.quaternion.clone(), scale: part.object.scale.clone() }));
+  const homes = model.parts.map((part) => ({ part, visible: part.object.visible, position: part.object.position.clone(), quaternion: part.object.quaternion.clone(), scale: part.object.scale.clone() }));
   freezeGeometry();
   completeBounds = model.root.userData.homeBounds.clone();
   const header = document.querySelector('.heading').getBoundingClientRect();
   const controls = document.querySelector('.controls').getBoundingClientRect();
   // Two shots per aspect: the tall vortex and the finished, ground-based row.
-  finalShot = computeShot(completePoints, eye, fillY, header, controls, FILL_X);
+  refitShowcase();
   motionShot = computeShot(motionPoints, eye, fillY, header, controls, .92);
   // Restore the caller's progress; the fit never leaves poses behind.
   for (const saved of homes) {
+    saved.part.object.visible = saved.visible;
     saved.part.object.position.copy(saved.position);
     saved.part.object.quaternion.copy(saved.quaternion);
     saved.part.object.scale.copy(saved.scale);
@@ -154,7 +164,13 @@ function updateCameraForProgress() {
   if (!finalShot) return;
   const blend = smoother((progress - FINAL_HOLD) / (VORTEX_TIMING.assemblyEnd - FINAL_HOLD));
   const from = motionShot;
-  const to = finalShot;
+  let to = finalShot;
+  if (completionLatch && showcaseShots.length) {
+    const phase = showcase.state().phase;
+    const index = ((phase % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI * 2) * SHOT_SAMPLES;
+    const a = showcaseShots[Math.floor(index) % SHOT_SAMPLES], b = showcaseShots[(Math.floor(index) + 1) % SHOT_SAMPLES];
+    to = { target: a.target.clone().lerp(b.target, index % 1), distance: THREE.MathUtils.lerp(a.distance, b.distance, index % 1) };
+  }
   const eye = CAMERA_EYE;
   const target = from.target.clone().lerp(to.target, blend);
   const distance = THREE.MathUtils.lerp(from.distance, to.distance, blend);
@@ -166,29 +182,39 @@ function updateCameraForProgress() {
 }
 
 function updateLabels() {
-  // Static labels stay visible under reduced motion; only scrolling is disabled.
-  const show = ready && progress >= VORTEX_TIMING.assemblyEnd && labelEntries.length > 0;
-  labelList.hidden = !show;
-  if (!show) return;
-  camera.updateMatrixWorld(true);
-  for (const entry of labelEntries) {
-    labelCenter.copy(entry.machine.homeBounds.getCenter(new THREE.Vector3()));
-    labelCenter.y = entry.machine.homeBounds.min.y;
-    labelPoint.copy(labelCenter).project(camera);
-    const x = (labelPoint.x + 1) / 2 * innerWidth;
-    let bottom = 0;
-    const box = entry.machine.homeBounds;
+  labelList.hidden = !completionLatch;
+  if (!completionLatch) return;
+  const top = document.querySelector('.heading').getBoundingClientRect().bottom + 8;
+  const bottom = document.querySelector('.controls').getBoundingClientRect().top - 8;
+  const front = showcase.state().frontId;
+  const plans = labelEntries.map((entry) => {
+    const box = showcase.boundsOf(entry.machine.id);
+    box.getCenter(labelCenter).project(camera);
+    let edge = 0;
     for (let corner = 0; corner < 8; corner++) {
       labelPoint.set(corner & 1 ? box.max.x : box.min.x, corner & 2 ? box.max.y : box.min.y, corner & 4 ? box.max.z : box.min.z).project(camera);
-      bottom = Math.max(bottom, (1 - labelPoint.y) / 2 * innerHeight);
+      edge = Math.max(edge, (1 - labelPoint.y) * innerHeight / 2);
     }
-    entry.element.style.transform = `translate(${x}px, ${bottom + 16}px) translate(-50%, -50%)`;
+    const w = entry.element.offsetWidth, h = entry.element.offsetHeight;
+    entry.element.classList.toggle('is-front', front === entry.machine.id);
+    entry.button.setAttribute('aria-pressed', String(front === entry.machine.id));
+    return { entry, w, h, x: Math.max(w / 2 + 8, Math.min(innerWidth - w / 2 - 8, (labelCenter.x + 1) * innerWidth / 2)),
+      y: Math.max(top + h / 2, Math.min(bottom - h / 2, edge + h / 2 + 8)) };
+  }).sort((a, b) => a.x - b.x);
+  const overlaps = (a, b) => Math.abs(a.x - b.x) < (a.w + b.w) / 2 + 8 && Math.abs(a.y - b.y) < (a.h + b.h) / 2 + 8;
+  // Three labels can avoid one another by a single row of vertical staggering.
+  for (let pass = 0; pass < 3; pass++) for (let i = 1; i < plans.length; i++) for (let j = 0; j < i; j++) {
+    const a = plans[i], b = plans[j];
+    if (!overlaps(a, b)) continue;
+    const gap = (a.h + b.h) / 2 + 8;
+    a.y = b.y + gap <= bottom - a.h / 2 ? b.y + gap : Math.max(top + a.h / 2, b.y - gap);
   }
+  for (const plan of plans) plan.entry.element.style.transform = `translate(${plan.x}px, ${plan.y}px) translate(-50%, -50%)`;
 }
 
 function describe() {
   const displayed = clamp(progress / VORTEX_TIMING.assemblyEnd);
-  const completed = state.stage === 'complete';
+  const completed = completionLatch;
   const percent = completed ? 100 : Math.min(99, Math.round(displayed * 100));
   stage.dataset.progress = progress.toFixed(5);
   stage.dataset.assembled = String(state.assembledCount);
@@ -202,11 +228,19 @@ function describe() {
   total.textContent = String(state.totalParts || '—');
   phaseName.textContent = progress === 0 ? '等待滚动' : stageNames[state.stage];
   firstHint.hidden = progress > .005 || !ready || reducedQuery.matches;
+  slider.disabled = completionLatch;
+  document.querySelector('#complete').hidden = completionLatch;
+  toggleShowcase.hidden = !completionLatch || reducedQuery.matches;
+  const paused = showcase?.state().paused || false;
+  toggleShowcase.textContent = paused ? '继续轮换' : '暂停轮换';
+  toggleShowcase.setAttribute('aria-pressed', String(paused));
+  renderer.domElement.classList.toggle('is-showcase', completionLatch);
+  interactionHint.textContent = completionLatch ? '点击移到前方 · 拖动旋转查看' : reducedQuery.matches ? '减少动效 · 拖动进度查看完成状态' : '滚动，飞入、旋绕、一起组装';
   const descriptions = {
     arrival: `${state.totalParts} 个组件边飞入边旋转，汇入较大的旋涡`,
     vortex: progress < VORTEX_TIMING.funnelSettled ? '三台设备共用一个旋涡，逐渐收至正常大小' : '组件继续旋绕，准备同步收拢',
     assembly: '三台设备在同一个旋涡里边旋转边落位',
-    complete: inspection ? '外壳已透视，可观察铣床内部组件' : '三台设备已就位',
+    complete: inspection ? '外壳已透视，可观察铣床内部组件' : '每 5 秒轮换 · 点击设备可移到前方',
   };
   activePart.textContent = progress === 0 ? '' : descriptions[state.stage];
 }
@@ -221,19 +255,33 @@ function applyReduced() {
   state = { ...state, activeLabels: [], assembledCount: progress >= VORTEX_TIMING.assemblyEnd ? model.parts.length : 0, stage: progress >= VORTEX_TIMING.assemblyEnd ? 'complete' : 'arrival' };
 }
 
-function draw() {
+function draw(now = performance.now()) {
   if (!ready || disposed) return;
+  if (!completionLatch && progress >= VORTEX_TIMING.assemblyEnd) {
+    progress = VORTEX_TIMING.assemblyEnd;
+    renderedScroll = targetScroll = progressToScroll(progress);
+    flight.apply(progress, camera);
+    state = flight.getState();
+    for (const part of model.parts) part.object.visible = true;
+    completionLatch = true;
+    showcase.start(now);
+  }
+  if (completionLatch) showcase.update(now);
   updateCameraForProgress();
-  flight.apply(progress, camera);
-  state = flight.getState();
-  if (reducedQuery.matches) applyReduced();
+  if (!completionLatch) {
+    flight.apply(progress, camera);
+    state = flight.getState();
+    if (reducedQuery.matches) applyReduced();
+  }
   model.root.updateMatrixWorld(true);
+  describe();
   renderer.render(scene, camera);
   updateLabels();
-  describe();
+  armWake();
 }
 
 function setProgress(value) {
+  if (!ready || disposed || completionLatch) return;
   cancelAnimationFrame(frame);
   frame = 0;
   progress = Math.min(clamp(Number(value)), VORTEX_TIMING.assemblyEnd);
@@ -289,13 +337,13 @@ function buildFlight() {
 function tick(now) {
   frame = 0;
   if (!ready || disposed) return;
-  if (renderedScroll !== targetScroll) {
+  if (!completionLatch && renderedScroll !== targetScroll) {
     renderedScroll = reducedQuery.matches ? targetScroll : followScroll(renderedScroll, targetScroll, (now - lastFrameTime) / 1000);
     progress = scrollToProgress(renderedScroll);
   }
   lastFrameTime = now;
-  draw();
-  if (renderedScroll !== targetScroll) frame = requestAnimationFrame(tick);
+  draw(now);
+  if (renderedScroll !== targetScroll || showcase.needsFrame()) frame = requestAnimationFrame(tick);
 }
 
 function invalidate() {
@@ -306,7 +354,7 @@ function invalidate() {
 }
 
 function onScroll() {
-  if (freezeProgress || scrollY === manualScrollY) return;
+  if (completionLatch || freezeProgress || scrollY === manualScrollY) return;
   manualScrollY = null;
   targetScroll = clamp(scrollY / scrollLength());
   invalidate();
@@ -318,7 +366,7 @@ function onResize() {
   // Keep progress, rendered/target scroll and any running inertia, and write the
   // native scroll for the new length so its echo cannot re-target progress.
   fitCamera();
-  writeScroll(renderedScroll * scrollLength());
+  if (!completionLatch) writeScroll(renderedScroll * scrollLength());
   draw();
 }
 
@@ -338,8 +386,127 @@ function currentState() {
     ...state,
     progress, displayProgress: clamp(progress / VORTEX_TIMING.assemblyEnd), targetProgress: scrollToProgress(targetScroll),
     settling: renderedScroll !== targetScroll, ready, renderer: stage.dataset.renderer,
-    reducedMotion: reducedQuery.matches, inspection, layout,
+    reducedMotion: reducedQuery.matches, inspection, layout, completionLocked: completionLatch, showcase: showcase?.state() || null,
   };
+}
+
+function cacheTemplates() {
+  for (const machine of model.machines) {
+    const box = machine.homeBounds, pivot = box.getCenter(new THREE.Vector3());
+    const corners = [];
+    for (let c = 0; c < 8; c++) corners.push(new THREE.Vector3(c & 1 ? box.max.x : box.min.x, c & 2 ? box.max.y : box.min.y, c & 4 ? box.max.z : box.min.z).sub(pivot));
+    machineTemplates.set(machine.id, { pivot, corners });
+  }
+}
+
+function showcaseEnvelope(phase) {
+  const points = [], poses = showcase.state().machines;
+  for (const machine of poses) {
+    const template = machineTemplates.get(machine.id);
+    const rotation = new THREE.Quaternion().fromArray(machine.rotation);
+    // World AABB corners also bound every part's AABB after arbitrary tilts.
+    // The rotated OBB alone bounds pixels, but misses those conservative corners.
+    const box = new THREE.Box3().setFromPoints(template.corners.map(point => point.clone().applyQuaternion(rotation)));
+    const corners = Array.from({ length: 8 }, (_, c) => new THREE.Vector3(c & 1 ? box.max.x : box.min.x, c & 2 ? box.max.y : box.min.y, c & 4 ? box.max.z : box.min.z));
+    const center = orbitOffset(SLOT_ANGLES[TRIANGLE_HOMES[machine.id]] + phase);
+    center.y = template.pivot.y + machine.lift;
+    for (const point of corners) points.push(point.clone().add(center));
+  }
+  return points;
+}
+
+function refitShowcase() {
+  const header = document.querySelector('.heading').getBoundingClientRect(), controls = document.querySelector('.controls').getBoundingClientRect();
+  const right = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), CAMERA_EYE).normalize();
+  // Fit each phase in advance; interpolate only target/distance while moving.
+  // Mirrored corners keep the vertical orbit axis at the screen centre.
+  showcaseShots = Array.from({ length: SHOT_SAMPLES }, (_, index) => {
+    const points = showcaseEnvelope(index * Math.PI * 2 / SHOT_SAMPLES);
+    points.push(...points.map(point => point.clone().addScaledVector(right, -2 * point.dot(right))));
+    return computeShot(points, CAMERA_EYE, host.clientWidth < 600 ? .74 : .80, header, controls, FILL_X);
+  });
+  finalShot = showcaseShots[0];
+}
+
+function clearWake() {
+  if (wakeTimer !== null) clearTimeout(wakeTimer);
+  wakeTimer = null; wakeAt = null;
+}
+
+function armWake() {
+  const due = completionLatch && !disposed ? showcase.nextWakeAt() : null;
+  if (due === wakeAt) return;
+  clearWake();
+  if (due === null) return;
+  wakeAt = due;
+  wakeTimer = setTimeout(() => { wakeTimer = null; wakeAt = null; invalidate(); }, Math.max(0, due - performance.now()));
+}
+
+function replay() {
+  if (!ready || disposed) return;
+  endPointer(null, true);
+  clearWake();
+  completionLatch = false;
+  showcase.reset();
+  showcase.setReduced(reducedQuery.matches);
+  showcase.setHidden(document.hidden);
+  refitShowcase();
+  setProgress(0);
+}
+
+function pickMachineAt(x, y) {
+  if (!completionLatch || !ready || disposed) return null;
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointerNdc.set((x - rect.left) / rect.width * 2 - 1, 1 - (y - rect.top) / rect.height * 2);
+  raycaster.setFromCamera(pointerNdc, camera);
+  for (const hit of raycaster.intersectObjects(model.root.children, true)) {
+    let object = hit.object;
+    while (object && object !== model.root) {
+      if (object.userData.machineId && object.visible) return object.userData.machineId;
+      object = object.parent;
+    }
+  }
+  return null;
+}
+
+function selectMachine(id) {
+  if (showcase?.select(id)) invalidate();
+}
+
+function onPointerDown(event) {
+  if (!completionLatch || event.button !== 0 || event.isPrimary === false || drag) return;
+  const id = pickMachineAt(event.clientX, event.clientY);
+  if (!id || !showcase.beginDrag(id)) return;
+  drag = { id, pointer: event.pointerId, x: event.clientX, y: event.clientY, moved: false, rotation: showcase.rotationOf(id),
+    right: new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0), up: new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1) };
+  renderer.domElement.setPointerCapture(event.pointerId);
+  renderer.domElement.classList.add('is-dragging');
+  clearWake();
+  invalidate();
+}
+
+function onPointerMove(event) {
+  if (!drag || event.pointerId !== drag.pointer) return;
+  const dx = event.clientX - drag.x, dy = event.clientY - drag.y;
+  if (Math.hypot(dx, dy) >= 5) drag.moved = true;
+  if (!drag.moved) return;
+  const yaw = new THREE.Quaternion().setFromAxisAngle(drag.up, dx * .009);
+  const pitch = new THREE.Quaternion().setFromAxisAngle(drag.right, dy * .009);
+  showcase.rotate(drag.id, yaw.multiply(pitch).multiply(drag.rotation));
+  refitShowcase();
+  invalidate();
+}
+
+function endPointer(event, cancelled = false) {
+  if (!drag || (event && event.pointerId !== drag.pointer)) return;
+  const done = drag;
+  drag = null;
+  const canvas = renderer.domElement;
+  canvas.classList.remove('is-dragging');
+  if (canvas.hasPointerCapture(done.pointer)) canvas.releasePointerCapture(done.pointer);
+  showcase.endDrag();
+  if (!cancelled && !done.moved) showcase.select(done.id);
+  invalidate();
 }
 
 try {
@@ -402,13 +569,23 @@ try {
     const element = document.createElement('li');
     element.className = 'machine-label';
     element.dataset.machine = machine.id;
-    element.textContent = machine.label;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.focusMachine = machine.id;
+    button.textContent = machine.label;
+    button.setAttribute('aria-label', `将${machine.label}移到前方`);
+    button.addEventListener('click', () => selectMachine(machine.id), { signal: eventScope.signal });
+    element.append(button);
     labelList.append(element);
-    labelEntries.push({ machine, element });
+    labelEntries.push({ machine, element, button });
   }
-  // One row for every viewport, baked before the flight is built.
+  // Triangle homes are baked once, before either animation controller is built.
   layout = layoutFor();
   model.setLayout(layout);
+  showcase = createShowcase({ machines: model.machines });
+  showcase.setReduced(reducedQuery.matches);
+  showcase.setHidden(document.hidden);
+  cacheTemplates();
   buildFlight();
   progress = scrollToProgress(clamp(scrollY / scrollLength()));
   renderedScroll = targetScroll = progressToScroll(progress);
@@ -417,11 +594,13 @@ try {
   stage.dataset.renderer = 'ready';
   fitCamera();
   draw();
-  renderer.domElement.addEventListener('webglcontextlost', (event) => { event.preventDefault(); cancelAnimationFrame(frame); noteFallback(new Error('WebGL context lost')); });
+  renderer.domElement.addEventListener('webglcontextlost', (event) => { event.preventDefault(); cancelAnimationFrame(frame); clearWake(); showcase?.dispose(); noteFallback(new Error('WebGL context lost')); });
 } catch (error) { noteFallback(error); }
 
 window.__workshopDemo = {
   setProgress,
+  getShowcaseState: () => showcase?.state(),
+  pickMachineAt,
   getState: currentState,
   getParts: () => model?.parts,
   getMachines: () => model?.machines.map((machine) => ({ ...machine })) || [],
@@ -429,7 +608,7 @@ window.__workshopDemo = {
   getBounds: () => completeBounds?.clone(),
   getScene: () => scene,
   getRenderStats: () => renderer ? ({
-    calls: renderer.info.render.calls, triangles: renderer.info.render.triangles,
+    calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, frames: renderer.info.render.frame,
     geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures,
     programs: renderer.info.programs?.length || 0, pixelRatio: renderer.getPixelRatio(),
   }) : null,
@@ -437,24 +616,47 @@ window.__workshopDemo = {
   getMotionEnvelope: () => motionEnvelope?.clone(),
 };
 
-slider.addEventListener('input', () => setProgress(Number(slider.value) / 1000 * VORTEX_TIMING.assemblyEnd));
-document.querySelector('#replay').addEventListener('click', () => setProgress(0));
-document.querySelector('#complete').addEventListener('click', () => setProgress(1));
-document.querySelector('#inspect').addEventListener('click', () => setInspection(!inspection));
-window.addEventListener('scroll', onScroll, { passive: true });
-window.addEventListener('resize', onResize);
+slider.addEventListener('input', () => setProgress(Number(slider.value) / 1000 * VORTEX_TIMING.assemblyEnd), { signal: eventScope.signal });
+document.querySelector('#replay').addEventListener('click', replay, { signal: eventScope.signal });
+document.querySelector('#complete').addEventListener('click', () => setProgress(1), { signal: eventScope.signal });
+document.querySelector('#inspect').addEventListener('click', () => setInspection(!inspection), { signal: eventScope.signal });
+window.addEventListener('scroll', onScroll, { passive: true, signal: eventScope.signal });
+window.addEventListener('resize', onResize, { signal: eventScope.signal });
 
 function updateMotionPreference() {
   document.body.dataset.motion = reducedQuery.matches ? 'reduced' : 'full';
-  if (ready) interactionHint.textContent = reducedQuery.matches ? '减少动效 · 拖动进度查看完成状态' : '滚动，飞入、旋绕、一起组装';
+  showcase?.setReduced(reducedQuery.matches);
+  armWake();
   invalidate();
 }
-reducedQuery.addEventListener('change', updateMotionPreference);
+reducedQuery.addEventListener('change', updateMotionPreference, { signal: eventScope.signal });
 updateMotionPreference();
+toggleShowcase.addEventListener('click', () => {
+  showcase?.setPaused(!showcase.state().paused);
+  invalidate();
+}, { signal: eventScope.signal });
+if (ready) {
+  const canvas = renderer.domElement;
+  canvas.addEventListener('pointerdown', onPointerDown, { signal: eventScope.signal });
+  canvas.addEventListener('pointermove', onPointerMove, { signal: eventScope.signal });
+  canvas.addEventListener('pointerup', endPointer, { signal: eventScope.signal });
+  canvas.addEventListener('pointercancel', event => endPointer(event, true), { signal: eventScope.signal });
+  canvas.addEventListener('lostpointercapture', event => endPointer(event, true), { signal: eventScope.signal });
+}
+document.addEventListener('visibilitychange', () => {
+  endPointer(null, true);
+  showcase?.setHidden(document.hidden);
+  if (document.hidden) { clearWake(); cancelAnimationFrame(frame); frame = 0; }
+  else invalidate();
+}, { signal: eventScope.signal });
 
 window.addEventListener('pagehide', () => {
   if (disposed) return;
+  endPointer(null, true);
   disposed = true;
+  eventScope.abort();
+  clearWake();
+  showcase?.dispose();
   cancelAnimationFrame(frame);
   frame = 0;
   model?.root.removeFromParent();

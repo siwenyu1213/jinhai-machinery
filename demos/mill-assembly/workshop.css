@@ -2,15 +2,26 @@
 @import './style.css';
 
 /* The stage is the render host. The page header, body and controls stay the
-   stable frame; only the labels above the canvas ever move. */
+   stable frame; only the labels above the canvas ever move. Before the
+   showcase the canvas is invisible to pointers so the page keeps scrolling. */
 .workshop-heading,
 .controls { z-index: 1; }
-#workshop-scene { pointer-events: none; }
+#workshop-scene { pointer-events: none; max-width: 100%; }
+#workshop-scene canvas.is-showcase { pointer-events: auto; touch-action: none; cursor: grab; }
+#workshop-scene canvas.is-dragging { cursor: grabbing; }
 
 .machine-labels { position: absolute; inset: 0; margin: 0; padding: 0; list-style: none; pointer-events: none; z-index: 1; }
-.machine-label { position: absolute; left: 0; top: 0; width: max-content; transform: translate(-50%, -50%); padding: 2px 8px; border-radius: 4px; background: rgb(248 249 246 / 88%); color: var(--ink); font-size: 12px; line-height: 1.5; white-space: nowrap; box-shadow: inset 0 0 0 1px var(--line); }
+.machine-label { position: absolute; left: 0; top: 0; width: max-content; transform: translate(-50%, -50%); pointer-events: auto; }
+.machine-label button {
+  display: block; min-height: 44px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 4px;
+  background: rgb(248 249 246 / 92%); color: var(--ink); font-size: 13px; line-height: 1.5; white-space: nowrap;
+}
+.machine-label button:hover { background: var(--surface); }
+.machine-label button:focus-visible { outline: 3px solid #79591e; outline-offset: 2px; }
+.machine-label.is-front button { border-color: #79591e; box-shadow: inset 0 2px 0 var(--accent); font-weight: 600; }
 
-#workshop-scene { max-width: 100%; }
+#toggle-showcase[aria-pressed="true"] { background: var(--surface); border-color: var(--line); }
+
 @media (max-width: 600px) {
-  .machine-label { font-size: 11px; padding: 1px 6px; }
+  .machine-label button { min-height: 44px; padding: 6px 10px; font-size: 12px; }
 }
