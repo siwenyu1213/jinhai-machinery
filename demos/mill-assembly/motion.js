@@ -1,10 +1,37 @@
-import { Box3, Euler, Quaternion, Vector3 } from 'three';
+import { Box3, Euler, Matrix4, Quaternion, Vector3 } from 'three';
+
+// Part-local geometry bounds from child transforms only; the root pose and
+// world matrix never participate, so results are independent of the home.
+function localPartBounds(root) {
+  const box = new Box3();
+  let found = false;
+  const visit = (parent, parentRelative) => {
+    for (const child of parent.children) {
+      child.updateMatrix();
+      const relative = new Matrix4().multiplyMatrices(parentRelative, child.matrix);
+      if (child.isMesh && child.geometry) {
+        if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
+        box.union(child.geometry.boundingBox.clone().applyMatrix4(relative));
+        found = true;
+      }
+      visit(child, relative);
+    }
+  };
+  visit(root, new Matrix4());
+  if (!found) box.set(new Vector3(), new Vector3());
+  return box;
+}
 
 export const VORTEX_TIMING = Object.freeze({ arrivalEnd: .24, funnelSettled: .42, assemblyStart: .64, assemblyEnd: .94 });
 const TAU = Math.PI * 2;
 const Y_AXIS = new Vector3(0, 1, 0);
 const clamp = (value) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
 const smoother = (value) => value * value * value * (value * (value * 6 - 15) + 10);
+const positive = (value, name) => {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) throw new Error(`Assembly ${name} must be a positive number.`);
+  return number;
+};
 const ARRIVAL_SCROLL_SCALE = 2.1;
 const VORTEX_SCROLL_SCALE = .7;
 const ASSEMBLY_SCROLL_SCALE = 2.5;
@@ -84,18 +111,26 @@ export function getFlightSchedule(parts) {
  * arbitrary modeling origins, orbit the Y axis so a tall casting stays readable.
  * Saved home poses are immutable; reversing or jumping the scrollbar is exact.
  */
-export function createAssemblyFlight(parts, { stagger = true } = {}) {
+export function createAssemblyFlight(parts, { stagger = true, vortexRadius = 1, vortexHeight = 1, pieceScale = 1, localSpaceBounds = false } = {}) {
+  // Shape knobs default to 1 and leave every legacy formula untouched. The
+  // ground plane (1.3) stays fixed; only the vertical span around it scales.
+  const radiusFactor = positive(vortexRadius, 'vortexRadius');
+  const heightFactor = positive(vortexHeight, 'vortexHeight');
+  const sizeFactor = positive(pieceScale, 'pieceScale');
+  const ground = 1.3;
   if (new Set(parts.map((part) => part.id)).size !== parts.length) throw new Error('Assembly part IDs must be unique.');
   const schedule = getFlightSchedule(parts);
   const entries = parts.map((part, index) => {
+    // The legacy path measures world AABBs and inverts the root matrix, which is
+    // sensitive to far-translation float noise. localSpaceBounds derives the box
+    // from child transforms only, so future home poses cannot perturb it.
     part.object.updateWorldMatrix(true, true);
-    const worldBox = new Box3().setFromObject(part.object);
-    const localBox = worldBox.clone().applyMatrix4(part.object.matrixWorld.clone().invert());
+    const localBox = localSpaceBounds ? localPartBounds(part.object) : new Box3().setFromObject(part.object).applyMatrix4(part.object.matrixWorld.clone().invert());
     const center = localBox.getCenter(new Vector3());
     const dimensions = localBox.getSize(new Vector3());
     const radius = Math.max(.12, dimensions.length() / 2);
     const seed = hash(part.id);
-    const scale = Math.max(.54, .88 - radius * .09);
+    const scale = Math.max(.54, .88 - radius * .09) * sizeFactor;
     const rotation = part.homeQuaternion.clone();
     const home = part.homePosition.clone();
     const homeCenter = center.clone().applyQuaternion(rotation).add(home);
@@ -120,8 +155,8 @@ export function createAssemblyFlight(parts, { stagger = true } = {}) {
       slots.push({
         layer,
         angle: azimuth + item * TAU / count + (hash(`angle-${layer}-${item}`) - .5) * .10,
-        orbitY: 1.30 + height * 5.55 + jitter * .22,
-        orbitRadius: (.93 + height * 2.68) * (.96 + hash(`radius-${layer}-${item}`) * .08),
+        orbitY: ground + (height * 5.55 + jitter * .22) * heightFactor,
+        orbitRadius: (.93 + height * 2.68) * (.96 + hash(`radius-${layer}-${item}`) * .08) * radiusFactor,
       });
     }
   }
@@ -129,11 +164,14 @@ export function createAssemblyFlight(parts, { stagger = true } = {}) {
   // middle, and fill the remaining slots without coupling size to azimuth.
   for (const entry of [...entries].sort((a, b) => b.radius - a.radius)) {
     const halfHeight = (entry.dimensions.y / 2 + Math.max(entry.dimensions.x, entry.dimensions.z) * .18) * entry.scale;
-    let choices = slots.filter((slot) => slot.orbitY > halfHeight + .15 && slot.orbitY < 8.65 - halfHeight);
+    // Height bounds and targets follow the same ground-based scaling as the
+    // slots, so a scaled funnel still selects the intended layer.
+    const ceil = ground + (8.65 - ground) * heightFactor;
+    let choices = slots.filter((slot) => slot.orbitY > halfHeight + .15 && slot.orbitY < ceil - halfHeight);
     if (!choices.length) choices = slots;
     const targetHeight = entry.radius > 1.5
-      ? entry.dimensions.y > Math.max(entry.dimensions.x, entry.dimensions.z) ? 4.2 : 6.3
-      : 1.3 + hash(entry.part.id + '-layer') * 5.55;
+      ? ground + ((entry.dimensions.y > Math.max(entry.dimensions.x, entry.dimensions.z) ? 4.2 : 6.3) - ground) * heightFactor
+      : ground + hash(entry.part.id + '-layer') * 5.55 * heightFactor;
     choices.sort((a, b) => Math.abs(a.orbitY - targetHeight) - Math.abs(b.orbitY - targetHeight)
       || hash(entry.part.id + a.angle) - hash(entry.part.id + b.angle));
     const slot = choices[0];
@@ -208,7 +246,7 @@ export function createAssemblyFlight(parts, { stagger = true } = {}) {
         + .10 * Math.cos(TAU * u * 3.1 + phaseOffset * 2)) * envelope;
       const breathing = 1 + .075 * Math.sin(TAU * u * 2.3 + phaseOffset) * envelope;
       const orbitRadius = (entry.orbitRadius * breathing + lift * .12) * funnelScale;
-      const orbitY = 1.3 + (entry.orbitY - 1.3) * (1 + .06 * (funnelScale - 1)) + lift;
+      const orbitY = ground + (entry.orbitY - ground) * (1 + .06 * (funnelScale - 1)) + lift;
       orbitPosition.set(Math.cos(entry.angle) * orbitRadius, orbitY, Math.sin(entry.angle) * orbitRadius);
       orbitPosition.lerp(homeCenter, assemblyProgress);
       turn.setFromAxisAngle(Y_AXIS, -(TAU * rotationProgress + angularDrift));

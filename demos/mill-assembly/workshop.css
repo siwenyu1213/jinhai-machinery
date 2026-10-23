@@ -1,0 +1,16 @@
+/* Shared tokens, stage, controls, fallback and scroll track live in style.css. */
+@import './style.css';
+
+/* The stage is the render host. The page header, body and controls stay the
+   stable frame; only the labels above the canvas ever move. */
+.workshop-heading,
+.controls { z-index: 1; }
+#workshop-scene { pointer-events: none; }
+
+.machine-labels { position: absolute; inset: 0; margin: 0; padding: 0; list-style: none; pointer-events: none; z-index: 1; }
+.machine-label { position: absolute; left: 0; top: 0; width: max-content; transform: translate(-50%, -50%); padding: 2px 8px; border-radius: 4px; background: rgb(248 249 246 / 88%); color: var(--ink); font-size: 12px; line-height: 1.5; white-space: nowrap; box-shadow: inset 0 0 0 1px var(--line); }
+
+#workshop-scene { max-width: 100%; }
+@media (max-width: 600px) {
+  .machine-label { font-size: 11px; padding: 1px 6px; }
+}

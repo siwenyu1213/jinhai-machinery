@@ -3,8 +3,9 @@ import { defineConfig } from 'vite';
 
 // Deliberately separate from site/: this experiment is never an input to the
 // production website build or its GitHub Pages deployment.
-// Two pages share one standalone build: the mill assembly (/index.html) and the
-// static model review (/model-review.html). Absolute inputs keep the demo root.
+// Three pages share one standalone build: the mill assembly (/index.html), the
+// static model review (/model-review.html) and the three-machine workshop
+// (/workshop.html). Absolute inputs keep the demo root.
 export default defineConfig({
   root: 'demos/mill-assembly',
   base: './',
@@ -16,6 +17,7 @@ export default defineConfig({
       input: {
         main: fileURLToPath(new URL('./demos/mill-assembly/index.html', import.meta.url)),
         review: fileURLToPath(new URL('./demos/mill-assembly/model-review.html', import.meta.url)),
+        workshop: fileURLToPath(new URL('./demos/mill-assembly/workshop.html', import.meta.url)),
       },
     },
   },

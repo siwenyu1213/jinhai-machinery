@@ -1,0 +1,66 @@
+<!doctype html>
+<!--
+Design brief: the shared vortex of three machines is primary; phase and component
+count are secondary; the structure note is tertiary. One action: scroll / scrub.
+Plain HTML/CSS + Three.js, no UI library, no dark variant. Tokens come from
+style.css (ink, paper, surface, line, accent); 44px controls and visible focus.
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="三台设备联合动效预览：铣床、车床与激光切割机的零件汇入同一个旋涡，旋转一整圈并同时组装。">
+  <title>三机 · 旋转装配</title>
+  <link rel="stylesheet" href="./workshop.css">
+</head>
+<body>
+  <main id="workshop-stage" class="stage" data-renderer="loading" data-progress="0" data-assembled="0" aria-label="三台设备联合旋转装配演示">
+    <div id="workshop-scene" class="scene" role="img" aria-label="铣床、车床和激光切割机的零件从画面两侧飞入，在同一旋涡中旋转并同时组装"></div>
+    <header class="heading workshop-heading">
+      <div>
+        <h1>三机 · 旋转装配</h1>
+        <p id="interaction-hint">滚动，飞入、旋绕、一起组装</p>
+      </div>
+      <div id="workshop-status" class="assembly-status" aria-label="当前装配状态">
+        <p id="phase-name">等待滚动</p>
+        <p><span id="assembled-count">0</span><span class="status-separator">/</span><span id="total-count">—</span> 组件</p>
+      </div>
+    </header>
+    <div id="first-hint" class="first-hint">
+      <span class="scroll-mark" aria-hidden="true"></span>
+      <p>全部零件汇入同一个旋涡</p>
+      <span>向下滚动：三台设备共用一条时间轴</span>
+    </div>
+    <ul id="machine-labels" class="machine-labels" aria-label="已就位的设备" hidden></ul>
+    <p id="active-part" class="active-part" aria-hidden="true"></p>
+    <section id="fallback" class="fallback" hidden aria-labelledby="fallback-title">
+      <h2 id="fallback-title">当前浏览器无法显示三维画面</h2>
+      <p>请使用开启硬件加速的浏览器重新打开。三台设备均为通用结构演示：</p>
+      <ol>
+        <li>铣床：底座、立柱、工作台、炮塔、滑枕、铣头与主轴驱动</li>
+        <li>车床：床身、主轴箱与卡盘、刀架、尾座和防护罩</li>
+        <li>激光切割机：床身、切割头与龙门、工作台和外壳</li>
+      </ol>
+    </section>
+    <footer class="controls" aria-label="装配控制">
+      <div class="scrub-row">
+        <label for="assembly-progress">装配进度</label>
+        <input id="assembly-progress" type="range" min="0" max="1000" value="0" step="1" aria-valuetext="0%">
+        <output id="progress-value" for="assembly-progress">0%</output>
+      </div>
+      <div class="control-bottom">
+        <p id="structure-note" class="disclaimer">通用结构演示 · 非实物复刻</p>
+        <div class="actions">
+          <button id="replay" type="button">重播</button>
+          <button id="inspect" type="button" aria-pressed="false">查看内部</button>
+          <button id="complete" type="button">查看完成</button>
+        </div>
+      </div>
+    </footer>
+    <noscript><p class="noscript">此交互演示需要 JavaScript。三台设备均展示通用结构：铣床的底座、立柱、工作台与主轴；车床的床身、卡盘与刀架；激光切割机的床身、龙门、切割头与工作台。</p></noscript>
+  </main>
+  <div class="scroll-track" aria-hidden="true"></div>
+  <script type="module" src="./workshop-main.js"></script>
+</body>
+</html>
