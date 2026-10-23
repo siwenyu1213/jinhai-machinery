@@ -320,9 +320,37 @@ test('completed machines sit between header and controls, labels do not overlap,
   expect(Math.min(...layout.points.map(([x]) => x))).toBeGreaterThan(-.99);
   expect(Math.max(...layout.points.map(([x]) => x))).toBeLessThan(.99);
   const occupiedWidth = (Math.max(...layout.points.map(([x]) => x)) - Math.min(...layout.points.map(([x]) => x))) / 2;
-  expect(occupiedWidth).toBeGreaterThan(.65);
+  expect(occupiedWidth).toBeGreaterThan(.90);
   expect(Math.min(...layout.points.map(([, y]) => y))).toBeGreaterThan(-.99);
   await testInfo.attach('workshop-complete', { body: await page.screenshot(), contentType: 'image/png' });
+});
+
+test('every part Box3 corner stays inside the frame from p=.24 through the finished row', async ({ page }) => {
+  await ready(page);
+  for (const progress of [.24, .42, .63, .74, .86]) {
+    await page.evaluate((value) => window.__workshopDemo.setProgress(value), progress);
+    await frames(page, 2);
+    const extents = await page.evaluate(() => {
+      const camera = window.__workshopDemo.getCamera();
+      const Box = window.__workshopDemo.getBounds().constructor;
+      const points = [];
+      for (const part of window.__workshopDemo.getParts()) {
+        const box = new Box().setFromObject(part.object);
+        for (let x = 0; x < 2; x++) for (let y = 0; y < 2; y++) for (let z = 0; z < 2; z++) {
+          points.push(new box.min.constructor(x ? box.max.x : box.min.x, y ? box.max.y : box.min.y, z ? box.max.z : box.min.z).project(camera).toArray());
+        }
+      }
+      return points;
+    });
+    expect(extents.length).toBe(91 * 8);
+    // Projected part corners, not visible flags, define the on-screen bounds.
+    for (const [x, y] of extents) {
+      expect(x, `p=${progress} x`).toBeGreaterThanOrEqual(-.99);
+      expect(x, `p=${progress} x`).toBeLessThanOrEqual(.99);
+      expect(y, `p=${progress} y`).toBeGreaterThanOrEqual(-.99);
+      expect(y, `p=${progress} y`).toBeLessThanOrEqual(.99);
+    }
+  }
 });
 
 test('crossing every breakpoint keeps the same row, all 91 homes and progress', async ({ page }) => {

@@ -21,7 +21,7 @@ const stageNames = { arrival: '旋转飞入', vortex: '中央旋绕', assembly: 
 // One fixed viewpoint for every screen and stage: the classic mill view angle.
 // Fitting may only move the target and distance, never tilt or orbit the eye.
 const CAMERA_EYE = new THREE.Vector3(11, 4.5, 14).normalize();
-const FILL_X = .84;
+const FILL_X = .95;
 // Sampled while fitting so the taller vortex never leaves the frame.
 const ENVELOPE_SAMPLES = [.24, .42, .55, .64, .72, .80, .88];
 const FINAL_HOLD = .78;
@@ -83,7 +83,7 @@ function occupiedCorners() {
   return points;
 }
 
-function computeShot(points, eye, fillY, headerRect, controlsRect) {
+function computeShot(points, eye, fillY, headerRect, controlsRect, fillX = FILL_X) {
   const right = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), eye).normalize();
   const up = new THREE.Vector3().crossVectors(eye, right).normalize();
   // Fit occupied part corners in the camera frame. A single world AABB around
@@ -96,7 +96,7 @@ function computeShot(points, eye, fillY, headerRect, controlsRect) {
   let distance = 0;
   for (const point of points) {
     const near = point.dot(eye) - center.z;
-    distance = Math.max(distance, near + Math.abs(point.dot(right) - center.x) / (tanVertical * camera.aspect * FILL_X),
+    distance = Math.max(distance, near + Math.abs(point.dot(right) - center.x) / (tanVertical * camera.aspect * fillX),
       near + Math.abs(point.dot(up) - center.y) / (tanVertical * fillY));
   }
   distance = Math.max(15, distance);
@@ -128,7 +128,7 @@ function fitCamera() {
   const narrow = width < 600;
   // Narrow screens only relax the vertical fill and pixel ratio, not the angle.
   const eye = CAMERA_EYE;
-  const fillY = narrow ? .62 : .68;
+  const fillY = narrow ? .74 : .80;
   // Measure a single pristine state: flight only writes poses, never homes.
   const homes = model.parts.map((part) => ({ part, position: part.object.position.clone(), quaternion: part.object.quaternion.clone(), scale: part.object.scale.clone() }));
   freezeGeometry();
@@ -136,8 +136,8 @@ function fitCamera() {
   const header = document.querySelector('.heading').getBoundingClientRect();
   const controls = document.querySelector('.controls').getBoundingClientRect();
   // Two shots per aspect: the tall vortex and the finished, ground-based row.
-  finalShot = computeShot(completePoints, eye, fillY, header, controls);
-  motionShot = computeShot(motionPoints, eye, fillY, header, controls);
+  finalShot = computeShot(completePoints, eye, fillY, header, controls, FILL_X);
+  motionShot = computeShot(motionPoints, eye, fillY, header, controls, .92);
   // Restore the caller's progress; the fit never leaves poses behind.
   for (const saved of homes) {
     saved.part.object.position.copy(saved.position);
