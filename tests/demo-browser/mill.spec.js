@@ -12,12 +12,12 @@ test('starts empty and real wheel scrolling advances and reverses the simultaneo
   await expect(page.locator('#first-hint')).toBeVisible();
   await page.mouse.move(300, 300);
   await page.mouse.wheel(0, 240);
-  await expect.poll(() => page.evaluate(() => window.__millDemo.getState().progress)).toBeGreaterThan(.10);
+  await expect.poll(() => page.evaluate(() => window.__millDemo.getState().progress)).toBeGreaterThan(.07);
   const forward = await page.evaluate(() => window.__millDemo.getState());
   expect(forward.assembledCount).toBe(0);
   expect(await page.evaluate(() => window.__millDemo.getParts().filter((part) => part.object.visible).length)).toBe(forward.totalParts);
   await page.mouse.wheel(0, -120);
-  await expect.poll(() => page.evaluate(() => window.__millDemo.getState().progress)).toBeLessThan(forward.progress - .04);
+  await expect.poll(() => page.evaluate(() => window.__millDemo.getState().progress)).toBeLessThan(forward.progress - .02);
   const backward = await page.evaluate(() => window.__millDemo.getState());
   expect(backward.assembledCount).toBe(0);
   await page.evaluate(() => window.__millDemo.setProgress(0));
@@ -27,10 +27,10 @@ test('starts empty and real wheel scrolling advances and reverses the simultaneo
 test('a short scroll path advances substantially per wheel step and finishes within twenty steps', async ({ page }) => {
   await ready(page);
   const travel = await page.evaluate(() => ({ distance: document.documentElement.scrollHeight - innerHeight, height: innerHeight }));
-  expect(travel.distance).toBeLessThanOrEqual(travel.height * 2.22);
+  expect(travel.distance).toBeLessThanOrEqual(travel.height * 2.26);
   await page.mouse.move(200, 300);
   await page.mouse.wheel(0, 120);
-  await expect.poll(() => page.evaluate(() => window.__millDemo.getState().progress)).toBeGreaterThan(.05);
+  await expect.poll(() => page.evaluate(() => window.__millDemo.getState().progress)).toBeGreaterThan(.035);
   for (let step = 1; step < 20; step++) await page.mouse.wheel(0, 120);
   await expect(page.locator('#phase-name')).toHaveText('装配完成');
   const state = await page.evaluate(() => window.__millDemo.getState());
@@ -44,8 +44,8 @@ test('arrival and overlapping assembly receive extra physical scroll time', asyn
     await page.evaluate((value) => window.__millDemo.setProgress(value), progress);
     positions.push(await page.evaluate(() => scrollY / innerHeight));
   }
-  expect(positions[0]).toBeCloseTo(.24 * 1.4 * 1.5, 2);
-  expect(positions[1] - positions[0]).toBeCloseTo((.64 - .24) * 1.4, 2);
+  expect(positions[0]).toBeCloseTo(.24 * 1.4 * 2.1, 2);
+  expect(positions[1] - positions[0]).toBeCloseTo((.64 - .24) * 1.4 * .7, 2);
   expect(positions[2] - positions[1]).toBeCloseTo((.94 - .64) * 1.4 * 2.5, 2);
 });
 
@@ -53,7 +53,7 @@ test('wheel release continues moving toward its target, supports reversal, and d
   await ready(page);
   await page.mouse.move(200, 300);
   await page.mouse.wheel(0, 360);
-  await expect.poll(() => page.evaluate(() => window.__millDemo.getState().targetProgress)).toBeGreaterThan(.15);
+  await expect.poll(() => page.evaluate(() => window.__millDemo.getState().targetProgress)).toBeGreaterThan(.12);
   const samples = await page.evaluate(async () => {
     const entries = [];
     const start = performance.now();

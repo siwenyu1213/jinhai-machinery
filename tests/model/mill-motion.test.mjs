@@ -55,9 +55,9 @@ function covarianceAxisRatio(points) {
 }
 
 test('arrival is slower and rotating assembly gets more scroll time with reversible input mappings', () => {
-  const span = 1.57;
-  assert.ok(Math.abs(progressToScroll(.24) * span - .24 * 1.5) < 1e-12);
-  assert.ok(Math.abs((progressToScroll(.64) - progressToScroll(.24)) * span - (.64 - .24)) < 1e-12);
+  const span = 1.594;
+  assert.ok(Math.abs(progressToScroll(.24) * span - .24 * 2.1) < 1e-12);
+  assert.ok(Math.abs((progressToScroll(.64) - progressToScroll(.24)) * span - (.64 - .24) * .7) < 1e-12);
   const assemblyDistance = (progressToScroll(.94) - progressToScroll(.64)) * span;
   assert.ok(Math.abs(assemblyDistance - 2.5 * (.94 - .64)) < 1e-12);
   assert.ok(assemblyDistance > 3 * (.94 - .76) * 1.35, 'Assembly should be at least 35 percent slower than the previous version');
@@ -84,6 +84,8 @@ test('scroll follow keeps moving after input ends, decelerates without overshoot
     progress = next;
   }
   assert.equal(progress, .7);
+  assert.ok(followScroll(0, 1, .6) > .7 && followScroll(0, 1, .6) < .8, 'A release should retain a visible tail after 600ms');
+  assert.ok(followScroll(0, 1, 1.2) > .9 && followScroll(0, 1, 1.2) < .95, 'The stronger inertia should still be settling after 1.2 seconds');
   const reversed = followScroll(progress, .2, .1);
   assert.ok(reversed > .2 && reversed < progress);
   assert.equal(followScroll(.4, .8, 0), .4);
@@ -163,6 +165,7 @@ test('equal physical scroll increments keep a clear but smooth slow-fast-slow tu
   for (let step = 1; step < 5; step++) assert.ok(increments[step] > increments[step - 1]);
   for (let step = 6; step < 10; step++) assert.ok(increments[step] < increments[step - 1]);
   assert.ok(increments[4] > increments[0] * 4, 'Slow-fast-slow should remain visible');
+  assert.ok(increments[4] > Math.PI * 2 * .19, 'The middle tenth should turn over 68 degrees, clearly faster than the previous 53 degrees');
   assert.ok(Math.max(...increments) < Math.PI * .4, 'No tenth should cram over 72 degrees into one scroll increment');
   assert.ok(Math.abs(increments.reduce((sum, value) => sum + value, 0) - Math.PI * 2) < 1e-8);
   // Match speeds across the old stopping point using physical scroll units.
@@ -275,6 +278,31 @@ test('real components advance consistently with small independent orbital speed 
       assert.ok(Math.max(...increments) - Math.min(...increments) > .001,
         `progress ${progress}: independent angular variations should avoid a rigid carousel turning at identical speed`);
     }
+  } finally { model.dispose(); }
+});
+
+test('independent gusts produce visible relative tumbling and simultaneous upward and downward motion', () => {
+  const model = createMill();
+  const flight = createAssemblyFlight(model.parts);
+  const camera = cameraFor();
+  const snapshot = (progress) => {
+    flight.apply(progress, camera);
+    return model.parts.map((part) => ({ rotation: part.object.quaternion.clone(), y: geometryCenter(part).y }));
+  };
+  try {
+    const before = snapshot(.4), after = snapshot(.58);
+    let independentlyTumbling = 0;
+    for (let index = 1; index < before.length; index++) {
+      const relativeBefore = before[index - 1].rotation.clone().invert().multiply(before[index].rotation);
+      const relativeAfter = after[index - 1].rotation.clone().invert().multiply(after[index].rotation);
+      if (relativeBefore.angleTo(relativeAfter) > .4) independentlyTumbling++;
+    }
+    assert.ok(independentlyTumbling >= 8, 'Many pieces must visibly change orientation relative to one another, beyond shared orbit rotation');
+    const shifts = after.map((part, index) => part.y - before[index].y);
+    assert.ok(shifts.filter((value) => value > .05).length >= 6);
+    assert.ok(shifts.filter((value) => value < -.05).length >= 6);
+    flight.apply(.94, camera);
+    for (const part of model.parts) assert.ok(part.object.quaternion.angleTo(part.homeQuaternion) < 1e-10);
   } finally { model.dispose(); }
 });
 

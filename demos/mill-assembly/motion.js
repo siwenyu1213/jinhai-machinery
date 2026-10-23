@@ -5,11 +5,13 @@ const TAU = Math.PI * 2;
 const Y_AXIS = new Vector3(0, 1, 0);
 const clamp = (value) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
 const smoother = (value) => value * value * value * (value * (value * 6 - 15) + 10);
-const ARRIVAL_SCROLL_SCALE = 1.5;
+const ARRIVAL_SCROLL_SCALE = 2.1;
+const VORTEX_SCROLL_SCALE = .7;
 const ASSEMBLY_SCROLL_SCALE = 2.5;
 const EXTRA_ARRIVAL_SCROLL = VORTEX_TIMING.arrivalEnd * (ARRIVAL_SCROLL_SCALE - 1);
+const EXTRA_VORTEX_SCROLL = (VORTEX_TIMING.assemblyStart - VORTEX_TIMING.arrivalEnd) * (VORTEX_SCROLL_SCALE - 1);
 const EXTRA_ASSEMBLY_SCROLL = (VORTEX_TIMING.assemblyEnd - VORTEX_TIMING.assemblyStart) * (ASSEMBLY_SCROLL_SCALE - 1);
-const SCROLL_SPAN = 1 + EXTRA_ARRIVAL_SCROLL + EXTRA_ASSEMBLY_SCROLL;
+const SCROLL_SPAN = 1 + EXTRA_ARRIVAL_SCROLL + EXTRA_VORTEX_SCROLL + EXTRA_ASSEMBLY_SCROLL;
 
 // Follow the physical scroll target with frame-rate-independent damping.
 // A small final snap lets the render loop sleep once the motion has settled.
@@ -17,7 +19,7 @@ export function followScroll(current, target, elapsed) {
   const start = clamp(current);
   const end = clamp(target);
   const seconds = Number.isFinite(elapsed) ? Math.max(0, elapsed) : 0;
-  const next = start + (end - start) * -Math.expm1(-seconds / .24);
+  const next = start + (end - start) * -Math.expm1(-seconds / .45);
   return Math.abs(end - next) < .0001 ? end : next;
 }
 
@@ -27,25 +29,31 @@ export function progressToScroll(value) {
   const extra = Math.min(Math.max(0, progress - VORTEX_TIMING.assemblyStart),
     VORTEX_TIMING.assemblyEnd - VORTEX_TIMING.assemblyStart) * (ASSEMBLY_SCROLL_SCALE - 1);
   const arrivalExtra = Math.min(progress, VORTEX_TIMING.arrivalEnd) * (ARRIVAL_SCROLL_SCALE - 1);
-  return (progress + arrivalExtra + extra) / SCROLL_SPAN;
+  const vortexExtra = Math.min(Math.max(0, progress - VORTEX_TIMING.arrivalEnd),
+    VORTEX_TIMING.assemblyStart - VORTEX_TIMING.arrivalEnd) * (VORTEX_SCROLL_SCALE - 1);
+  return (progress + arrivalExtra + vortexExtra + extra) / SCROLL_SPAN;
 }
 
 export function scrollToProgress(value) {
   const travel = clamp(value) * SCROLL_SPAN;
   const arrivalTravelEnd = VORTEX_TIMING.arrivalEnd + EXTRA_ARRIVAL_SCROLL;
-  const assemblyTravelStart = VORTEX_TIMING.assemblyStart + EXTRA_ARRIVAL_SCROLL;
-  const assemblyTravelEnd = VORTEX_TIMING.assemblyEnd + EXTRA_ARRIVAL_SCROLL + EXTRA_ASSEMBLY_SCROLL;
+  const assemblyTravelStart = VORTEX_TIMING.assemblyStart + EXTRA_ARRIVAL_SCROLL + EXTRA_VORTEX_SCROLL;
+  const assemblyTravelEnd = VORTEX_TIMING.assemblyEnd + EXTRA_ARRIVAL_SCROLL + EXTRA_VORTEX_SCROLL + EXTRA_ASSEMBLY_SCROLL;
+  if (Math.abs(travel - assemblyTravelEnd) < 1e-12) return VORTEX_TIMING.assemblyEnd;
   if (travel <= arrivalTravelEnd) return travel / ARRIVAL_SCROLL_SCALE;
-  if (travel <= assemblyTravelStart) return travel - EXTRA_ARRIVAL_SCROLL;
+  if (travel <= assemblyTravelStart) return VORTEX_TIMING.arrivalEnd + (travel - arrivalTravelEnd) / VORTEX_SCROLL_SCALE;
   if (travel < assemblyTravelEnd) return VORTEX_TIMING.assemblyStart + (travel - assemblyTravelStart) / ASSEMBLY_SCROLL_SCALE;
-  return clamp(travel - EXTRA_ARRIVAL_SCROLL - EXTRA_ASSEMBLY_SCROLL);
+  return clamp(travel - EXTRA_ARRIVAL_SCROLL - EXTRA_VORTEX_SCROLL - EXTRA_ASSEMBLY_SCROLL);
 }
 
 // A continuous acceleration curve avoids concentrating most of the turn into
 // a few wheel steps. Rotation and contraction share one physical scroll clock.
 function windTurn(value) {
   const t = clamp(value);
-  return t * t * (3 - 2 * t);
+  if (t === 0 || t === 1) return t;
+  const steady = t * t * (3 - 2 * t);
+  const focused = t ** 4 * (35 - 84 * t + 70 * t * t - 20 * t ** 3);
+  return clamp(.25 * steady + .75 * focused);
 }
 
 function hash(value) {
@@ -191,9 +199,13 @@ export function createAssemblyFlight(parts, { stagger = true } = {}) {
       const u = rotationClock;
       const envelope = Math.sin(Math.PI * u) ** 2;
       const phaseOffset = seed * TAU;
-      const angularDrift = .085 * Math.sin(TAU * u + phaseOffset) * envelope * envelope * (1 - assemblyProgress);
-      const lift = (.20 + .16 * Math.sin(TAU * u + phaseOffset)) * envelope;
-      const breathing = 1 + .035 * Math.sin(TAU * u * 1.3 + phaseOffset) * envelope;
+      // Stable multi-frequency offsets give each piece its own gust response.
+      // They fade during assembly and remain deterministic on reverse scroll.
+      const angularDrift = (.16 * Math.sin(TAU * u * 1.4 + phaseOffset)
+        + .05 * Math.sin(TAU * u * 3.3 + phaseOffset * 1.7)) * envelope * envelope * (1 - assemblyProgress);
+      const lift = (.16 + .28 * Math.sin(TAU * u * 1.7 + phaseOffset)
+        + .10 * Math.cos(TAU * u * 3.1 + phaseOffset * 2)) * envelope;
+      const breathing = 1 + .075 * Math.sin(TAU * u * 2.3 + phaseOffset) * envelope;
       const orbitRadius = (entry.orbitRadius * breathing + lift * .12) * funnelScale;
       const orbitY = 1.3 + (entry.orbitY - 1.3) * (1 + .06 * (funnelScale - 1)) + lift;
       orbitPosition.set(Math.cos(entry.angle) * orbitRadius, orbitY, Math.sin(entry.angle) * orbitRadius);
@@ -201,9 +213,10 @@ export function createAssemblyFlight(parts, { stagger = true } = {}) {
       turn.setFromAxisAngle(Y_AXIS, -(TAU * rotationProgress + angularDrift));
       const response = Math.max(.35, 1 - radius * .15) * (1 - assemblyProgress);
       euler.set(
-        .24 * response * Math.sin(TAU * u * 1.2 + phaseOffset) * envelope,
-        .14 * response * Math.sin(TAU * u * .8 + phaseOffset * 1.7) * envelope,
-        .20 * response * Math.cos(TAU * u + phaseOffset) * envelope,
+        response * (.52 * Math.sin(TAU * u * 2.1 + phaseOffset)
+          + .16 * Math.sin(TAU * u * 4.3 + phaseOffset * 1.5)) * envelope,
+        .32 * response * Math.sin(TAU * u * 1.3 + phaseOffset * 1.7) * envelope,
+        .46 * response * Math.cos(TAU * u * 1.7 + phaseOffset) * envelope,
       );
       spin.setFromEuler(euler);
       orbitOrientation.copy(orbitRotation).slerp(entry.rotation, assemblyProgress);
