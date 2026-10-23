@@ -1,8 +1,9 @@
 import {
-  Box3, BufferGeometry, CylinderGeometry, ExtrudeGeometry, Float32BufferAttribute, Group, Mesh, MeshStandardMaterial,
-  Shape, TorusGeometry,
+  Box3, BufferGeometry, CylinderGeometry, ExtrudeGeometry, Float32BufferAttribute, Group, Mesh,
+  PlaneGeometry, Shape, TorusGeometry,
 } from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { createMillMaterials } from './materials.js';
 
 // A generic turret knee mill, built locally for a visual assembly study.
 // All dimensions are illustrative. +Z faces the operator; every moving part
@@ -12,14 +13,8 @@ export function createMill() {
   root.name = '炮塔铣床装配演示';
   const parts = [];
   const geometries = new Set();
-  const materials = {
-    body: new MeshStandardMaterial({ color: '#77888b', roughness: .73, metalness: .08 }),
-    bodyLight: new MeshStandardMaterial({ color: '#a5b0ae', roughness: .7, metalness: .06 }),
-    steel: new MeshStandardMaterial({ color: '#ced4d1', roughness: .43, metalness: .24 }),
-    dark: new MeshStandardMaterial({ color: '#35494f', roughness: .74, metalness: .05 }),
-    rubber: new MeshStandardMaterial({ color: '#252c2e', roughness: .92, metalness: 0 }),
-    accent: new MeshStandardMaterial({ color: '#deb66b', roughness: .65, metalness: .08 }),
-  };
+  const assets = createMillMaterials();
+  const materials = assets.materials;
 
   function mesh(parent, geometry, material, position = [0, 0, 0], rotation = [0, 0, 0]) {
     geometries.add(geometry);
@@ -61,8 +56,39 @@ export function createMill() {
     return mesh(parent, geometry, material);
   }
 
+  let boltCount = 0;
+  // Hex bolt with a washer: the first 10 visible bolts also get a recessed hex socket.
   function bolt(parent, position, axis = 'y', radius = .075) {
-    return cylinder(parent, radius, .075, position, materials.dark, axis, radius, 6);
+    const withDetails = boltCount < 10;
+    boltCount++;
+    const [x, y, z] = position;
+    const head = cylinder(parent, radius, .075, position, materials.fastener, axis, radius, 6);
+    head.userData.surfaceDetail = withDetails ? 'bolt-head' : 'bolt-head-plain';
+    if (!withDetails) return head;
+    const face = axis === 'y' ? [x, y + .038, z] : axis === 'x' ? [x + .038, y, z] : [x, y, z + .038];
+    const washer = axis === 'y' ? [x, y - .042, z] : axis === 'x' ? [x - .042, y, z] : [x, y, z - .042];
+    cylinder(parent, radius * 1.32, .016, washer, materials.machined, axis, radius * 1.32, 16).userData.surfaceDetail = 'washer';
+    cylinder(parent, radius * .46, .012, face, materials.dark, axis, radius * .46, 6).userData.surfaceDetail = 'hex-socket';
+    return head;
+  }
+
+  // Thin oil film / run-off decal, rotated so its normal is the given world axis.
+  function oilFilm(parent, width, height, position, run = false, axis = 'z') {
+    const plane = mesh(parent, new PlaneGeometry(width, height), run ? materials.oilRun : materials.oil, position);
+    if (axis === 'x') plane.rotation.y = Math.PI / 2;
+    else if (axis === 'y') plane.rotation.x = -Math.PI / 2;
+    plane.castShadow = false;
+    plane.receiveShadow = false;
+    plane.renderOrder = 2;
+    plane.userData.surfaceDetail = run ? 'oil-drip' : 'oil-seep';
+    plane.userData.surfaceNormalAxis = axis;
+    return plane;
+  }
+
+  function greaseNipple(parent, position, axis = 'z') {
+    const nipple = cylinder(parent, .032, .06, position, materials.machined, axis, .018, 8);
+    nipple.userData.surfaceDetail = 'grease-nipple';
+    return nipple;
   }
 
   function wheel(parent, radius, axis = 'z') {
@@ -83,12 +109,32 @@ export function createMill() {
 
   function screw(parent, length, axis) {
     cylinder(parent, .075, length, [0, 0, 0], materials.dark, axis);
-    for (let index = 0; index < 25; index++) {
-      const offset = -length * .45 + length * .9 * index / 24;
-      const position = axis === 'x' ? [offset, 0, 0] : axis === 'z' ? [0, 0, offset] : [0, offset, 0];
-      ring(parent, .083, .018, position, materials.steel, axis);
+    // A continuous trapezoidal lead thread replaces 25 disconnected rings.
+    // One mesh per screw is more accurate in close-up and saves 72 meshes.
+    const turns = 25, steps = turns * 32, pitch = length * .9 / turns;
+    const profile = [[-.42, .075], [-.19, .101], [.19, .101], [.42, .075]];
+    const vertices = [], uv = [], indices = [];
+    for (let row = 0; row <= steps; row++) {
+      const t = row / steps, angle = t * turns * Math.PI * 2;
+      for (let side = 0; side < 4; side++) {
+        const [offset, radius] = profile[side];
+        vertices.push(Math.sin(angle) * radius, (t - .5) * length * .9 + offset * pitch, Math.cos(angle) * radius);
+        uv.push(t * turns, side / 3);
+        if (row < steps && side < 3) {
+          const a = row * 4 + side, b = a + 4;
+          indices.push(a, b, a + 1, b, b + 1, a + 1);
+        }
+      }
     }
-    block(parent, axis === 'x' ? [.25, .29, .29] : axis === 'z' ? [.29, .29, .25] : [.29, .25, .29], [0, 0, 0], materials.accent, .04);
+    const thread = new BufferGeometry();
+    thread.setAttribute('position', new Float32BufferAttribute(vertices, 3));
+    thread.setAttribute('uv', new Float32BufferAttribute(uv, 2));
+    thread.setIndex(indices);
+    thread.computeVertexNormals();
+    if (axis === 'x') thread.rotateZ(Math.PI / 2);
+    else if (axis === 'z') thread.rotateX(Math.PI / 2);
+    mesh(parent, thread, materials.steel).userData.surfaceDetail = 'continuous-lead-thread';
+    block(parent, axis === 'x' ? [.25, .29, .29] : axis === 'z' ? [.29, .29, .25] : [.29, .25, .29], [0, 0, 0], materials.bronze, .04);
   }
 
   function part(id, label, phase, position, build) {
@@ -109,6 +155,8 @@ export function createMill() {
       cylinder(g, .16, .10, [x, -.24, z], materials.dark);
       bolt(g, [x, .37, z]);
     }
+    // Lower casting seam; no oil film on the base (its side normal is X).
+    block(g, [.06, .018, 2.9], [1.43, -.12, 0], materials.dark, .006);
   });
   part('column', '立柱铸件', 0, [0, .67, -1.0], (g) => {
     castProfile(g, [[-.80, 0], [.78, 0], [.78, 1.05], [.52, 1.65], [.35, 4.85], [.24, 5.62], [-.62, 5.62], [-.86, 5.15]], 1.65);
@@ -116,6 +164,11 @@ export function createMill() {
     for (const x of [-.68, .68]) block(g, [.13, 4.55, .12], [x, 2.90, .55], materials.steel, .025);
     block(g, [.74, .36, .06], [0, 4.84, .41], materials.dark, .025);
     block(g, [.54, .06, .025], [0, 4.84, .45], materials.accent, .01);
+    // Removable front access cover with a parted seam and its screws.
+    block(g, [.9, .78, .03], [0, 1.95, -.84], materials.bodyLight, .015);
+    block(g, [.92, .014, .025], [0, 2.36, -.855], materials.dark, .004);
+    for (const [x, y] of [[-.40, 1.60], [.40, 1.60], [-.40, 2.30], [.40, 2.30]]) bolt(g, [x, y, -.875], 'z', .045);
+    greaseNipple(g, [.80, 2.1, .35], 'x');
   });
   part('lift-screw', '升降丝杠', 0, [0, 1.63, .85], (g) => screw(g, 1.75, 'y'));
   part('knee', '升降台', 0, [0, 2.14, -.40], (g) => {
@@ -123,6 +176,13 @@ export function createMill() {
     block(g, [1.85, .17, 2.35], [0, 1.06, 1.0], materials.steel, .045);
     for (const x of [-.60, .60]) block(g, [.14, .12, 2.16], [x, 1.19, .99], materials.dark, .025);
     cylinder(g, .17, .16, [.85, .62, 1.18], materials.steel, 'x');
+    // Near side of the knee casting (normal +X): seam bolt row, grease fitting and
+    // a light seep with a short fine run-off at the saddle joint.
+    for (const z of [-.30, .60]) bolt(g, [.818, .30, z], 'x', .055);
+    greaseNipple(g, [.83, .72, -.05], 'x');
+    // Extrusion bevel thickness extends the actual flat face to x=.875.
+    oilFilm(g, .24, .20, [.877, .40, 1.18], false, 'x');
+    oilFilm(g, .035, .10, [.877, .29, 1.18], true, 'x');
   });
 
   part('y-leadscrew', 'Y轴进给丝杠', 1, [0, 3.30, 1.0], (g) => screw(g, 2.24, 'z'));
@@ -144,8 +204,16 @@ export function createMill() {
     for (let index = -15; index <= 15; index++) block(g, [.015, index % 5 === 0 ? .075 : .035, .018], [index * .18, -.07, .924], materials.steel, .002);
     for (const x of [-3.20, 3.20]) block(g, [.16, .37, 1.69], [x, -.03, 0], materials.bodyLight, .035);
   });
-  part('table-left-bearing', '左进给轴承座', 1, [-3.35, 3.62, 1.40], (g) => cylinder(g, .19, .27, [0, 0, 0], materials.bodyLight, 'x'));
-  part('table-right-bearing', '右进给轴承座', 1, [3.35, 3.62, 1.40], (g) => cylinder(g, .19, .27, [0, 0, 0], materials.bodyLight, 'x'));
+  part('table-left-bearing', '左进给轴承座', 1, [-3.35, 3.62, 1.40], (g) => {
+    cylinder(g, .19, .27, [0, 0, 0], materials.bodyLight, 'x');
+    for (const y of [-.09, .09]) greaseNipple(g, [0, y, .19], 'z');
+  });
+  part('table-right-bearing', '右进给轴承座', 1, [3.35, 3.62, 1.40], (g) => {
+    cylinder(g, .19, .27, [0, 0, 0], materials.bodyLight, 'x');
+    for (const y of [-.09, .09]) greaseNipple(g, [0, y, .19], 'z');
+    // Seep on the +X end face, kept inside the R.19 cylinder.
+    oilFilm(g, .12, .12, [.137, -.04, 0], false, 'x');
+  });
 
   part('turret', '炮塔回转座', 2, [0, 6.47, -1.0], (g) => {
     cylinder(g, .99, .25, [0, 0, 0], materials.bodyLight);
@@ -161,6 +229,8 @@ export function createMill() {
     cylinder(g, .57, .32, [0, 0, 0], materials.bodyLight, 'z');
     ring(g, .43, .025, [0, 0, .18], materials.dark, 'z');
     for (let index = 0; index < 4; index++) bolt(g, [Math.cos(index * Math.PI / 2 + .7) * .43, Math.sin(index * Math.PI / 2 + .7) * .43, .20], 'z');
+    // Parting line between the adapter and the head flange.
+    block(g, [.83, .012, .02], [0, -.03, .158], materials.dark, .003);
   });
 
   part('spindle', '精加工主轴', 3, [0, 5.63, 2.12], (g) => {
@@ -184,6 +254,10 @@ export function createMill() {
     geo.translate(0, .575, 0);
     mesh(g, geo, materials.steel);
     for (let index = 0; index < 9; index++) block(g, [.18, .025, .06], [0, -.36 + index * .08, -.29], materials.dark, .006);
+    // Seep on the exposed lower end of the R.29 sleeve (normal +Z), above its y=-.575 end.
+    oilFilm(g, .08, .09, [0, -.51, .292]);
+    // Retaining screws on the operator-side sleeve face.
+    for (const z of [-.2, .22]) bolt(g, [-.245, .40, z], 'x', .04);
   });
   part('drawbar', '刀具拉杆', 3, [0, 6.75, 2.12], (g) => {
     cylinder(g, .06, 2.38, [0, 0, 0], materials.dark);
@@ -197,6 +271,11 @@ export function createMill() {
     block(g, [.50, .24, .035], [0, .17, .58], materials.dark, .025);
     block(g, [.29, .045, .018], [0, .17, .606], materials.accent, .005);
     for (const x of [-.38, .38]) for (const y of [-.43, .54]) bolt(g, [x, y, .54], 'z', .055);
+    // Front casting cover seam around the quill bore.
+    block(g, [.72, .012, .02], [0, -.585, .54], materials.dark, .003);
+    // Seep on the +X right-side flat cover, with a very short fine tail.
+    oilFilm(g, .19, .17, [.587, -.02, 0], false, 'x');
+    oilFilm(g, .03, .09, [.587, -.12, 0], true, 'x');
   });
   part('belt-housing', '上部传动壳体', 4, [0, 7.17, 2.0], (g) => {
     g.userData.isCover = true;
@@ -299,7 +378,7 @@ export function createMill() {
     geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
-    const cuttingEnd = mesh(g, geometry, materials.dark);
+    const cuttingEnd = mesh(g, geometry, materials.toolSteel);
     cuttingEnd.userData.toolSection = 'cutting-end';
   });
   part('head-locks', '铣头锁紧件', 5, [0, 6.65, 2.03], (g) => {
@@ -309,17 +388,20 @@ export function createMill() {
     }
   });
 
+  let totalMeshes = 0;
+  root.traverse((object) => { if (object.isMesh) totalMeshes++; });
+  root.userData.surfaceDetail = { totalMeshes, continuousLeadThreads: 3 };
   root.updateMatrixWorld(true);
   root.userData.bounds = new Box3().setFromObject(root);
   root.userData.description = '通用炮塔铣床结构演示；非本厂设备复刻，非制造或维修依据。';
   let disposed = false;
   return {
-    root, parts,
+    root, parts, materials, textures: assets.textures,
     dispose() {
       if (disposed) return;
       disposed = true;
       geometries.forEach((geometry) => geometry.dispose());
-      Object.values(materials).forEach((material) => material.dispose());
+      assets.dispose();
       root.clear();
     },
   };

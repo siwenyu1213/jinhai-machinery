@@ -13,7 +13,7 @@ try {
     await page.locator('#mill-stage[data-renderer="ready"]').waitFor();
     for (const progress of [0, 0.12, 0.24, 0.50, 0.76, 0.87, 1]) {
       await page.evaluate((value) => window.__millDemo.setProgress(value), progress);
-      await page.waitForFunction((value) => Math.abs(window.__millDemo.getState().progress - value) < 0.003, progress);
+      await page.waitForFunction((value) => Math.abs(window.__millDemo.getState().progress - Math.min(value, .94)) < 0.003, progress);
       await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       const path = `${directory}/${width}-${Math.round(progress * 100)}.png`;
       await page.screenshot({ path });
@@ -24,6 +24,26 @@ try {
     const internalPath = `${directory}/${width}-internal.png`;
     await page.screenshot({ path: internalPath });
     report.captures.push({ width, height, progress: 1, inspection: true, path: internalPath });
+    if (width === 1280) {
+      await page.evaluate(() => window.__millDemo.setInspection(false));
+      for (const id of ['head-shell', 'knee', 'base']) {
+        await page.evaluate(({ id, width, height }) => {
+          const api=window.__millDemo, camera=api.getCamera();
+          camera.clearViewOffset();api.setProgress(.94);
+          const point=api.getParts().find(part=>part.id===id).homePosition.clone();
+          if(id==='knee')point.y+=.7;
+          point.project(camera);
+          const zoom=4;
+          camera.setViewOffset(width,height,(point.x+1)*width/2-width/zoom/2,
+            (1-point.y)*height/2-height/zoom/2,width/zoom,height/zoom);
+          api.setProgress(.94);
+          document.querySelectorAll('.heading,.active-part,.controls').forEach(e=>e.style.visibility='hidden');
+        },{id,width,height});
+        const detailPath=`${directory}/${width}-detail-${id}.png`;
+        await page.screenshot({path:detailPath});
+        report.captures.push({width,height,detail:id,path:detailPath});
+      }
+    }
     await page.close();
   }
 } finally {

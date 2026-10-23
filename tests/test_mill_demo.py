@@ -11,7 +11,7 @@ DEMO = ROOT / "demos" / "mill-assembly"
 
 class MillDemoTests(unittest.TestCase):
     def test_demo_is_complete_and_has_explicit_launch_commands(self):
-        for name in ("index.html", "main.js", "style.css", "model.js", "motion.js", "README.md"):
+        for name in ("index.html", "main.js", "style.css", "model.js", "materials.js", "motion.js", "README.md"):
             self.assertTrue((DEMO / name).is_file(), name)
         package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
         for command in ("demo:dev", "demo:build", "demo:preview", "test:demo"):
@@ -19,7 +19,7 @@ class MillDemoTests(unittest.TestCase):
         self.assertIn("test:demo", package["scripts"]["test"])
 
     def test_demo_has_no_remote_runtime_or_machine_texture_downloads(self):
-        for name in ("index.html", "main.js", "model.js", "motion.js", "style.css"):
+        for name in ("index.html", "main.js", "model.js", "materials.js", "motion.js", "style.css"):
             content = (DEMO / name).read_text(encoding="utf-8")
             self.assertNotRegex(content, r"(?:src|href)=[\"']https?://", name)
             self.assertNotRegex(content, r"(?:fetch|import)\s*\(\s*[\"']https?://", name)

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createMill } from './model.js';
 import { createAssemblyFlight, VORTEX_TIMING, progressToScroll, scrollToProgress, followScroll } from './motion.js';
 
@@ -19,6 +20,7 @@ const cameraTarget = new THREE.Vector3();
 const cameraEye = new THREE.Vector3(11, 4.5, 14).normalize();
 let completeCameraDistance = 20;
 let renderer, scene, camera, model, flight, frame = 0, progress = 0;
+let environmentTarget;
 let renderedScroll = 0, targetScroll = 0, lastFrameTime = 0, manualScrollY = null;
 let state = { progress: 0, assembledCount: 0, activeLabels: [], phase: 0, totalParts: 0 };
 let ready = false;
@@ -234,15 +236,24 @@ try {
   renderer.setClearColor(0xf8f9f6);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.12;
+  renderer.toneMappingExposure = 1;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   host.append(renderer.domElement);
   scene = new THREE.Scene();
+  // A prefiltered studio reflection gives steel readable highlights while
+  // keeping the page background unchanged. It is generated once, locally.
+  const room = new RoomEnvironment();
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  environmentTarget = pmrem.fromScene(room, .04);
+  scene.environment = environmentTarget.texture;
+  scene.environmentIntensity = .8;
+  room.dispose();
+  pmrem.dispose();
   scene.fog = new THREE.Fog(0xf8f9f6, 30, 65);
   camera = new THREE.PerspectiveCamera(36, 1, .08, 200);
-  scene.add(new THREE.HemisphereLight(0xffffff, 0xa3afab, 2.4));
-  const key = new THREE.DirectionalLight(0xffffff, 3.2);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xa3afab, .85));
+  const key = new THREE.DirectionalLight(0xffffff, 2.7);
   key.position.set(7, 15, 9);
   key.castShadow = true;
   key.shadow.mapSize.set(1024, 1024);
@@ -252,7 +263,7 @@ try {
   key.shadow.radius = 4;
   key.target.position.set(0, 3.5, 0);
   scene.add(key, key.target);
-  const fill = new THREE.DirectionalLight(0xe1edff, 1.5);
+  const fill = new THREE.DirectionalLight(0xe1edff, 1.1);
   fill.position.set(-8, 7, -5);
   scene.add(fill);
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: 0xf8f9f6, roughness: 1, metalness: 0 }));
@@ -261,8 +272,12 @@ try {
   floor.receiveShadow = true;
   scene.add(floor);
   model = createMill();
+  for (const texture of model.textures || []) {
+    texture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+  }
   scene.add(model.root);
-  model.root.traverse((object) => { if (object.isMesh) { object.castShadow = true; object.receiveShadow = true; } });
+  // Keep per-surface shadow flags: transparent oil films must not cast opaque
+  // rectangular shadows. Geometry helpers already enable solid-part shadows.
   prepareInspection();
   bounds = new THREE.Box3().setFromObject(model.root);
   flight = createAssemblyFlight(model.parts);
@@ -282,6 +297,11 @@ window.__millDemo = {
   getCamera: () => camera,
   getBounds: () => bounds?.clone(),
   getScene: () => scene,
+  getRenderStats: () => renderer ? ({
+    calls: renderer.info.render.calls, triangles: renderer.info.render.triangles,
+    geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures,
+    programs: renderer.info.programs?.length || 0, pixelRatio: renderer.getPixelRatio(),
+  }) : null,
   inspectPart,
   setInspection,
 };
@@ -320,4 +340,5 @@ window.addEventListener('pagehide', () => {
     object.shadow?.map?.dispose();
   });
   renderer?.dispose();
+  environmentTarget?.dispose();
 }, { once: true });

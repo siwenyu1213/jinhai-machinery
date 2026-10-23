@@ -5,6 +5,35 @@ async function ready(page) {
   await expect(page.locator('#mill-stage')).toHaveAttribute('data-renderer', 'ready');
 }
 
+test('procedural paint, metal and oil use a baked local environment and keep GPU resources stable while scrubbing', async ({ page }) => {
+  await ready(page);
+  const result=await page.evaluate(() => {
+    const api=window.__millDemo;
+    api.setProgress(.94);api.setInspection(true);api.setInspection(false);
+    const before=api.getRenderStats(), textures=new Set(), oils=[];
+    for(const part of api.getParts()) part.object.traverse(o=>{
+      if(!o.isMesh)return;
+      for(const key of ['map','bumpMap','roughnessMap']) if(o.material[key]) textures.add(o.material[key]);
+      if(o.material.userData.materialRole?.startsWith('oil-')) oils.push({shadow:o.castShadow,depth:o.material.depthTest});
+    });
+    for(let i=0;i<30;i++)api.setProgress((i%10)/10*.94);
+    api.setProgress(.94);
+    return {before,after:api.getRenderStats(), environment:api.getScene().environment?.isTexture,
+      textureCount:textures.size,anisotropy:[...textures].map(t=>t.anisotropy),oils,state:api.getState()};
+  });
+  expect(result.environment).toBe(true);
+  expect(result.textureCount).toBe(7);
+  expect(result.anisotropy.every(n=>n>=1&&n<=4)).toBe(true);
+  expect(result.oils).toHaveLength(6);
+  expect(result.oils.every(o=>!o.shadow&&o.depth)).toBe(true);
+  expect(result.after.textures).toBe(result.before.textures);
+  expect(result.after.geometries).toBe(result.before.geometries);
+  expect(result.after.calls).toBeLessThan(539);
+  expect(result.after.triangles).toBeLessThan(194674);
+  expect(result.state.assembledCount).toBe(34);
+  expect(result.state.displayProgress).toBe(1);
+});
+
 test('starts empty and real wheel scrolling advances and reverses the simultaneous flight', async ({ page }) => {
   await ready(page);
   const stage = page.locator('#mill-stage');

@@ -27,7 +27,7 @@ test('mill has independent, named assembly components and immutable home-pose sn
   } finally { mill.dispose(); }
 });
 
-test('assembled mill has finite detailed geometry, no textures, and proportionate machine bounds', () => {
+test('assembled mill has finite detailed geometry, procedural surface textures, and proportionate machine bounds', () => {
   const mill = createMill();
   try {
     let meshes = 0;
@@ -36,9 +36,9 @@ test('assembled mill has finite detailed geometry, no textures, and proportionat
       meshes++;
       const positions = object.geometry.attributes.position;
       for (const coordinate of positions.array) assert.ok(Number.isFinite(coordinate));
-      assert.equal(object.material.map, null);
-      assert.equal(object.material.normalMap, null);
-      assert.equal(object.material.roughnessMap, null);
+      for (const key of ['map', 'normalMap', 'roughnessMap', 'bumpMap']) {
+        if (object.material[key]) assert.ok(object.material[key].isDataTexture, 'surfaces use local CPU textures');
+      }
     });
     assert.ok(meshes > 150, 'slots, handwheels, fins and screw ridges must be actual geometry');
     const bounds = new Box3().setFromObject(mill.root);
@@ -138,6 +138,7 @@ test('mill disposal releases every unique geometry and material exactly once', (
   mill.root.traverse((object) => {
     if (object.isMesh) { resources.add(object.geometry); resources.add(object.material); }
   });
+  for (const resource of [...Object.values(mill.materials), ...mill.textures]) resources.add(resource);
   const counts = new Map();
   for (const resource of resources) {
     counts.set(resource, 0);
