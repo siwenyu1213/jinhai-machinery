@@ -1,0 +1,76 @@
+<!doctype html>
+<!--
+Design brief (static model review, stage 2):
+1. Primary: one large 3D machine viewport — the lathe (default) or the open-bed laser
+   cutter, filling the stage, fully framed, standing on the floor, real metal gloss.
+2. Secondary: device switch ("车床" / "激光切割机") and view controls
+   ("正面" / "俯视" / "复位视角"). Exactly one pressable action group of each;
+   device switch is the primary action, view buttons are secondary.
+3. Tertiary: title hint, corner device name + real component count, bottom note
+   "通用结构示意".
+Not built in this stage: no assembly animation, no scroll timeline, no
+auto-rotation, no combined tornado / three-machine sequence.
+Plain HTML + CSS + Three.js ESM; no Tailwind, no component library, no dark mode.
+Reuse project tokens from style.css: ink #252c2e, muted #566264, paper #f8f9f6,
+surface #e9edeb, line #cdd3d0, accent #deb66b, focus #79591e.
+Type: Microsoft YaHei / PingFang SC; spacing 8 / 16 / 24 / 32; visible focus;
+44px touch targets; controls never overlap the framed machine.
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="车床与板材激光切割机的通用结构示意，静态初步审阅。">
+  <title>设备模型 · 初步审阅</title>
+  <link rel="stylesheet" href="./model-review.css">
+  <script type="module" src="./model-review.js"></script>
+</head>
+<body>
+  <main id="review" class="review" data-renderer="loading" aria-labelledby="review-title">
+    <header class="heading">
+      <div class="title-block">
+        <h1 id="review-title">设备模型 · 初步审阅</h1>
+        <p class="hint">拖动旋转 · 滚轮缩放</p>
+      </div>
+      <div class="device-badge" aria-live="polite">
+        <p class="device-name" id="device-name">车床</p>
+        <p class="device-count"><span id="part-count">—</span> 个组件</p>
+      </div>
+    </header>
+
+    <section class="stage" aria-label="设备模型视窗">
+      <div id="scene" class="scene" role="img" aria-label="车床三维模型，可拖动旋转、滚轮缩放"></div>
+      <noscript>
+        <div class="fallback">
+          <h2>需要启用 JavaScript</h2>
+          <p>本页使用三维画面展示设备结构。启用 JavaScript 后，可查看车床与激光切割机。</p>
+        </div>
+      </noscript>
+      <section id="fallback" class="fallback" hidden aria-labelledby="fallback-title">
+        <h2 id="fallback-title">当前浏览器无法显示三维画面</h2>
+        <p>设备结构仍可在下方部件概览中查看。如需三维画面，请更换支持 WebGL 的浏览器。</p>
+        <details>
+          <summary>部件概览</summary>
+          <ul id="fallback-parts"></ul>
+        </details>
+      </section>
+    </section>
+
+    <footer class="controls">
+      <div class="control-row">
+        <div class="segment" role="group" aria-label="设备">
+          <button type="button" class="device-button" data-machine="lathe" aria-pressed="true">车床</button>
+          <button type="button" class="device-button" data-machine="laser" aria-pressed="false">激光切割机</button>
+        </div>
+        <div class="segment" id="view-group" role="group" aria-label="视角">
+          <button type="button" class="view-button" data-view="front" aria-pressed="false">正面</button>
+          <button type="button" class="view-button" data-view="top" aria-pressed="false">俯视</button>
+          <button type="button" class="view-button" data-view="iso" aria-pressed="false">复位视角</button>
+        </div>
+      </div>
+      <p class="disclaimer">通用结构示意</p>
+    </footer>
+  </main>
+</body>
+</html>
