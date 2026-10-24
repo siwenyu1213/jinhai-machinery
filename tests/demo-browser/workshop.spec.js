@@ -183,7 +183,7 @@ test('resizing inside one breakpoint refits aspect and canvas while keeping prog
   }
 });
 
-test('one timeline: every part is visible and finite, and only the end lands every pose on its home', async ({ page }) => {
+test('one timeline: every part is visible and finite, and only the end lands every pose on its presentation slot', async ({ page }) => {
   await ready(page);
   for (const progress of [.20, .42, .63, .74, .86]) {
     await page.evaluate((value) => window.__workshopDemo.setProgress(value), progress);
@@ -197,12 +197,20 @@ test('one timeline: every part is visible and finite, and only the end lands eve
   }
   await page.evaluate(() => window.__workshopDemo.setProgress(.94));
   await waitLocked(page);
+  await page.locator('#toggle-showcase').click();
   const done = await snapshot(page);
+  const offsets = await page.evaluate(() => {
+    const api = window.__workshopDemo, slots = api.getShowcaseState().machines;
+    return Object.fromEntries(api.getMachines().map(machine => {
+      const home = machine.homeBounds.getCenter(machine.homeBounds.min.clone()).toArray();
+      return [machine.id, slots.find(slot => slot.id === machine.id).center.map((value, axis) => value - home[axis])];
+    }));
+  });
   const machines = await page.evaluate(() => window.__workshopDemo.getMachines().map((machine) => ({ id: machine.id, min: machine.homeBounds.min.toArray(), max: machine.homeBounds.max.toArray() })));
-  // The first finished frame shows each part exactly on its triangle home.
+  // Desktop presentation spreads the rear homes sideways as one rigid machine.
   for (const part of done) {
     expect(part.visible).toBe(true);
-    expect(part.position).toEqual(part.homePosition);
+    part.position.forEach((value, axis) => expect(value).toBeCloseTo(part.homePosition[axis] + offsets[part.machineId][axis], 8));
     expect(part.quaternion).toEqual(part.homeQuaternion);
     expect(part.scale).toEqual([1, 1, 1]);
   }
@@ -567,7 +575,16 @@ test('reduced motion skips the flight, shows the three machines only when comple
   await expect(page.locator('#phase-name')).toHaveText('装配完成');
   await waitLocked(page);
   expect(await page.evaluate(() => window.__workshopDemo.getParts().filter((part) => part.object.visible).length)).toBe(91);
-  expect(await page.evaluate(() => window.__workshopDemo.getParts().every((part) => part.object.position.distanceTo(part.homePosition) < 1e-8))).toBe(true);
+  expect(await page.evaluate(() => {
+    const api = window.__workshopDemo, state = api.getShowcaseState();
+    const Vector = api.getCamera().position.constructor, right = new Vector(14, 0, -11).normalize();
+    return api.getMachines().every(machine => {
+      const center = machine.homeBounds.getCenter(new Vector());
+      const offset = right.clone().multiplyScalar(center.dot(right) * (state.spread - 1));
+      return machine.parts.every(part => part.object.position.distanceTo(part.homePosition.clone().add(offset)) < 1e-8
+        && part.object.quaternion.equals(part.homeQuaternion));
+    }) && state.reduced && state.nextMoveAt === null;
+  })).toBe(true);
   await expect(page.locator('#machine-labels')).toBeVisible();
   await expect(page.locator('.machine-label')).toHaveCount(3);
   await expect(page.locator('#toggle-showcase')).toBeHidden();
@@ -784,7 +801,7 @@ test('clicking a real back machine body on the canvas brings that machine to the
 });
 
 // Real pointer drag on the canvas: only the dragged machine's poses change, its
-// internal distances stay fixed, nothing is sent to the front, camera stays put.
+// internal proportions stay fixed, nothing is sent to the front, camera stays put.
 test('dragging a real machine on the canvas rotates only that machine and never the camera', async ({ page }) => {
   await ready(page);
   await page.getByRole('button', { name: '查看完成' }).click();
@@ -794,13 +811,16 @@ test('dragging a real machine on the canvas rotates only that machine and never 
   const capture = () => page.evaluate(() => ({
     front: window.__workshopDemo.getState().showcase.frontId,
     camera: window.__workshopDemo.getCamera().getWorldDirection(window.__workshopDemo.getCamera().position.clone()).toArray(),
+    cameraPosition: window.__workshopDemo.getCamera().position.toArray(),
+    viewScales: Object.fromEntries(window.__workshopDemo.getShowcaseState().machines.map(machine => [machine.id, machine.viewScale])),
+    labels: [...document.querySelectorAll('.machine-label')].map(node => node.getBoundingClientRect().toJSON()),
     parts: window.__workshopDemo.getParts().map((part) => ({ id: part.id, machineId: part.machineId, position: part.object.position.toArray(), quaternion: part.object.quaternion.toArray() })),
   }));
-  const internalDistances = (parts, machineId) => {
+  const internalDistances = (parts, machineId, viewScale) => {
     const owned = parts.filter((part) => part.machineId === machineId);
     const distances = [];
     for (let a = 0; a < owned.length; a++) for (let b = a + 1; b < owned.length; b += Math.max(1, Math.floor(owned.length / 6))) {
-      distances.push(owned[a].position.reduce((sum, value, axis) => sum + (value - owned[b].position[axis]) ** 2, 0));
+      distances.push(owned[a].position.reduce((sum, value, axis) => sum + (value - owned[b].position[axis]) ** 2, 0) / viewScale ** 2);
     }
     return distances;
   };
@@ -815,9 +835,16 @@ test('dragging a real machine on the canvas rotates only that machine and never 
     await page.mouse.move(point.x, point.y);
     await page.mouse.down();
     await page.mouse.move(point.x + 24, point.y + 10, { steps: 6 });
+    await frames(page, 2);
+    const during = await capture();
+    expect(during.cameraPosition).toEqual(before.cameraPosition);
+    expect(during.labels).toEqual(before.labels);
+    expect(during.parts.filter(part => part.machineId !== id)).toEqual(before.parts.filter(part => part.machineId !== id));
     await page.mouse.up();
     await frames(page, 2);
     const after = await capture();
+    expect(after.cameraPosition).toEqual(before.cameraPosition);
+    expect(after.labels).toEqual(before.labels);
     expect(after.front).toBe('mill');
     for (let axis = 0; axis < 3; axis++) expect(Math.abs(after.camera[axis] - before.camera[axis])).toBeLessThan(1e-6);
     const changed = new Set();
@@ -827,11 +854,60 @@ test('dragging a real machine on the canvas rotates only that machine and never 
         || Math.abs(A.quaternion.reduce((sum, value, axis) => sum + value * B.quaternion[axis], 0)) < Math.cos(1e-4)) changed.add(A.machineId);
     }
     expect([...changed]).toEqual([id]);
-    const beforeDistances = internalDistances(before.parts, id);
-    const afterDistances = internalDistances(after.parts, id);
+    const beforeDistances = internalDistances(before.parts, id, before.viewScales[id]);
+    const afterDistances = internalDistances(after.parts, id, after.viewScales[id]);
     beforeDistances.forEach((value, index) => expect(afterDistances[index]).toBeCloseTo(value, 4));
     await expectFixedCamera(page, `after dragging ${id}`);
   }
+});
+
+test('an inspected model returns after three idle seconds; a new click restarts the delay without moving the shared frame', async ({ page }) => {
+  await ready(page);
+  await page.locator('#complete').click();
+  await page.locator('#toggle-showcase').click();
+  await frames(page, 3);
+  const fixed = await page.evaluate(() => ({ camera: window.__workshopDemo.getCamera().position.toArray(),
+    labels: [...document.querySelectorAll('.machine-label')].map(node => node.style.transform) }));
+  const point = await bodyPoint(page, 'mill');
+  await page.mouse.move(point.x, point.y); await page.mouse.down();
+  await page.mouse.move(point.x + 90, point.y - 50, { steps: 8 });
+  await page.mouse.up(); await frames(page, 3);
+  const rotation = await page.evaluate(() => window.__workshopDemo.getShowcaseState().machines.find(m => m.id === 'mill').rotation);
+  expect(Math.abs(rotation[3])).toBeLessThan(.95);
+  await page.waitForTimeout(1800);
+  // Clicking this same front label leaves the layout fixed and renews inspection.
+  await page.getByRole('button', { name: '将铣床移到前方' }).click();
+  await page.waitForTimeout(1800);
+  expect(await page.evaluate(() => window.__workshopDemo.getShowcaseState().machines.find(m => m.id === 'mill').rotation)).toEqual(rotation);
+  await expect.poll(() => page.evaluate(() => window.__workshopDemo.getShowcaseState().machines.find(m => m.id === 'mill').rotation), { timeout: 4000 }).toEqual([0, 0, 0, 1]);
+  const after = await page.evaluate(() => ({ camera: window.__workshopDemo.getCamera().position.toArray(),
+    labels: [...document.querySelectorAll('.machine-label')].map(node => node.style.transform),
+    scales: window.__workshopDemo.getParts().map(part => part.object.scale.toArray()) }));
+  expect(after.camera).toEqual(fixed.camera); expect(after.labels).toEqual(fixed.labels);
+  expect(after.scales.every(scale => scale.every(value => value === 1))).toBe(true);
+  const rendered = await page.evaluate(() => window.__workshopDemo.getRenderStats().frames);
+  await page.waitForTimeout(200);
+  expect(await page.evaluate(() => window.__workshopDemo.getRenderStats().frames)).toBe(rendered);
+});
+
+test('desktop rear slots spread farther apart while phone homes and front depth stay the same', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await ready(page); await page.locator('#complete').click(); await page.locator('#toggle-showcase').click();
+  const positions = () => page.evaluate(() => {
+    const api = window.__workshopDemo;
+    const right = [14, 0, -11].map(value => value / Math.hypot(14, 11));
+    return { spread: api.getShowcaseState().spread, homes: api.getParts().map(p => p.homePosition.toArray()),
+      machines: api.getShowcaseState().machines.map(m => ({ id: m.id, x: m.center.reduce((sum, value, i) => sum + value * right[i], 0), center: m.center })) };
+  });
+  const desktop = await positions(); expect(desktop.spread).toBe(1.15);
+  expectFramed(await geometry(page), 'desktop spread');
+  await page.setViewportSize({ width: 375, height: 812 }); await frames(page, 3);
+  const phone = await positions(); expect(phone.spread).toBe(1); expect(phone.homes).toEqual(desktop.homes);
+  for (const id of ['lathe', 'laser']) {
+    expect(Math.abs(desktop.machines.find(m => m.id === id).x)).toBeCloseTo(Math.abs(phone.machines.find(m => m.id === id).x) * 1.15, 5);
+  }
+  expect(desktop.machines.find(m => m.id === 'mill').center).toEqual(phone.machines.find(m => m.id === 'mill').center);
+  expectFramed(await geometry(page), 'phone spread');
 });
 
 test('scrolling naturally into completion locks the machines until replay', async ({ page }) => {

@@ -28,8 +28,9 @@ const ENVELOPE_SAMPLES = [.24, .42, .55, .64, .72, .80, .88];
 const FINAL_HOLD = .78;
 const clamp = (value) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
 const smoother = (value) => { const t = clamp(value); return t * t * t * (t * (t * 6 - 15) + 10); };
-// The final triangle stays the same on every screen; only the camera refits.
+// Homes stay shared across screens; desktop adds a modest presentation spread.
 const layoutFor = () => 'triangle';
+const layoutSpread = () => host.clientWidth >= 900 ? 1.15 : 1;
 
 let renderer, scene, camera, model, flight, frame = 0, progress = 0;
 let environmentTarget, floor, keyLight;
@@ -68,14 +69,17 @@ function freezeGeometry() {
   motionPoints = [];
   for (const sample of ENVELOPE_SAMPLES) {
     flight.apply(sample, camera);
+    spreadFlight(sample);
     model.root.updateMatrixWorld(true);
     motionEnvelope.union(new THREE.Box3().setFromObject(model.root));
     motionPoints.push(...occupiedCorners());
   }
   flight.apply(VORTEX_TIMING.assemblyEnd, camera);
+  spreadFlight(VORTEX_TIMING.assemblyEnd);
   model.root.updateMatrixWorld(true);
   completePoints = occupiedCorners();
   flight.apply(progress, camera);
+  spreadFlight(progress);
   model.root.updateMatrixWorld(true);
 }
 
@@ -186,9 +190,13 @@ function updateLabels() {
   if (!completionLatch) return;
   const top = document.querySelector('.heading').getBoundingClientRect().bottom + 8;
   const bottom = document.querySelector('.controls').getBoundingClientRect().top - 8;
-  const front = showcase.state().frontId;
+  const showcaseState = showcase.state(), front = showcaseState.frontId;
   const plans = labelEntries.map((entry) => {
-    const box = showcase.boundsOf(entry.machine.id);
+    // Keep labels tied to their slot, not to a turning model's changing bbox.
+    // Otherwise the collision layout shifts the other two labels during drag.
+    const machine = showcaseState.machines.find(machine => machine.id === entry.machine.id);
+    const offset = orbitOffset(machine.angle, showcaseState.spread).sub(orbitOffset(SLOT_ANGLES[TRIANGLE_HOMES[machine.id]]));
+    const box = entry.machine.homeBounds.clone().translate(offset);
     box.getCenter(labelCenter).project(camera);
     let edge = 0;
     for (let corner = 0; corner < 8; corner++) {
@@ -268,8 +276,10 @@ function draw(now = performance.now()) {
   }
   if (completionLatch) showcase.update(now);
   updateCameraForProgress();
+  if (completionLatch) fitInspectedMachines();
   if (!completionLatch) {
     flight.apply(progress, camera);
+    spreadFlight(progress);
     state = flight.getState();
     if (reducedQuery.matches) applyReduced();
   }
@@ -365,6 +375,7 @@ function onResize() {
   // Homes never depend on the viewport, so only the camera and renderer refit.
   // Keep progress, rendered/target scroll and any running inertia, and write the
   // native scroll for the new length so its echo cannot re-target progress.
+  showcase.setSpread(layoutSpread());
   fitCamera();
   if (!completionLatch) writeScroll(renderedScroll * scrollLength());
   draw();
@@ -400,19 +411,55 @@ function cacheTemplates() {
 }
 
 function showcaseEnvelope(phase) {
-  const points = [], poses = showcase.state().machines;
-  for (const machine of poses) {
+  const points = [];
+  for (const machine of model.machines) {
     const template = machineTemplates.get(machine.id);
-    const rotation = new THREE.Quaternion().fromArray(machine.rotation);
-    // World AABB corners also bound every part's AABB after arbitrary tilts.
-    // The rotated OBB alone bounds pixels, but misses those conservative corners.
-    const box = new THREE.Box3().setFromPoints(template.corners.map(point => point.clone().applyQuaternion(rotation)));
-    const corners = Array.from({ length: 8 }, (_, c) => new THREE.Vector3(c & 1 ? box.max.x : box.min.x, c & 2 ? box.max.y : box.min.y, c & 4 ? box.max.z : box.min.z));
-    const center = orbitOffset(SLOT_ANGLES[TRIANGLE_HOMES[machine.id]] + phase);
-    center.y = template.pivot.y + machine.lift;
-    for (const point of corners) points.push(point.clone().add(center));
+    // The camera only fits canonical poses. User rotations never change the
+    // shared shot, so the rest of the scene stays still during inspection.
+    const center = orbitOffset(SLOT_ANGLES[TRIANGLE_HOMES[machine.id]] + phase, layoutSpread());
+    center.y = template.pivot.y;
+    for (const point of template.corners) points.push(point.clone().add(center));
   }
   return points;
+}
+
+function spreadFlight(value) {
+  const amount = smoother((value - FINAL_HOLD) / (VORTEX_TIMING.assemblyEnd - FINAL_HOLD));
+  if (!amount || layoutSpread() === 1) return;
+  for (const machine of model.machines) {
+    const angle = SLOT_ANGLES[TRIANGLE_HOMES[machine.id]];
+    const delta = orbitOffset(angle, layoutSpread()).sub(orbitOffset(angle)).multiplyScalar(amount);
+    for (const part of machine.parts) part.object.position.add(delta);
+  }
+}
+
+function fitInspectedMachines() {
+  const top = document.querySelector('.heading').getBoundingClientRect().bottom + 16;
+  const bottom = document.querySelector('.controls').getBoundingClientRect().top - 36;
+  for (const machine of showcase.state().machines) {
+    if (machine.rotation[0] === 0 && machine.rotation[1] === 0 && machine.rotation[2] === 0) {
+      showcase.setViewScale(machine.id, 1);
+      continue;
+    }
+    // A large tilt may need extra room. Fit only this machine around its ground
+    // anchor; never pull the shared camera (and every other element) around.
+    const box = showcase.boundsOf(machine.id), anchor = new THREE.Vector3(machine.center[0], 0, machine.center[2]);
+    const corners = Array.from({ length: 8 }, (_, c) => new THREE.Vector3(c & 1 ? box.max.x : box.min.x,
+      c & 2 ? box.max.y : box.min.y, c & 4 ? box.max.z : box.min.z).sub(anchor).divideScalar(machine.viewScale));
+    const point = new THREE.Vector3();
+    const fits = scale => corners.every(corner => {
+      point.copy(corner).multiplyScalar(scale).add(anchor).project(camera);
+      const x = (point.x + 1) * innerWidth / 2, y = (1 - point.y) * innerHeight / 2;
+      return point.z > -1 && point.z < 1 && x >= 8 && x <= innerWidth - 8 && y >= top && y <= bottom;
+    });
+    let low = 0, high = 1;
+    if (fits(1)) low = 1;
+    else for (let attempt = 0; attempt < 12; attempt++) {
+      const mid = (low + high) / 2;
+      if (fits(mid)) low = mid; else high = mid;
+    }
+    showcase.setViewScale(machine.id, Math.max(.01, low));
+  }
 }
 
 function computeShowcaseShot(points, header, controls) {
@@ -519,7 +566,6 @@ function onPointerMove(event) {
   const yaw = new THREE.Quaternion().setFromAxisAngle(drag.up, dx * .009);
   const pitch = new THREE.Quaternion().setFromAxisAngle(drag.right, dy * .009);
   showcase.rotate(drag.id, yaw.multiply(pitch).multiply(drag.rotation));
-  refitShowcase();
   invalidate();
 }
 
@@ -608,7 +654,7 @@ try {
   // Triangle homes are baked once, before either animation controller is built.
   layout = layoutFor();
   model.setLayout(layout);
-  showcase = createShowcase({ machines: model.machines });
+  showcase = createShowcase({ machines: model.machines, spread: layoutSpread() });
   showcase.setReduced(reducedQuery.matches);
   showcase.setHidden(document.hidden);
   cacheTemplates();

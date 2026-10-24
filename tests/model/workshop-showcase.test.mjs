@@ -133,3 +133,65 @@ test('dispose drops scheduled work and never changes model-owned resources', () 
   close(orbitOffset(0).dot(EYE), 22.5); assert.equal(SHOWCASE_TIMING.interval, 5000);
   assert.ok(new Box3().setFromObject(model.root).isEmpty() === false);
 }));
+
+test('three idle seconds start a smooth return; only the inspected machine changes and its exact home pose is restored', () => fixture(({ model, show, at }) => {
+  show.start(0); show.setPaused(true, 0);
+  const initial = poses(model), q = new Quaternion().setFromAxisAngle(new Vector3(1, .4, 0).normalize(), 2);
+  show.beginDrag('mill', 0); show.rotate('mill', q); show.endDrag(100);
+  assert.equal(show.nextWakeAt(), 3100); assert.equal(show.needsFrame(), false);
+  at(3099); close(show.rotationOf('mill').angleTo(q), 0);
+  at(3100); assert.equal(show.needsFrame(), true); close(show.rotationOf('mill').angleTo(q), 0);
+  at(3450); close(show.rotationOf('mill').angleTo(new Quaternion()), 1);
+  close(show.boundsOf('mill').min.y, 0);
+  model.parts.forEach((p, i) => { if (p.machineId !== 'mill') assert.deepEqual([p.object.position.toArray(), p.object.quaternion.toArray()], initial[i]); });
+  at(3800); assert.deepEqual(show.rotationOf('mill').toArray(), [0, 0, 0, 1]);
+  assert.deepEqual(poses(model), initial); assert.equal(show.needsFrame(), false); assert.equal(show.nextWakeAt(), null);
+}));
+
+test('holding and clicking refresh the idle deadline, and grabbing a returning model continues from its live angle', () => fixture(({ model, show, at }) => {
+  show.start(0); show.setPaused(true, 0);
+  const q = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), 1.6);
+  show.beginDrag('mill', 0); show.rotate('mill', q); show.endDrag(0);
+  at(2000); show.beginDrag('lathe', 2000); at(10000);
+  close(show.rotationOf('mill').angleTo(q), 0); assert.equal(show.nextWakeAt(), null);
+  show.endDrag(10000); assert.equal(show.nextWakeAt(), 13000);
+  show.select('mill', 12000); assert.equal(show.nextWakeAt(), 15000);
+  at(14999); close(show.rotationOf('mill').angleTo(q), 0);
+  at(15350); const live = poses(model);
+  show.beginDrag('mill', 15350); assert.deepEqual(poses(model), live);
+  at(20000); assert.deepEqual(poses(model), live);
+  show.endDrag(20000); at(23700);
+  assert.deepEqual(show.rotationOf('mill').toArray(), [0, 0, 0, 1]);
+}));
+
+test('hidden, reduced-motion, replay and disposal do not leave stale restoration work', () => fixture(({ show, at, model }) => {
+  show.start(0); show.setPaused(true, 0);
+  show.rotate('laser', new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), 1));
+  show.setViewScale('laser', .6);
+  show.setHidden(true, 1000); at(100000); assert.equal(show.nextWakeAt(), null);
+  assert.ok(show.rotationOf('laser').angleTo(new Quaternion()) > .9);
+  show.setHidden(false, 100000); assert.equal(show.nextWakeAt(), 103000);
+  show.setReduced(true, 100001); at(103000);
+  assert.deepEqual(show.rotationOf('laser').toArray(), [0, 0, 0, 1]);
+  assert.equal(show.state().machines.find(m => m.id === 'laser').viewScale, 1);
+  assert.equal(show.needsFrame(), false);
+  show.rotate('mill', new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), 1));
+  show.reset(); assert.equal(show.nextWakeAt(), null);
+  assert.ok(model.parts.every(p => p.object.scale.x === 1));
+  show.dispose(); at(200000); assert.equal(show.needsFrame(), false); assert.equal(show.nextWakeAt(), null);
+}));
+
+test('desktop spread only separates the rear slots; changing viewport spread preserves homes, angles and the orbit clock', () => fixture(({ model, show, at }) => {
+  const initial = homes(model);
+  show.start(0); show.setSpread(1.15);
+  const state = show.state();
+  for (const machine of state.machines) {
+    const center = new Vector3().fromArray(machine.center);
+    const slot = TRIANGLE_OFFSETS[TRIANGLE_HOMES[machine.id]];
+    close(center.dot(RIGHT), slot[0] * 1.15); close(center.dot(EYE), slot[1]);
+  }
+  assert.equal(state.nextMoveAt, 5000);
+  at(5000); at(5500); const phase = show.state().phase;
+  show.setSpread(1); close(show.state().phase, phase);
+  assert.equal(show.state().moving, true); assert.deepEqual(homes(model), initial);
+}));
