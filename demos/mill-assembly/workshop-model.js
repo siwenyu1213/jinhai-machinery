@@ -19,12 +19,14 @@ export const RIGHT = new Vector3(14, 0, -11).normalize();
 const ROW_OFFSETS = Object.freeze({ mill: Object.freeze([0, 0]), lathe: Object.freeze([-9, 0]), laser: Object.freeze([9, 0]) });
 // The finished showcase layout: a triangle around the vertical axis through the
 // scene centre, on the same XZ eye/right plane. "front" closes in on the camera,
-// "left"/"right" sit further back at +-sqrt(3)/2 of the radius.
+// "left"/"right" sit further back. The deeper ellipse gives the front machine
+// stronger perspective emphasis without spreading the rear machines sideways.
 export const TRIANGLE_RADIUS = 9;
+export const TRIANGLE_DEPTH = 22.5;
 export const TRIANGLE_OFFSETS = Object.freeze({
-  front: Object.freeze([0, TRIANGLE_RADIUS]),
-  left: Object.freeze([-Math.sqrt(3) / 2 * TRIANGLE_RADIUS, -TRIANGLE_RADIUS / 2]),
-  right: Object.freeze([Math.sqrt(3) / 2 * TRIANGLE_RADIUS, -TRIANGLE_RADIUS / 2]),
+  front: Object.freeze([0, TRIANGLE_DEPTH]),
+  left: Object.freeze([-Math.sqrt(3) / 2 * TRIANGLE_RADIUS, -TRIANGLE_DEPTH / 2]),
+  right: Object.freeze([Math.sqrt(3) / 2 * TRIANGLE_RADIUS, -TRIANGLE_DEPTH / 2]),
 });
 export const TRIANGLE_HOMES = Object.freeze({ mill: 'front', lathe: 'left', laser: 'right' });
 export const LAYOUT_OFFSETS = Object.freeze({ wide: ROW_OFFSETS, compact: ROW_OFFSETS, triangle: TRIANGLE_OFFSETS });

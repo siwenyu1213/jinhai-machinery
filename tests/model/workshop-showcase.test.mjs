@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Box3, Quaternion, Vector3 } from 'three';
-import { createWorkshop, EYE, RIGHT, TRIANGLE_OFFSETS, TRIANGLE_HOMES } from '../../demos/mill-assembly/workshop-model.js';
+import { createWorkshop, EYE, RIGHT, TRIANGLE_OFFSETS, TRIANGLE_HOMES, TRIANGLE_DEPTH } from '../../demos/mill-assembly/workshop-model.js';
 import { createShowcase, orbitOffset, SHOWCASE_TIMING } from '../../demos/mill-assembly/workshop-showcase.js';
 
 const close = (a, b, message = '') => assert.ok(Math.abs(a - b) < 1e-6, `${message}: ${a} != ${b}`);
@@ -28,18 +28,24 @@ test('triangle centres occupy front and rear slots on the ground; old row layout
   for (const p of model.parts) assert.deepEqual(p.object.position.toArray(), p.homePosition.toArray());
 }));
 
-test('auto starts at 5000ms, follows the circle and cycles right-front-left every five seconds', () => fixture(({ show, at, model }) => {
+test('auto starts at 5000ms, follows the deep ellipse and cycles right-front-left every five seconds', () => fixture(({ show, at, model }) => {
   const home = homes(model), initial = poses(model);
   show.start(0); at(4999); assert.equal(show.state().moving, false); assert.equal(show.state().frontId, 'mill');
   at(5000); assert.equal(show.state().moving, true);
   at(5700);
   const mid = show.state();
   close(mid.phase, -Math.PI / 3);
-  for (const machine of mid.machines) close(Math.hypot(machine.center[0], machine.center[2]), 9, 'orbit radius');
+  for (const machine of mid.machines) {
+    const center = new Vector3().fromArray(machine.center);
+    close((center.dot(RIGHT) / 9) ** 2 + (center.dot(EYE) / TRIANGLE_DEPTH) ** 2, 1, 'elliptical orbit');
+  }
   at(6400); assert.equal(show.state().frontId, 'laser');
   const states = Object.fromEntries(show.state().machines.map(m => [m.id, new Vector3().fromArray(m.center)]));
   close(states.mill.dot(RIGHT), -Math.sqrt(3) * 4.5); close(states.lathe.dot(RIGHT), Math.sqrt(3) * 4.5);
-  close(states.laser.dot(EYE), 9);
+  close(states.laser.dot(EYE), 22.5);
+  close(states.mill.dot(EYE), -11.25);
+  close(states.lathe.dot(EYE), -11.25);
+  assert.ok(states.laser.dot(EYE) - states.mill.dot(EYE) > 30, 'strong front/back separation');
   at(9999); assert.equal(show.state().moving, false);
   at(10000); assert.equal(show.state().moving, true);
   at(11400); assert.equal(show.state().frontId, 'lathe');
@@ -124,6 +130,6 @@ test('dispose drops scheduled work and never changes model-owned resources', () 
   show.start(0); show.dispose();
   assert.equal(show.needsFrame(), false); assert.equal(show.nextWakeAt(), null);
   assert.equal(show.select('mill'), false); assert.equal(model.parts.length, 91);
-  close(orbitOffset(0).dot(EYE), 9); assert.equal(SHOWCASE_TIMING.interval, 5000);
+  close(orbitOffset(0).dot(EYE), 22.5); assert.equal(SHOWCASE_TIMING.interval, 5000);
   assert.ok(new Box3().setFromObject(model.root).isEmpty() === false);
 }));

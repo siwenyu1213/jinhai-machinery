@@ -1,5 +1,5 @@
 import { Box3, Quaternion, Vector3 } from 'three';
-import { EYE, RIGHT, TRIANGLE_HOMES, TRIANGLE_RADIUS } from './workshop-model.js';
+import { EYE, RIGHT, TRIANGLE_HOMES, TRIANGLE_RADIUS, TRIANGLE_DEPTH } from './workshop-model.js';
 
 // A clock-driven controller: no timers, rendering, geometry or home mutations.
 // The orbit translates rigid machines; each viewing quaternion stays separate.
@@ -11,8 +11,8 @@ export const SLOT_ANGLES = Object.freeze({ front: 0, left: STEP * 2, right: STEP
 const wrap = (angle) => ((angle + Math.PI) % TAU + TAU) % TAU - Math.PI;
 const smoother = (value) => { const t = Math.min(1, Math.max(0, value)); return t ** 3 * (t * (t * 6 - 15) + 10); };
 const IDENTITY = new Quaternion();
-export function orbitOffset(theta, radius = SHOWCASE_RADIUS) {
-  return new Vector3().addScaledVector(RIGHT, Math.sin(theta) * radius).addScaledVector(EYE, Math.cos(theta) * radius);
+export function orbitOffset(theta) {
+  return new Vector3().addScaledVector(RIGHT, Math.sin(theta) * SHOWCASE_RADIUS).addScaledVector(EYE, Math.cos(theta) * TRIANGLE_DEPTH);
 }
 
 export function createShowcase({ machines, now = () => performance.now() } = {}) {

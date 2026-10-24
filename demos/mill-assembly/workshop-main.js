@@ -415,16 +415,42 @@ function showcaseEnvelope(phase) {
   return points;
 }
 
+function computeShowcaseShot(points, header, controls) {
+  // Hierarchy (§2.1): use the available frame for the front machine. With a
+  // deep orbit, centring the world bounds makes the camera retreat to fit a
+  // large empty gap. Solve the perspective limits directly instead, keeping
+  // the vertical carousel axis centred and the original viewing direction.
+  const right = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), CAMERA_EYE).normalize();
+  const up = new THREE.Vector3().crossVectors(CAMERA_EYE, right).normalize();
+  const tan = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  const top = header.bottom + 16, bottom = controls.top - 36;
+  const mid = 1 - (top + bottom) / innerHeight;
+  const half = (bottom - top) / innerHeight * .94;
+  const high = mid + half, low = mid - half;
+  const horizontal = Math.min(FILL_X, 1 - 16 / innerWidth);
+  let distance = -Infinity, lower = -Infinity, upper = Infinity;
+  let minDepth = Infinity, maxDepth = -Infinity;
+  for (const point of points) {
+    const x = point.dot(right), y = point.dot(up), z = point.dot(CAMERA_EYE);
+    minDepth = Math.min(minDepth, z); maxDepth = Math.max(maxDepth, z);
+    distance = Math.max(distance, z + Math.abs(x) / (tan * camera.aspect * horizontal), z + camera.near + 1);
+    lower = Math.max(lower, y + high * z * tan);
+    upper = Math.min(upper, y + low * z * tan);
+  }
+  // All corners must share a feasible vertical target. These two linear
+  // constraints give the nearest distance without iterative zooming out.
+  distance = Math.max(distance, (lower - upper) / ((high - low) * tan));
+  const targetHeight = (lower - high * distance * tan + upper - low * distance * tan) / 2;
+  const targetDepth = (minDepth + maxDepth) / 2;
+  return { target: up.multiplyScalar(targetHeight).addScaledVector(CAMERA_EYE, targetDepth),
+    distance: distance - targetDepth, eye: CAMERA_EYE.clone() };
+}
+
 function refitShowcase() {
   const header = document.querySelector('.heading').getBoundingClientRect(), controls = document.querySelector('.controls').getBoundingClientRect();
-  const right = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), CAMERA_EYE).normalize();
   // Fit each phase in advance; interpolate only target/distance while moving.
-  // Mirrored corners keep the vertical orbit axis at the screen centre.
-  showcaseShots = Array.from({ length: SHOT_SAMPLES }, (_, index) => {
-    const points = showcaseEnvelope(index * Math.PI * 2 / SHOT_SAMPLES);
-    points.push(...points.map(point => point.clone().addScaledVector(right, -2 * point.dot(right))));
-    return computeShot(points, CAMERA_EYE, host.clientWidth < 600 ? .74 : .80, header, controls, FILL_X);
-  });
+  showcaseShots = Array.from({ length: SHOT_SAMPLES }, (_, index) =>
+    computeShowcaseShot(showcaseEnvelope(index * Math.PI * 2 / SHOT_SAMPLES), header, controls));
   finalShot = showcaseShots[0];
 }
 

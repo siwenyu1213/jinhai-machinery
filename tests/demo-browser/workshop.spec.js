@@ -394,9 +394,47 @@ test('completed machines sit inside the fixed frame between header and controls,
   expect(layout.controls.left).toBeGreaterThanOrEqual(0);
   expect(layout.controls.right).toBeLessThanOrEqual(layout.width);
   expectFramed(layout, 'complete');
-  const occupiedWidth = (Math.max(...layout.points.map(([x]) => x)) - Math.min(...layout.points.map(([x]) => x))) / 2;
-  expect(occupiedWidth).toBeGreaterThan(.70);
   await testInfo.attach('workshop-complete', { body: await page.screenshot(), contentType: 'image/png' });
+});
+
+test('each front machine fills more of the frame while the rear machines stay visibly further away', async ({ page }) => {
+  await ready(page);
+  await page.locator('#complete').click();
+  await waitLocked(page);
+  await page.locator('#toggle-showcase').click();
+  const views = {};
+  for (const id of ['mill', 'laser', 'lathe']) {
+    await page.locator(`.machine-label[data-machine="${id}"] button`).click();
+    await expect.poll(() => page.evaluate(() => window.__workshopDemo.getShowcaseState().frontId)).toBe(id);
+    const shot = await page.evaluate(() => {
+      const api = window.__workshopDemo, camera = api.getCamera();
+      const Box = api.getBounds().constructor, Vector = camera.position.constructor;
+      return { width: innerWidth, height: innerHeight, machines: Object.fromEntries(api.getMachines().map(machine => {
+        const box = new Box(), points = [];
+        for (const part of machine.parts) {
+          const b = new Box().setFromObject(part.object); box.union(b);
+          for (let c = 0; c < 8; c++) points.push(new Vector(c & 1 ? b.max.x : b.min.x, c & 2 ? b.max.y : b.min.y, c & 4 ? b.max.z : b.min.z).project(camera));
+        }
+        return [machine.id, { distance: box.getCenter(new Vector()).distanceTo(camera.position),
+          width: (Math.max(...points.map(p => p.x)) - Math.min(...points.map(p => p.x))) / 2,
+          height: (Math.max(...points.map(p => p.y)) - Math.min(...points.map(p => p.y))) / 2 }];
+      })) };
+    });
+    views[id] = shot.machines;
+    const front = shot.machines[id], phone = shot.width < 600;
+    if (id === 'mill') expect(front.height, `${id} foreground height`).toBeGreaterThan(phone ? .17 : .57);
+    else expect(front.width, `${id} foreground width`).toBeGreaterThan(id === 'lathe' ? (phone ? .43 : .40) : (phone ? .51 : .44));
+    for (const [otherId, rear] of Object.entries(shot.machines)) {
+      if (otherId !== id) expect(front.distance, `${id} closer than ${otherId}`).toBeLessThan(rear.distance * .65);
+    }
+    expectFramed(await geometry(page), `large front ${id}`);
+    await expectFixedCamera(page, `large front ${id}`);
+  }
+  for (const id of ['mill', 'laser', 'lathe']) {
+    for (const otherFront of ['mill', 'laser', 'lathe'].filter(other => other !== id)) {
+      expect(views[id][id].width, `${id} grows when moved from back to front`).toBeGreaterThan(views[otherFront][id].width * 1.5);
+    }
+  }
 });
 
 test('every part Box3 corner stays inside the frame from p=.24 through the finished triangle', async ({ page }) => {
