@@ -890,6 +890,35 @@ test('an inspected model returns after three idle seconds; a new click restarts 
   expect(await page.evaluate(() => window.__workshopDemo.getRenderStats().frames)).toBe(rendered);
 });
 
+test('each model keeps its own three-second return clock while another model is held or clicked', async ({ page }) => {
+  await ready(page); await page.locator('#complete').click(); await page.locator('#toggle-showcase').click();
+  await frames(page, 3);
+  const machine = id => page.evaluate(id => window.__workshopDemo.getShowcaseState().machines.find(m => m.id === id), id);
+  const first = await bodyPoint(page, 'mill');
+  await page.mouse.move(first.x, first.y); await page.mouse.down();
+  await page.mouse.move(first.x + 55, first.y - 24, { steps: 6 }); await page.mouse.up();
+  const firstDeadline = (await machine('mill')).returnAt;
+  expect(firstDeadline).not.toBeNull();
+  await page.waitForTimeout(600);
+  const second = await bodyPoint(page, 'lathe');
+  await page.mouse.move(second.x, second.y); await page.mouse.down();
+  await page.mouse.move(second.x + 40, second.y - 20, { steps: 6 }); await frames(page, 2);
+  const held = await machine('lathe');
+  expect(held.returnAt).toBeNull(); expect(Math.abs(held.rotation[3])).toBeLessThan(.99);
+  expect((await machine('mill')).returnAt).toBe(firstDeadline);
+  // The mill reaches its own deadline while the pointer still holds the lathe.
+  await expect.poll(async () => (await machine('mill')).rotation, { timeout: 5000 }).toEqual([0, 0, 0, 1]);
+  expect((await machine('lathe')).rotation).toEqual(held.rotation);
+  expect(await page.evaluate(() => window.__workshopDemo.getShowcaseState().draggingId)).toBe('lathe');
+  await page.mouse.up();
+  const secondDeadline = (await machine('lathe')).returnAt;
+  expect(secondDeadline).toBeGreaterThan(firstDeadline + 3000);
+  await page.getByRole('button', { name: '将铣床移到前方' }).click();
+  expect((await machine('lathe')).returnAt).toBe(secondDeadline);
+  await expect.poll(async () => (await machine('lathe')).rotation, { timeout: 5000 }).toEqual([0, 0, 0, 1]);
+  expect(await page.evaluate(() => window.__workshopDemo.getShowcaseState().machines.every(m => m.returnAt === null && !m.returning))).toBe(true);
+});
+
 test('desktop rear slots spread farther apart while phone homes and front depth stay the same', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await ready(page); await page.locator('#complete').click(); await page.locator('#toggle-showcase').click();

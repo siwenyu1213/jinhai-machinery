@@ -148,20 +148,42 @@ test('three idle seconds start a smooth return; only the inspected machine chang
   assert.deepEqual(poses(model), initial); assert.equal(show.needsFrame(), false); assert.equal(show.nextWakeAt(), null);
 }));
 
-test('holding and clicking refresh the idle deadline, and grabbing a returning model continues from its live angle', () => fixture(({ model, show, at }) => {
+test('dragging another machine leaves the first deadline running; only the clicked machine restarts its clock', () => fixture(({ model, show, at }) => {
   show.start(0); show.setPaused(true, 0);
   const q = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), 1.6);
   show.beginDrag('mill', 0); show.rotate('mill', q); show.endDrag(0);
-  at(2000); show.beginDrag('lathe', 2000); at(10000);
-  close(show.rotationOf('mill').angleTo(q), 0); assert.equal(show.nextWakeAt(), null);
-  show.endDrag(10000); assert.equal(show.nextWakeAt(), 13000);
-  show.select('mill', 12000); assert.equal(show.nextWakeAt(), 15000);
-  at(14999); close(show.rotationOf('mill').angleTo(q), 0);
-  at(15350); const live = poses(model);
-  show.beginDrag('mill', 15350); assert.deepEqual(poses(model), live);
-  at(20000); assert.deepEqual(poses(model), live);
-  show.endDrag(20000); at(23700);
-  assert.deepEqual(show.rotationOf('mill').toArray(), [0, 0, 0, 1]);
+  at(2000); show.beginDrag('lathe', 2000); show.rotate('lathe', q);
+  assert.equal(show.nextWakeAt(), 3000);
+  at(3350); assert.equal(show.needsFrame(), true);
+  close(show.rotationOf('mill').angleTo(new Quaternion()), .8);
+  close(show.rotationOf('lathe').angleTo(q), 0);
+  at(3700); assert.deepEqual(show.rotationOf('mill').toArray(), [0, 0, 0, 1]);
+  show.endDrag(4000); assert.equal(show.nextWakeAt(), 7000);
+  show.select('mill', 5000); assert.equal(show.nextWakeAt(), 7000);
+  show.select('lathe', 6000); assert.equal(show.nextWakeAt(), 9000);
+  at(8999); close(show.rotationOf('lathe').angleTo(q), 0);
+  at(9350); const live = poses(model);
+  show.beginDrag('lathe', 9350); assert.deepEqual(poses(model), live);
+  at(12000); assert.deepEqual(poses(model), live);
+  show.endDrag(12000); at(15700);
+  assert.deepEqual(show.rotationOf('lathe').toArray(), [0, 0, 0, 1]);
+}));
+
+test('all three machines return on independent deadlines, including an uninterrupted return when another is clicked', () => fixture(({ show, at }) => {
+  show.start(0); show.setPaused(true, 0);
+  const q = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), 1);
+  show.rotate('mill', q, 0); show.rotate('lathe', q, 500); show.rotate('laser', q, 1000);
+  show.select('lathe', 1400);
+  assert.deepEqual(show.state().machines.map(m => m.returnAt), [3000, 4400, 4000]);
+  at(3000); assert.equal(show.state().machines.find(m => m.id === 'mill').returning, true);
+  show.select('laser', 3100);
+  assert.equal(show.state().machines.find(m => m.id === 'mill').returning, true);
+  assert.equal(show.state().machines.find(m => m.id === 'lathe').returnAt, 4400);
+  at(3700); assert.deepEqual(show.rotationOf('mill').toArray(), [0, 0, 0, 1]);
+  at(5100); assert.deepEqual(show.rotationOf('lathe').toArray(), [0, 0, 0, 1]);
+  close(show.rotationOf('laser').angleTo(q), 0);
+  at(6800); assert.deepEqual(show.rotationOf('laser').toArray(), [0, 0, 0, 1]);
+  assert.equal(show.nextWakeAt(), null); assert.equal(show.needsFrame(), false);
 }));
 
 test('hidden, reduced-motion, replay and disposal do not leave stale restoration work', () => fixture(({ show, at, model }) => {
@@ -170,8 +192,8 @@ test('hidden, reduced-motion, replay and disposal do not leave stale restoration
   show.setViewScale('laser', .6);
   show.setHidden(true, 1000); at(100000); assert.equal(show.nextWakeAt(), null);
   assert.ok(show.rotationOf('laser').angleTo(new Quaternion()) > .9);
-  show.setHidden(false, 100000); assert.equal(show.nextWakeAt(), 103000);
-  show.setReduced(true, 100001); at(103000);
+  show.setHidden(false, 100000); assert.equal(show.nextWakeAt(), 102000);
+  show.setReduced(true, 100001); at(102000);
   assert.deepEqual(show.rotationOf('laser').toArray(), [0, 0, 0, 1]);
   assert.equal(show.state().machines.find(m => m.id === 'laser').viewScale, 1);
   assert.equal(show.needsFrame(), false);

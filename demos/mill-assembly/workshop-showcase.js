@@ -27,16 +27,14 @@ export function createShowcase({ machines, now = () => performance.now(), spread
     }];
   }));
   let active = false, paused = false, reduced = false, hidden = false, disposed = false;
-  let phase = 0, transition = null, nextMoveAt = null, draggingId = null;
+  let phase = 0, transition = null, nextMoveAt = null, draggingId = null, hiddenAt = null;
   const canAuto = () => active && !paused && !reduced && !hidden && !draggingId && !disposed;
   const resetClock = (time) => { nextMoveAt = canAuto() ? time + SHOWCASE_TIMING.interval : null; };
   const inspecting = () => [...entries.values()].some(entry => entry.returnAt !== null || entry.returning);
   const returning = () => [...entries.values()].some(entry => entry.returning);
-  const touch = (time) => {
-    for (const entry of entries.values()) {
-      entry.returning = null;
-      entry.returnAt = !entry.user.equals(IDENTITY) && !draggingId ? time + SHOWCASE_TIMING.returnDelay : null;
-    }
+  const touch = (entry, time) => {
+    entry.returning = null;
+    entry.returnAt = !entry.user.equals(IDENTITY) && draggingId !== entry.id ? time + SHOWCASE_TIMING.returnDelay : null;
   };
 
   function boundsOf(id, target = new Box3()) {
@@ -78,9 +76,10 @@ export function createShowcase({ machines, now = () => performance.now(), spread
     else begin(target, time);
   }
   function update(time = now()) {
-    if (disposed || !active || hidden || draggingId) return false;
+    if (disposed || !active || hidden) return false;
     let changed = false;
     for (const entry of entries.values()) {
+      if (entry.id === draggingId) continue;
       if (entry.returnAt !== null && time >= entry.returnAt) {
         entry.returning = { start: entry.returnAt, from: entry.user.clone() };
         entry.returnAt = null;
@@ -110,9 +109,9 @@ export function createShowcase({ machines, now = () => performance.now(), spread
     start(time = now()) { if (disposed || active) return; active = true; resetClock(time); apply(); },
     update, apply, boundsOf,
     rotationOf: (id) => entries.get(id)?.user.clone() ?? null,
-    needsFrame: () => Boolean(active && (transition || returning()) && !hidden && !draggingId && !disposed),
+    needsFrame: () => Boolean(active && (transition || returning()) && !hidden && !disposed),
     nextWakeAt: () => {
-      if (!active || hidden || draggingId || disposed) return null;
+      if (!active || hidden || disposed) return null;
       const due = [...entries.values()].map(entry => entry.returnAt).filter(time => time !== null);
       if (canAuto() && !transition && !inspecting() && nextMoveAt !== null) due.push(nextMoveAt);
       return due.length ? Math.min(...due) : null;
@@ -132,7 +131,7 @@ export function createShowcase({ machines, now = () => performance.now(), spread
       const entry = entries.get(id);
       if (disposed || !active || hidden || draggingId || !entry) return false;
       update(time);
-      touch(time);
+      touch(entry, time);
       const target = phase + wrap(-entry.angle - phase);
       if (reduced) { phase = target; transition = null; resetClock(time); apply(); }
       else begin(target, time);
@@ -143,7 +142,7 @@ export function createShowcase({ machines, now = () => performance.now(), spread
       update(time);
       transition = null;
       draggingId = id;
-      touch(time);
+      touch(entries.get(id), time);
       nextMoveAt = null;
       return true;
     },
@@ -151,14 +150,15 @@ export function createShowcase({ machines, now = () => performance.now(), spread
       const entry = entries.get(id);
       if (disposed || !active || !entry || !quaternion?.toArray().every(Number.isFinite)) return false;
       entry.user.copy(quaternion).normalize();
-      touch(time);
+      touch(entry, time);
       applyMachine(entry, true);
       return true;
     },
     endDrag(time = now()) {
       if (!draggingId || disposed) return;
+      const entry = entries.get(draggingId);
       draggingId = null;
-      touch(time);
+      touch(entry, time);
       align(time);
     },
     setPaused(value, time = now()) {
@@ -180,10 +180,19 @@ export function createShowcase({ machines, now = () => performance.now(), spread
       if (disposed || hidden === Boolean(value)) return;
       update(time);
       hidden = Boolean(value);
+      if (hidden) hiddenAt = time;
+      else {
+        const elapsed = time - (hiddenAt ?? time);
+        for (const entry of entries.values()) {
+          if (entry.returnAt !== null) entry.returnAt += elapsed;
+          if (entry.returning) entry.returning.start += elapsed;
+        }
+        hiddenAt = null;
+      }
       transition = null;
       draggingId = null;
       resetClock(time);
-      if (!hidden && active) { touch(time); align(time); }
+      if (!hidden && active) align(time);
     },
     reset() {
       if (disposed) return;
