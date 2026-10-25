@@ -1,0 +1,46 @@
+{
+  "purpose": "Independent typography proposal; not applied to the website",
+  "date": "2026-10-25",
+  "fonts": [
+    {
+      "file": "fonts/IBMPlexSansCondensed-Regular.woff2",
+      "sha256": "a71a56e516751883cb7877112d39f9c13b92c2dc15caaf00277b7f9d941d673a",
+      "source": "https://github.com/IBM/plex/tree/71f558992315a12ca1f06a2215d57962a1992162/packages",
+      "license": "fonts/IBMPlex-LICENSE.txt",
+      "modified": false
+    },
+    {
+      "file": "fonts/IBMPlexSansCondensed-SemiBold.woff2",
+      "sha256": "385a082a1eac88343eab01fb6746be04b7175dacaf4550b17dee76ea0f78126d",
+      "source": "https://github.com/IBM/plex/tree/71f558992315a12ca1f06a2215d57962a1992162/packages",
+      "license": "fonts/IBMPlex-LICENSE.txt",
+      "modified": false
+    },
+    {
+      "file": "fonts/IBMPlexSansSC-Regular.woff2",
+      "sha256": "dc51399ce38f7200806df891476d7216a81c8aede47284e421a54413608c407c",
+      "source": "https://github.com/IBM/plex/tree/71f558992315a12ca1f06a2215d57962a1992162/packages",
+      "license": "fonts/IBMPlex-LICENSE.txt",
+      "modified": false
+    },
+    {
+      "file": "fonts/IBMPlexSansSC-SemiBold.woff2",
+      "sha256": "31c2e2375deec6d2ea3d371bec2d3cb2bfe43a51a9e8af986d5b25cd7cb279d3",
+      "source": "https://github.com/IBM/plex/tree/71f558992315a12ca1f06a2215d57962a1992162/packages",
+      "license": "fonts/IBMPlex-LICENSE.txt",
+      "modified": false
+    },
+    {
+      "file": "fonts/SmileySans-Oblique.woff2",
+      "sha256": "731f22973349404b15a88a99ef3b5dd4104c0965c23b7e485c1f11e84fea99e2",
+      "source": "https://github.com/atelier-anchor/smiley-sans/releases/tag/v2.0.1",
+      "license": "fonts/SmileySans-LICENSE.txt",
+      "modified": false
+    }
+  ],
+  "image": {
+    "file": "images/lathe.webp",
+    "source": "site/public/images/generated/lathe-hero.webp",
+    "sha256": "76be4c68514d305dbbcdb9fceb2540f2f7c4cd6400be42432462ab92d9a0d39b"
+  }
+}

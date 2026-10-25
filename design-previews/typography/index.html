@@ -1,0 +1,54 @@
+<!doctype html>
+<!-- Typography proposal: original native HTML/CSS; existing near-black, cream and orange palette.
+     Primary: the proposed headline in the actual machine composition. Secondary: body and metric specimens.
+     Compare one coordinated type system against the current system without editing or embedding the website. -->
+<html lang="zh-CN" data-type="proposed">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>金海机械 · 字体搭配预览</title>
+  <link rel="stylesheet" href="./preview.css">
+</head>
+<body>
+  <header class="review-bar">
+    <a class="review-brand" href="#top">金海机械 <span>字体预览</span></a>
+    <div class="comparison" role="group" aria-label="比较字体搭配">
+      <button type="button" data-mode="proposed" aria-pressed="true">推荐搭配</button>
+      <button type="button" data-mode="current" aria-pressed="false">当前字体</button>
+    </div>
+    <a class="site-link" href="http://127.0.0.1:4173/jinhai-machinery/" target="_blank" rel="noopener">查看原网页 ↗</a>
+  </header>
+  <main id="top">
+    <section class="proposal-intro" aria-labelledby="proposal-title">
+      <div><p class="status">独立提案 · 尚未应用到网站</p><h1 id="proposal-title">让字形，也有机械的力量。</h1></div>
+      <p class="proposal-summary">窄而有势的标题、清楚克制的正文、像设备铭牌一样的数字。<br>保留现在的近黑底色、奶油白和橙色，让字体本身产生变化。</p>
+    </section>
+    <p class="mode-note" id="mode-note" aria-live="polite">正在预览：得意黑 + IBM Plex 字体家族</p>
+    <section class="hero-specimen specimen" aria-label="首页标题的实际构图预览">
+      <div class="specimen-nav"><span>设备能力　 主营业务　 机台展示</span><a class="wordmark display-type" href="#headline">金海<br><strong>机械</strong></a><span class="demo-contact">联系演示 ↗</span></div>
+      <div class="hero-copy"><p>非标定制 · 钣金加工 · 机台维修</p><h2 class="display-type hero-headline" id="headline"><span>把想法，</span><span>加工成形。</span></h2><div class="hero-actions"><a href="#details">查看业务 <span>↗</span></a><a class="secondary-link" href="#numbers">设备参数 ↘</a></div></div>
+      <img class="machine-image" src="./images/lathe.webp" width="1280" height="900" alt="现有车床模型的静态渲染，用于比较字体与机台的搭配">
+      <div class="machine-name display-type">车床</div><p class="specimen-caption">字体效果示意 · 模型为现有通用结构</p>
+    </section>
+    <section class="type-notes" aria-label="推荐字体分工">
+      <article><p class="role-label">品牌与短标题</p><h3>得意黑 <span>Smiley Sans</span></h3><p>原生窄斜字形，带切削般的斜向势能。只放在首页大标题、品牌字和机台名称，让最重要的几句话先被看见。</p><a href="https://github.com/atelier-anchor/smiley-sans" target="_blank" rel="noopener">字体来源 ↗</a></article>
+      <article><p class="role-label">正文与界面</p><h3>IBM Plex Sans SC</h3><p>正文、菜单和按钮保持正体，保留清楚的字腔与笔画。用留白和字号建立层级，让页面有个性，也能轻松阅读。</p><a href="https://github.com/IBM/plex/tree/master/packages/plex-sans-sc" target="_blank" rel="noopener">字体来源 ↗</a></article>
+      <article><p class="role-label">数字与单位</p><h3>IBM Plex Sans Condensed</h3><p>窄体数字更像机台铭牌。参数用大号实心数字，单位缩小并对齐基线；型号和台数使用同一套数字语言。</p><a href="https://github.com/IBM/plex/tree/master/packages/plex-sans-condensed" target="_blank" rel="noopener">字体来源 ↗</a></article>
+    </section>
+    <section class="details specimen light" id="details" aria-labelledby="details-title">
+      <div class="section-intro"><h2 class="section-title" id="details-title">主营业务</h2><p>中等字重负责标题，常规字重负责说明。<br>正文不使用斜体，也不刻意拉宽字距。</p></div>
+      <div class="business-list"><article><h3>非标零配件与设备定制</h3><p>线上线下沟通，中小件为主。大件需沟通协商。</p></article><article><h3>钣金定制</h3><p>激光切割、折弯与焊接。</p></article><article><h3>维修服务</h3><p>先看机台类型、故障与所在地区。</p></article></div>
+      <div class="reading-sample"><p class="role-label">连续阅读的实际大小 · 16px</p><p>一家家庭机械加工厂，服务食品、印刷、包装相关客户。提供图纸或照片、尺寸、材料、数量，先沟通需求，再确认范围与交接方式。</p><a class="sample-button" href="#numbers">查看设备参数 <span>↘</span></a></div>
+    </section>
+    <section class="numbers specimen" id="numbers" aria-labelledby="numbers-title">
+      <div class="section-intro"><h2 class="section-title" id="numbers-title">设备与工艺</h2><p>数字采用 Plex 窄体，文字与数字分工。<br>以下沿用网页已有设备信息。</p></div>
+      <div class="metric-grid"><article><h3>大族激光切割机</h3><p class="metric"><strong class="numeric-type">6000</strong><span class="numeric-type">W</span></p><p>1 台</p></article><article><h3>板料折弯机</h3><p class="metric"><strong class="numeric-type">165</strong><span>吨</span></p><p>1 台</p></article></div>
+      <div class="secondary-metrics"><p><strong class="numeric-type">6</strong> 台车床 <span>含 1 台数控车床</span></p><p><strong class="numeric-type">3</strong> 台铣床 <span>北京 / 三明 / 炮塔</span></p><p><strong class="numeric-type">4</strong> 台钻床 <span>武夷山台钻</span></p></div>
+    </section>
+    <section class="try-type light" aria-labelledby="try-title"><div><h2 id="try-title">也可以试一句自己的标题。</h2><p>输入内容只在当前预览页显示，不会保存或发送。</p></div><label for="type-input">标题内容<input id="type-input" type="text" maxlength="18" value="从结构，看懂机台。" autocomplete="off"></label><p id="custom-specimen" class="display-type">从结构，看懂机台。</p></section>
+    <section class="plan" aria-labelledby="plan-title"><h2 id="plan-title">应用到网页时，我会这样处理。</h2><ul><li>大标题、品牌字和机台名使用得意黑，保留原生倾斜，不再额外变形。</li><li>区块标题、菜单、按钮和正文使用 Plex Sans SC，按 16 / 24 / 36 / 48 的层级组织。</li><li>设备参数和型号使用 Plex 窄体数字；首页标题在桌面约 104px、手机约 60px。</li><li>字体保存在本地，按用途裁剪字库，避免依赖外部字体服务。本页先使用完整字库核对效果。</li></ul><p class="footnote">此页只演示字体方案，机台使用静态画面。正式网站与原动效尚未修改。字体的原始许可与来源随预览文件保留。</p></section>
+  </main>
+  <footer><span>金海机械 · 字体提案</span><span><a id="smiley-license" href="./fonts/SmileySans-LICENSE.txt">得意黑许可</a>　<a id="plex-license" href="./fonts/IBMPlex-LICENSE.txt">IBM Plex 许可</a></span><a href="#top">回到顶部 ↑</a></footer>
+  <script type="module" src="./preview.js"></script>
+</body>
+</html>
