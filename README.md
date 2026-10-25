@@ -1,5 +1,7 @@
 # 金海机械 · 网站学习练习
 
+2026-10-25 字体方案已确认并应用：首页及三机装配页使用得意黑标题、Plex 中文正文和窄体数字。本地 WOFF2 子集合计约 286 KB，来源、许可和重建方式见 [字体说明](site/public/fonts/README.md)。原始完整字库与对照预览保留在 [字体提案](design-previews/typography/README.md)，不会随网站发布。
+
 2026-10-25 本地新版：参考 RiskSolved 的三维首屏、居中字标、米白大标题与橙色操作，整体调整官网。三个机台逐个轮换，完整飞入装配位于 `machines.html`；先前的三套生成背景已删除。运行 `npm run build`、`npm run preview` 后打开 `http://127.0.0.1:4173/jinhai-machinery/`。设计依据见 [设计参考.md](设计参考.md)，模型静态图记录见 [machine-hero.json](site/public/images/generated/machine-hero.json)。本轮未上传或发布。下方三爪卡盘记录属于历史版本。
 
 原生 HTML/CSS/JavaScript、Vite、GSAP 与 Three.js 构建的静态展示网站。仅供学习，不用于商业接单，不收集真实客户需求。

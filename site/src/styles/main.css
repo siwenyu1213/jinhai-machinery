@@ -1,6 +1,8 @@
+@import './font-faces.css';
 @import './tokens.css';
 @import './layout.css';
 @import './components.css';
 @import './assembly.css';
 @import './risk-theme.css';
 @import './scope-map.css';
+@import './typography.css';

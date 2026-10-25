@@ -1,0 +1,7 @@
+/* Reviewed original glyphs, locally subset and renamed under the OFL. */
+@font-face { font-family: 'Jinhai Display'; src: url('/fonts/jinhai-display.woff2') format('woff2'); font-style: normal; font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Jinhai Text'; src: url('/fonts/jinhai-text-regular.woff2') format('woff2'); font-style: normal; font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Jinhai Text'; src: url('/fonts/jinhai-text-semibold.woff2') format('woff2'); font-style: normal; font-weight: 600; font-display: swap; }
+@font-face { font-family: 'Jinhai Narrow'; src: url('/fonts/jinhai-narrow-regular.woff2') format('woff2'); font-style: normal; font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Jinhai Narrow'; src: url('/fonts/jinhai-narrow-semibold.woff2') format('woff2'); font-style: normal; font-weight: 600; font-display: swap; }
+:root { --font-body: 'Jinhai Text', 'Microsoft YaHei', 'PingFang SC', system-ui, sans-serif; --font-display: 'Jinhai Display', var(--font-body); --font-numbers: 'Jinhai Narrow', var(--font-body); }

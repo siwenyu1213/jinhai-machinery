@@ -1,6 +1,6 @@
 import { chromium } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
-const directory = 'artifacts/tmp/risk-redesign';
+const directory = process.env.CAPTURE_DIR || 'artifacts/tmp/risk-redesign';
 await mkdir(directory, { recursive: true });
 const browser = await chromium.launch({ channel: process.platform === 'win32' ? 'msedge' : undefined });
 const report = { captures: [], errors: [] };
@@ -10,6 +10,7 @@ try {
     page.on('pageerror', error => report.errors.push(error.message));
     await page.goto('http://127.0.0.1:4173/jinhai-machinery/');
     await page.locator('.hero[data-renderer="ready"]').waitFor({ timeout: 30000 });
+    await page.evaluate(() => document.fonts.ready);
     await page.evaluate(async () => { const images = [...document.images]; images.forEach(image => image.loading = 'eager'); await Promise.all(images.map(image => image.decode().catch(() => {}))); });
     for (const id of ['mill', 'lathe', 'laser']) {
       await page.evaluate(value => window.__machineHero.select(value, true), id);
