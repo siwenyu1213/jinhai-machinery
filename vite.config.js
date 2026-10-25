@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { fileURLToPath } from 'node:url';
 
 export default defineConfig({
   root: 'site',
@@ -6,6 +7,10 @@ export default defineConfig({
   build: {
     outDir: '../dist', emptyOutDir: true,
     rolldownOptions: {
+      input: {
+        main: fileURLToPath(new URL('./site/index.html', import.meta.url)),
+        machines: fileURLToPath(new URL('./site/machines.html', import.meta.url)),
+      },
       output: {
         codeSplitting: {
           groups: [{ name: 'three-core', test: /node_modules[\\/]three[\\/]build[\\/]three\.core\.js$/ }],

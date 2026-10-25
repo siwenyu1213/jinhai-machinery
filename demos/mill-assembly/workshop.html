@@ -6,10 +6,10 @@ drag to rotate it around the fixed camera) becomes primary; the per-machine
 labels are the secondary selection; the structure note is tertiary. One action:
 scroll / scrub. Plain HTML/CSS + Three.js, no UI library, no dark variant.
 Tokens come from style.css (ink, paper, surface, line, accent); 44px controls
-and visible focus. The backdrop is tertiary, behind the transparent canvas.
+and visible focus. No image backdrop.
 Machine-name lettering uses actual paint colors from workshop-palette.js;
-contrasting paint panels preserve the pale mill lettering. Background choices
-share one timeline and never reset assembly or machine inspection.
+contrasting paint panels preserve the pale mill lettering. Names follow the
+actual machine controller and never reset assembly or inspection.
 -->
 <html lang="zh-CN">
 <head>
@@ -22,7 +22,6 @@ share one timeline and never reset assembly or machine inspection.
 </head>
 <body>
   <main id="workshop-stage" class="stage" data-renderer="loading" data-progress="0" data-assembled="0" aria-label="三台设备联合旋转装配演示">
-    <div id="workshop-backdrop" aria-hidden="true"></div>
     <div id="workshop-scene" class="scene" role="img" aria-label="铣床、车床和激光切割机的零件从画面两侧飞入，在同一旋涡中旋转并同时组装"></div>
     <header class="heading workshop-heading">
       <div>
@@ -33,11 +32,6 @@ share one timeline and never reset assembly or machine inspection.
         <p id="phase-name">等待滚动</p>
         <p><span id="assembled-count">0</span><span class="status-separator">/</span><span id="total-count">—</span> 组件</p>
       </div>
-      <nav class="backdrop-switcher" aria-label="背景方案">
-        <button type="button" data-backdrop-mode="studio" aria-pressed="true">工业摄影棚</button>
-        <button type="button" data-backdrop-mode="airflow" aria-pressed="false">旋转气流</button>
-        <button type="button" data-backdrop-mode="blueprint" aria-pressed="false">工程图纸</button>
-      </nav>
     </header>
     <div id="first-hint" class="first-hint">
       <span class="scroll-mark" aria-hidden="true"></span>

@@ -46,6 +46,18 @@ class ReferenceDesignTests(unittest.TestCase):
         self.assertIn("浏览器样式取值和截图", reference)
         self.assertIn("参考站的 Logo、建筑照片、视频", reference)
 
+    def test_latest_reference_and_removed_backdrops_match_the_current_website(self):
+        reference = (ROOT / '设计参考.md').read_text(encoding='utf-8')
+        self.assertIn('https://www.risksolved.com/', reference)
+        self.assertIn('0 个色板项', reference)
+        self.assertIn('TASA Orbiter Text SemiBold', reference)
+        page = (ROOT / 'site/index.html').read_text(encoding='utf-8')
+        self.assertLess(page.index('Design brief'), page.index('<html'))
+        self.assertIn('hero-machine-canvas', page)
+        for source in (ROOT / 'demos/mill-assembly/assets/backgrounds').glob('*.webp'):
+            self.fail(f'Removed background remains: {source}')
+        self.assertNotIn('data-backdrop-mode', (ROOT / 'site/machines.html').read_text(encoding='utf-8'))
+
 
 if __name__ == "__main__":
     unittest.main()

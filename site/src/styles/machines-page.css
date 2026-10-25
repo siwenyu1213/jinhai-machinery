@@ -1,0 +1,11 @@
+:root { --paper: #1d2526; --ink: #f1e6ce; --muted: #c2c8c3; --line: #4b5655; --surface: #33423f; --accent: #ef5326; background: var(--paper); }
+.stage { background: linear-gradient(160deg, #66706a, #1c2729 65%, #121a1b); }
+.workshop-heading > div::before { display: none; }
+.machine-home-link { display: inline-block; margin-top: 8px; min-height: 44px; color: var(--ink); text-decoration: underline; text-underline-offset: 4px; font-size: 13px; pointer-events: auto; }
+.machine-label button { background: #253433e8; color: var(--ink); border-color: #73817b; border-radius: 30px; }
+.machine-label.is-front button { border-color: var(--accent); box-shadow: none; }
+#workshop-stage .controls { background: #1c2526e8; }
+.actions button { border-radius: 30px; }
+#workshop-stage .first-hint, #workshop-stage .active-part { background: #263430e8; }
+.machine-title > span { border-radius: 4px; }
+.scrub-row input { accent-color: #ef5326; }

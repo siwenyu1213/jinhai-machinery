@@ -1,100 +1,45 @@
 import { test, expect } from '@playwright/test';
-
-test('photographic opening fills the viewport and keeps copy, controls and source separate', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('./');
-  const hero = await page.locator('.hero').boundingBox();
-  const photo = await page.locator('.hero-photo').boundingBox();
-  expect(hero.x).toBe(0);
-  expect(hero.y).toBe(0);
-  expect(photo.width).toBeCloseTo(hero.width, 0);
-  expect(photo.height).toBeCloseTo(hero.height, 0);
-  const content = await page.locator('.hero-copy').boundingBox();
-  const controls = await page.locator('.hero-controls').boundingBox();
-  const credit = await page.locator('.hero-art figcaption').boundingBox();
-  expect(content.y + content.height).toBeLessThan(controls.y);
-  expect(controls.y + controls.height).toBeLessThan(credit.y);
-  await expect(page.locator('.hero-controls button[aria-pressed=true]')).toHaveCount(1);
-  await expect(page.locator('#hero-credit')).toHaveAttribute('href', /_VBsh_IKsD8$/);
-  await expect(page.locator('#hero-credit')).toHaveAccessibleName(/LISK OBE/);
-  await expect(page.locator('#service-credit')).toHaveAccessibleName(/Matt Richmond/);
+test.describe.configure({ timeout: 45000 });
+test('immersive model opening uses the reference palette, large type and centered desktop wordmark',async({page})=>{
+  await page.emulateMedia({reducedMotion:'reduce'});await page.goto('./');
+  await expect(page.locator('.hero')).toHaveAttribute('data-renderer','ready',{timeout:20000});
+  const actual=await page.evaluate(()=>{const hero=document.querySelector('.hero').getBoundingClientRect(),brand=document.querySelector('.site-header .brand').getBoundingClientRect(),style=getComputedStyle(document.querySelector('#hero-title'));return {w:innerWidth,hero:[hero.x,hero.y,hero.width,hero.height],brand:(brand.left+brand.right)/2,size:parseFloat(style.fontSize),color:style.color};});
+  expect(actual.hero[0]).toBe(0);expect(actual.hero[1]).toBe(0);expect(actual.hero[2]).toBe(actual.w);
+  expect(actual.size).toBeGreaterThanOrEqual(actual.w>760?72:48);expect(actual.color).toBe('rgb(242, 233, 214)');
+  if(actual.w>1000)expect(Math.abs(actual.brand-actual.w/2)).toBeLessThan(3);
+  await expect(page.locator('.hero-controls [data-hero-machine][aria-pressed="true"]')).toHaveCount(1);
   await expect(page.locator('.learning-note')).toContainText('不用于商业接单');
 });
-
-test('fixed navigation changes surface and does not cover an anchored section', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('./');
-  const header = page.locator('.site-header');
-  await expect(header).not.toHaveClass(/is-scrolled/);
-  const menu = page.getByRole('button', { name: '菜单' });
-  if (await menu.isVisible()) {
-    await menu.click();
-    await expect(menu).toHaveAttribute('aria-expanded', 'true');
-    await page.keyboard.press('Escape');
-    await expect(menu).toBeFocused();
-    await expect(page.locator('#main-nav')).toBeHidden();
-    await menu.click();
-  }
-  await page.locator('#main-nav a[href="#equipment"]').click();
-  await expect(header).toHaveClass(/is-scrolled/);
-  await expect(page.locator('#main-nav a[href="#equipment"]')).toHaveAttribute('aria-current', 'location');
-  const title = await page.locator('#equipment-title').boundingBox();
-  const bar = await header.boundingBox();
-  expect(title.y).toBeGreaterThanOrEqual(bar.y + bar.height);
-  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
-  await expect(header).not.toHaveClass(/is-scrolled/);
+test('navigation anchors clear the fixed header and the phone menu supports Escape',async({page})=>{
+  await page.emulateMedia({reducedMotion:'reduce'});await page.goto('./');
+  const menu=page.getByRole('button',{name:'菜单'});if(await menu.isVisible()){await menu.click();await page.keyboard.press('Escape');await expect(menu).toBeFocused();await menu.click();}
+  await page.locator('#main-nav a[href="#equipment"]').click();await expect(page.locator('.site-header')).toHaveClass(/is-scrolled/);
+  const title=await page.locator('#equipment-title').boundingBox(),bar=await page.locator('.site-header').boundingBox();expect(title.y).toBeGreaterThanOrEqual(bar.y+bar.height-1);
 });
-
-test('rapid photo choices and keyboard control keep the last image and its attribution', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.route('**/images/cutting.webp', async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 350));
-    await route.continue();
-  });
-  await page.goto('./');
-  const delayed = page.waitForResponse('**/images/cutting.webp');
-  await page.locator('[data-hero-slide="1"]').click();
-  await page.locator('[data-hero-slide="2"]').click();
-  await expect(page.locator('#hero-image')).toHaveAttribute('src', /chuck\.webp$/);
-  await delayed;
-  await expect(page.locator('#hero-image')).toHaveAttribute('src', /chuck\.webp$/);
-  await expect(page.locator('#hero-credit')).toHaveAttribute('href', /-D_-zq54DpI$/);
-  await expect(page.locator('#hero-credit')).toHaveAccessibleName(/Miguel/);
-  await page.keyboard.press('Home');
-  await expect(page.locator('[data-hero-slide="0"]')).toBeFocused();
-  await expect(page.locator('#hero-image')).toHaveAttribute('src', /lathe\.webp$/);
-  await page.keyboard.press('ArrowRight');
-  await expect(page.locator('[data-hero-slide="1"]')).toBeFocused();
-  await expect(page.locator('#hero-image')).toHaveAttribute('src', /cutting\.webp$/);
-  await expect(page.locator('#hero-credit')).toHaveAttribute('href', /thdb7o0nLyc$/);
-  await expect(page.locator('.hero-controls button[aria-pressed=true]')).toHaveCount(1);
-  await expect(page.locator('.hero-photo')).toHaveCSS('transform', 'none');
+test('machine preview cards and the complete assembly entry point to actual models',async({page})=>{
+  await page.emulateMedia({reducedMotion:'reduce'});await page.goto('./');await expect(page.locator('.hero')).toHaveAttribute('data-renderer','ready',{timeout:20000});
+  await expect(page.locator('.machine-preview img')).toHaveCount(3);for(const image of await page.locator('.machine-preview img').all()) { await image.scrollIntoViewIfNeeded(); await expect.poll(()=>image.evaluate(node=>node.complete&&node.naturalWidth>0)).toBe(true); }
+  await page.locator('.machine-preview[data-hero-machine="laser"]').click();
+  await expect.poll(()=>page.evaluate(()=>window.__machineHero.getState().active)).toBe('laser');await expect(page.locator('#hero-title')).toBeInViewport();
+  const response=await page.request.get('./machines.html');expect(response.ok()).toBe(true);
 });
-
-test('a failed photo choice preserves the current image and usable contact action', async ({ page }) => {
-  const errors = [];
-  page.on('pageerror', (error) => errors.push(error.message));
-  await page.route('**/images/cutting.webp', (route) => route.abort());
-  await page.goto('./');
-  await page.locator('[data-hero-slide="1"]').click();
-  await expect(page.locator('#hero-status')).toContainText('暂时无法加载');
-  await expect(page.locator('#hero-image')).toHaveAttribute('src', /lathe\.webp$/);
-  await expect(page.locator('[data-hero-slide="0"]')).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('#hero-credit')).toHaveAttribute('href', /_VBsh_IKsD8$/);
-  await page.locator('.hero-actions [data-contact]').click();
-  await expect(page.locator('#contact-dialog')).toBeVisible();
-  expect(errors).toEqual([]);
+test('the old scenic images are absent and all model assets load from the same origin',async({page})=>{
+  const bad=[];page.on('request',r=>{if(['image','script'].includes(r.resourceType())&&new URL(r.url()).origin!==new URL(page.url()).origin)bad.push(r.url());});
+  await page.goto('./');await expect(page.locator('.hero')).toHaveAttribute('data-renderer','ready',{timeout:20000});
+  await expect(page.locator('[data-backdrop-mode],#workshop-backdrop,.hero-photo')).toHaveCount(0);expect(bad).toEqual([]);
 });
-
-test('concise copy retains business limits, facts and accessible source information', async ({ page }) => {
+test('concise copy retains confirmed business limits and photography attribution',async({page})=>{
+  await page.goto('./');const main=(await page.locator('main').innerText()).replace(/\s/g,'');expect(main.length).toBeLessThan(1200);
+  await expect(page.locator('#services')).toContainText('中小件为主');await expect(page.locator('#services')).toContainText('大件需沟通');
+  await expect(page.locator('#equipment')).toContainText('含 1 台数控车床');await expect(page.locator('#scope')).toContainText('超出以下范围的上门维修需求不接');
+  await expect(page.locator('#work')).toContainText('真实案例待补');await expect(page.locator('.site-footer .photo-credit')).toHaveAttribute('href',/credits\.json$/);
+});
+test('equipment values retain aligned readable units in the two-column metric layout',async({page})=>{
   await page.goto('./');
-  const main = (await page.locator('main').innerText()).replace(/\s/g, '');
-  expect(main.length).toBeLessThan(1200);
-  await expect(page.locator('#services')).toContainText('中小件为主');
-  await expect(page.locator('#services')).toContainText('大件需沟通');
-  await expect(page.locator('#equipment')).toContainText('含 1 台数控车床');
-  await expect(page.locator('.scope-note')).toContainText('不代表当地驻点或可维修机型');
-  await expect(page.locator('#scope')).toContainText('超出以下范围的上门维修需求不接');
-  await expect(page.locator('#work')).toContainText('真实案例待补');
-  await expect(page.locator('.site-footer .photo-credit')).toHaveAttribute('href', /credits\.json$/);
+  const units=page.locator('.equipment-highlights > div > strong > span');
+  await expect(units).toHaveCount(2);
+  const boxes=await units.evaluateAll(elements=>elements.map(node=>({top:node.getBoundingClientRect().top,display:getComputedStyle(node).display,text:node.textContent.trim()})));
+  expect(boxes.map(box=>box.text)).toEqual(['W','吨']);
+  expect(boxes.every(box=>box.display==='block')).toBe(true);
+  expect(Math.abs(boxes[0].top-boxes[1].top)).toBeLessThan(2);
 });

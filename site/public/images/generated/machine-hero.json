@@ -1,0 +1,40 @@
+{
+  "assets": [
+    {
+      "id": "mill",
+      "file": "mill-hero.webp",
+      "width": 1280,
+      "height": 900,
+      "bytes": 28482,
+      "sha256": "4185086566a4ba7bc6329ba64b48c163032ca459f3652a8ccb61b0ea20ef87a7",
+      "kind": "procedural-render",
+      "source": "demos/mill-assembly/workshop-model.js",
+      "renderer": "site/src/three/machine-hero.js",
+      "usage": "通用模型，非本厂产品或客户案例。"
+    },
+    {
+      "id": "lathe",
+      "file": "lathe-hero.webp",
+      "width": 1280,
+      "height": 900,
+      "bytes": 50070,
+      "sha256": "76be4c68514d305dbbcdb9fceb2540f2f7c4cd6400be42432462ab92d9a0d39b",
+      "kind": "procedural-render",
+      "source": "demos/mill-assembly/workshop-model.js",
+      "renderer": "site/src/three/machine-hero.js",
+      "usage": "通用模型，非本厂产品或客户案例。"
+    },
+    {
+      "id": "laser",
+      "file": "laser-hero.webp",
+      "width": 1280,
+      "height": 900,
+      "bytes": 85562,
+      "sha256": "419b8fc96a1bfa37a537dc90d7de47bc1d2d2ad2ae48e4f08856a1c828cf0482",
+      "kind": "procedural-render",
+      "source": "demos/mill-assembly/workshop-model.js",
+      "renderer": "site/src/three/machine-hero.js",
+      "usage": "通用模型，非本厂产品或客户案例。"
+    }
+  ]
+}

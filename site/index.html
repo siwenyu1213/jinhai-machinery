@@ -1,4 +1,10 @@
 <!doctype html>
+<!-- Design brief: RiskSolved-inspired immersive three-dimensional hero.
+Primary: actual machine + centered cream headline + one orange business action.
+Secondary: machine selection, confirmed services and equipment. Tertiary: provenance.
+Native HTML/CSS + Three.js; charcoal #182122, cream #f2e9d6, orange #ee5428.
+Chinese system sans, 400/500/600 weights, 24/40/64 spacing, 44px controls.
+No scene photographs, copied brand assets, fabricated claims or external runtime. -->
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
@@ -12,43 +18,42 @@
 </head>
 <body>
   <a class="skip-link" href="#main">跳到正文</a>
-  <!-- §2.1 / §7.2: one photographic focal point and one primary business action.
-       Existing charcoal, paper and workshop-gold tokens define the visual system. -->
+
   <header class="site-header">
     <div class="header-inner wrap">
       <a class="brand" href="#home" aria-label="金海机械，返回首页">
         <svg width="34" height="34" viewBox="0 0 40 40" aria-hidden="true"><path d="M4 8h26v8H12v16H4zm14 14h18v10H18z" fill="currentColor"/></svg>
-        <span>金海机械</span>
+        <span>金海<strong>机械</strong></span>
       </a>
       <button class="menu-toggle" aria-expanded="false" aria-controls="main-nav" hidden>菜单 <span aria-hidden="true">☰</span></button>
       <nav id="main-nav" aria-label="主导航">
-        <a href="#equipment">设备能力</a><a href="#services">主营业务</a><a href="#assembly">拆装展示</a><a href="#process">加工细节</a><a href="#work">机械影像</a><a href="#scope">维修范围</a>
+        <a href="#equipment">设备能力</a><a href="#services">主营业务</a><a href="#assembly">机台展示</a><a href="#process">加工细节</a><a href="#work">机械影像</a><a href="#scope">维修范围</a>
       </nav>
       <button class="button button-small header-contact" data-contact>联系演示 <span aria-hidden="true">↗</span></button>
     </div>
   </header>
   <main id="main">
-    <section class="hero" id="home" aria-labelledby="hero-title">
-      <div class="wrap hero-layout">
-        <div class="hero-copy">
-          <p class="hero-intro"><span aria-hidden="true"></span> 非标定制 · 钣金加工 · 机台维修</p>
-          <h1 id="hero-title">把想法，<br>加工成形。</h1>
-          <div class="hero-actions"><a class="button button-orange" href="#services">查看业务 <span aria-hidden="true">→</span></a><button class="text-button light" data-contact>联系演示 <span aria-hidden="true">↗</span></button></div>
-          <p class="learning-note">学习演示，不用于商业接单。</p>
-        </div>
-      </div>
+    <section class="hero" id="home" data-renderer="poster" data-machine="mill" aria-labelledby="hero-title">
       <figure class="hero-art">
-        <div class="hero-photo-frame"><img id="hero-image" class="hero-photo" src="./images/lathe.webp" width="1600" height="1067" alt="车床刀架、导轨与手轮的机械结构，图库参考摄影，非本厂实拍" fetchpriority="high"></div>
-        <figcaption><span id="hero-photo-label">机床 / 刀架与导轨</span><a id="hero-credit" aria-label="摄影来源：LISK OBE / Unsplash，非本厂实拍" class="photo-credit" href="https://unsplash.com/photos/close-up-of-an-old-metal-lathe-in-a-workshop-_VBsh_IKsD8" target="_blank" rel="noopener noreferrer">图库参考，非本厂实拍 ↗</a></figcaption>
+        <div id="hero-machine-canvas" class="hero-machine-canvas" role="img" aria-label="铣床、车床与激光切割机的三维模型轮换展示"></div>
+        <img id="hero-poster" class="hero-poster" src="./images/generated/mill-hero.webp" width="1280" height="900" alt="炮塔铣床的通用三维模型，非本厂设备实拍或指定型号复刻" fetchpriority="high">
+        <figcaption><span id="hero-machine-name">铣床</span><span>通用结构演示 · 非实物复刻</span></figcaption>
       </figure>
-      <div class="hero-controls" role="group" aria-label="首屏摄影切换" hidden>
-        <button type="button" data-hero-slide="0" aria-label="切换首屏：机床加工" aria-pressed="true"><span aria-hidden="true">01</span>机床加工</button>
-        <button type="button" data-hero-slide="1" aria-label="切换首屏：钣金切割" aria-pressed="false"><span aria-hidden="true">02</span>钣金切割</button>
-        <button type="button" data-hero-slide="2" aria-label="切换首屏：金属细节" aria-pressed="false"><span aria-hidden="true">03</span>金属细节</button>
+      <div class="wrap hero-layout"><div class="hero-copy">
+        <p class="hero-intro">非标定制 · 钣金加工 · 机台维修</p>
+        <h1 id="hero-title">把想法，<br>加工成形。</h1>
+        <div class="hero-actions"><a class="button button-orange" href="#services">查看业务 <span aria-hidden="true">↗</span></a><a class="text-button light" href="./machines.html">三机装配 <span aria-hidden="true">↗</span></a></div>
+        <p class="learning-note">学习演示，不用于商业接单。</p>
+      </div></div>
+      <div class="hero-controls" role="group" aria-label="选择机台" hidden>
+        <button type="button" data-hero-machine="mill" aria-pressed="true">铣床</button>
+        <button type="button" data-hero-machine="lathe" aria-pressed="false">车床</button>
+        <button type="button" data-hero-machine="laser" aria-pressed="false">激光切割机</button>
+        <button id="hero-pause" type="button" aria-pressed="false" hidden>暂停轮换</button>
       </div>
-      <p id="hero-status" class="sr-only" role="status" aria-live="polite"></p>
       <div class="hero-bottom wrap"><span>食品 · 印刷 · 包装</span><a href="#equipment">向下，了解金海 <span aria-hidden="true">↓</span></a></div>
     </section>
+    <section class="risk-intro wrap" aria-label="业务方向"><p>非标零配件与设备定制、钣金定制、维修服务。<span>面向食品、印刷与包装行业。</span></p></section>
 
     <section class="section wrap equipment-section" id="equipment" aria-labelledby="equipment-title">
       <div class="section-heading"><h2 id="equipment-title">设备与工艺</h2><p>加工材料、尺寸、精度需沟通确认。</p></div>
@@ -79,39 +84,13 @@
       </div>
     </section>
 
-    <section class="assembly-section" id="assembly" data-assembly data-renderer="poster" aria-labelledby="assembly-title">
-      <div class="assembly-stage">
-        <div class="wrap assembly-layout">
-          <div class="assembly-copy">
-            <h2 id="assembly-title">三爪卡盘拆装</h2>
-            <div class="assembly-reading">
-              <h3 id="assembly-state" aria-live="polite">展开，看到里面</h3>
-              <p id="assembly-description">卡爪、盘件与壳体逐层分离，沿着装配的方向，看清零件之间的关系。</p>
-            </div>
-          </div>
-          <figure class="assembly-visual">
-            <div class="assembly-viewport" role="img" aria-label="银灰色金属三爪卡盘，展示卡爪、导向面盘、平面螺纹盘、壳体与后盖的分离和组合">
-              <img class="assembly-poster" src="./images/generated/chuck-assembly.webp" width="1200" height="1000" alt="三爪卡盘的金属爆炸结构示意，包含独立卡爪、壳体与盘件" loading="lazy">
-            </div>
-            <figcaption>三爪卡盘结构示意 <span>非本厂产品或客户案例</span></figcaption>
-          </figure>
-          <div class="assembly-bottom">
-            <p class="assembly-hint">三爪卡盘的分层结构</p>
-            <div class="assembly-controls" hidden>
-              <div class="assembly-buttons" role="group" aria-label="选择卡盘拆装状态">
-                <button data-assembly-stop="0" aria-pressed="true">整体</button>
-                <button data-assembly-stop="1" aria-pressed="false">拆解</button>
-                <button data-assembly-stop="2" aria-pressed="false">组合</button>
-              </div>
-              <div class="assembly-scrubber">
-                <label class="sr-only" for="assembly-progress">卡盘拆装进度</label>
-                <div class="assembly-track"><span class="assembly-progress-fill"></span></div>
-                <input id="assembly-progress" type="range" min="0" max="100" value="0" aria-valuetext="0%，完整的配合">
-                <span class="assembly-percentage" aria-hidden="true"><span id="assembly-percent">00</span><small> / 100</small></span>
-              </div>
-            </div>
-          </div>
-        </div>
+    <section class="section machine-section" id="assembly" aria-labelledby="assembly-title">
+      <div class="wrap"><div class="section-heading"><h2 id="assembly-title">从结构，看懂机台。</h2><a class="button" href="./machines.html">查看三机装配 <span aria-hidden="true">↗</span></a></div>
+        <div class="machine-preview-grid">
+          <a href="#home" class="machine-preview" data-hero-machine="mill" aria-label="在首屏查看铣床"><img src="./images/generated/mill-hero.webp" width="1280" height="900" alt="通用铣床三维模型，展示工作台、立柱和铣头" loading="lazy"><h3>铣床</h3><p>工作台、立柱与主轴。</p></a>
+          <a href="#home" class="machine-preview" data-hero-machine="lathe" aria-label="在首屏查看车床"><img src="./images/generated/lathe-hero.webp" width="1280" height="900" alt="通用车床三维模型，展示床身、卡盘和尾座" loading="lazy"><h3>车床</h3><p>床身、卡盘与刀架。</p></a>
+          <a href="#home" class="machine-preview" data-hero-machine="laser" aria-label="在首屏查看激光切割机"><img src="./images/generated/laser-hero.webp" width="1280" height="900" alt="通用激光切割机三维模型，展示龙门、切割头与工作台" loading="lazy"><h3>激光切割机</h3><p>龙门、切割头与工作台。</p></a>
+        </div><p class="caption-note">通用模型，非本厂产品或客户案例。</p>
       </div>
     </section>
 

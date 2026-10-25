@@ -44,12 +44,16 @@ class MillDemoTests(unittest.TestCase):
         self.assertLess(total_bytes, 4_000_000, "keep 1K surface assets bounded")
         self.assertTrue((DEMO / "材质参考.md").is_file())
 
-    def test_website_build_and_entry_do_not_import_the_experiment(self):
+    def test_website_shares_models_without_importing_the_standalone_entry(self):
         config = (ROOT / "vite.config.js").read_text(encoding="utf-8")
         self.assertIn("root: 'site'", config)
         self.assertNotIn("mill-assembly", config)
         for name in ("index.html", "src/main.js"):
             self.assertNotIn("mill-assembly", (ROOT / "site" / name).read_text(encoding="utf-8"))
+        hero = (ROOT / 'site/src/three/machine-hero.js').read_text(encoding='utf-8')
+        self.assertIn('workshop-model.js', hero)
+        self.assertNotIn('workshop-main.js', hero)
+        self.assertIn('site/machines.html', config)
         standalone = (ROOT / "vite.demo.config.js").read_text(encoding="utf-8")
         self.assertIn("root: 'demos/mill-assembly'", standalone)
 

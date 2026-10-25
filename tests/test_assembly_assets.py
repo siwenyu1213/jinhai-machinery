@@ -27,12 +27,24 @@ class AssemblyAssetTests(unittest.TestCase):
 
     def test_generated_model_is_distinguished_from_reference_photographs(self):
         page = (ROOT / "site/index.html").read_text(encoding="utf-8")
-        self.assertIn('./images/generated/chuck-assembly.webp', page)
+        for machine in ['mill', 'lathe', 'laser']:
+            self.assertIn(f'./images/generated/{machine}-hero.webp', page)
         self.assertIn("非本厂产品或客户案例", page)
         records = json.loads((ROOT / "site/public/images/credits.json").read_text(encoding="utf-8"))
         self.assertNotIn("chuck-assembly.webp", {record["file"] for record in records})
         for name in ["README.md", "素材说明.md"]:
             self.assertIn("chuck-assembly", (ROOT / name).read_text(encoding="utf-8"))
+
+    def test_three_machine_posters_match_the_shared_model_renderer(self):
+        record = json.loads((DIRECTORY / 'machine-hero.json').read_text(encoding='utf-8'))
+        self.assertEqual({entry['id'] for entry in record['assets']}, {'mill', 'lathe', 'laser'})
+        for entry in record['assets']:
+            data = (DIRECTORY / entry['file']).read_bytes()
+            self.assertEqual(hashlib.sha256(data).hexdigest(), entry['sha256'])
+            self.assertEqual(len(data), entry['bytes'])
+            self.assertEqual(data[8:12], b'WEBP')
+            self.assertTrue((ROOT / entry['source']).is_file())
+            self.assertTrue((ROOT / entry['renderer']).is_file())
 
 
 if __name__ == "__main__":

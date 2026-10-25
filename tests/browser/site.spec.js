@@ -40,7 +40,7 @@ test('business and process controls support repeated state changes', async ({ pa
 test('equipment filtering and photographic gallery work', async ({ page }) => {
   await page.goto('./');
   await page.locator('.equipment-details summary').click();
-  await page.getByRole('button', { name: '车床', exact: true }).click();
+  await page.getByRole('group', { name: '设备分类' }).getByRole('button', { name: '车床', exact: true }).click();
   await expect(page.locator('.equipment-table tbody tr:visible')).toHaveCount(4);
   await page.getByRole('button', { name: '全部设备', exact: true }).click();
   await expect(page.locator('.equipment-table tbody tr:visible')).toHaveCount(11);
@@ -59,7 +59,7 @@ test('equipment filtering and photographic gallery work', async ({ page }) => {
 
 test('contact has honest empty state, copy success and denied-copy fallback', async ({ page }) => {
   await page.goto('./');
-  await page.locator('.hero-actions [data-contact]').click();
+  await page.locator('.contact-section [data-contact]').click();
   await expect(page.locator('#contact-dialog')).toContainText('尚未提供');
   await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (value) => { window.__copied = value; } } }));
   await page.getByRole('button', { name: '复制资料清单' }).click();
@@ -71,7 +71,7 @@ test('contact has honest empty state, copy success and denied-copy fallback', as
   await expect(page.locator('#manual-copy')).toHaveValue(/超出范围不接/);
   await page.keyboard.press('Escape');
   await expect(page.locator('#contact-dialog')).not.toBeVisible();
-  await expect(page.locator('.hero-actions [data-contact]')).toBeFocused();
+  await expect(page.locator('.contact-section [data-contact]')).toBeFocused();
 });
 
 test('motion preference persists and system reduction is respected', async ({ page }) => {
@@ -85,14 +85,11 @@ test('motion preference persists and system reduction is respected', async ({ pa
   await expect(page.locator('#motion-toggle')).toBeDisabled();
 });
 
-test('full motion completes with a readable photographic hero', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await page.goto('./');
-  await expect(page.locator('html')).toHaveAttribute('data-motion', 'full');
-  const photo = page.locator('.hero-photo');
-  await expect(photo).toBeVisible();
-  await expect.poll(() => photo.evaluate((element) => getComputedStyle(element).transform)).toBe('none');
-  await expect(photo).toHaveJSProperty('complete', true);
+test('full motion completes with a readable model opening', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });await page.goto('./');
+  await expect(page.locator('html')).toHaveAttribute('data-motion','full');
+  await expect(page.locator('.hero')).toHaveAttribute('data-renderer','ready',{timeout:20000});
+  await expect(page.locator('#hero-machine-canvas canvas')).toBeVisible();
 });
 
 test('mechanical photography replaces drawn models and remains local with attributable sources', async ({ page }) => {
@@ -103,9 +100,9 @@ test('mechanical photography replaces drawn models and remains local with attrib
   await page.goto('./');
   await expect(page.locator('.hero-art svg, .service-stage svg, .process-visual svg')).toHaveCount(0);
   await expect(page.locator('img[src$=".svg"], .gallery-item[href$=".svg"]')).toHaveCount(0);
-  await expect(page.locator('.hero-art figcaption')).toContainText('非本厂实拍');
-  await expect(page.locator('.hero-photo')).toHaveAttribute('fetchpriority', 'high');
-  await expect(page.locator('.hero-photo')).toHaveAttribute('src', /lathe\.webp$/);
+  await expect(page.locator('.hero-art figcaption')).toContainText('通用结构演示');
+  await expect(page.locator('#hero-poster')).toHaveAttribute('fetchpriority', 'high');
+  await expect(page.locator('#hero-poster')).toHaveAttribute('src', /(?:mill|lathe|laser)-hero\.webp$/);
   const response = await page.request.get('./images/credits.json');
   expect(response.ok()).toBe(true);
   const credits = await response.json();
@@ -134,18 +131,18 @@ test('process photography and source follow the last selected step under reduced
   await expect(page.locator('#process-credit')).toHaveAttribute('href', /dmgYI2uuOoY$/);
   await expect(page.locator('#process-credit')).toHaveAccessibleName(/Rodrigo Rodrigues/);
   await expect(page.locator('.process-visual')).not.toHaveAttribute('aria-pressed');
-  await expect(page.locator('.hero-photo')).toHaveCSS('transform', 'none');
+  await expect(page.locator('.hero')).toHaveAttribute('data-renderer', 'ready', {timeout:20000});
 });
 
 test('photo loading failure preserves business content and contact controls', async ({ page }) => {
   await page.route('**/images/*.webp', (route) => route.abort());
   await page.goto('./');
-  await expect(page.locator('.hero-photo')).toHaveAttribute('alt', /图库参考/);
+  await expect(page.locator('#hero-poster')).toHaveAttribute('alt', /通用三维/);
   await page.locator('[data-service="repair"]').click();
   await expect(page.locator('#service-detail')).toContainText('丰泽');
   await page.locator('[data-step="2"]').click();
   await expect(page.locator('#process-description')).toContainText('焊接');
-  await page.locator('.hero-actions [data-contact]').click();
+  await page.locator('.contact-section [data-contact]').click();
   await expect(page.locator('#contact-dialog')).toBeVisible();
 });
 
@@ -186,12 +183,9 @@ test('animation chunk failure leaves functional UI available', async ({ page }) 
   await expect(page.locator('#motion-toggle')).toHaveText('基础展示模式');
   await page.locator('[data-service="sheet"]').click();
   await expect(page.locator('#service-caption')).toHaveText('钣金定制');
-  await page.locator('#assembly').scrollIntoViewIfNeeded();
-  await expect(page.locator('#assembly')).toHaveAttribute('data-renderer', 'webgl');
-  await expect(page.locator('.assembly-hint')).toContainText('点击按钮');
-  await expect(page.locator('.pin-spacer:has(.assembly-stage)')).toHaveCount(0);
-  await page.getByRole('button', { name: '拆解', exact: true }).click();
-  await expect(page.locator('#assembly')).toHaveAttribute('data-spread', '1.000');
+  await expect(page.locator('.hero')).toHaveAttribute('data-renderer','ready',{timeout:20000});
+  await page.evaluate(()=>window.__machineHero.select('laser',true));
+  await expect(page.locator('#hero-machine-name')).toHaveText('激光切割机');
 });
 
 

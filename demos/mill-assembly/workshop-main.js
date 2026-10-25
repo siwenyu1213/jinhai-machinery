@@ -5,7 +5,6 @@ import { createWorkshopFlight } from './workshop-motion.js';
 import { createShowcase, orbitOffset, SLOT_ANGLES } from './workshop-showcase.js';
 import { loadMillSurfaceAssets } from './surface-assets.js';
 import { WORKSHOP_PALETTES } from './workshop-palette.js';
-import { createWorkshopBackdrop, BACKDROP_MODES } from './workshop-backdrop.js';
 import { VORTEX_TIMING, progressToScroll, scrollToProgress, followScroll } from './motion.js';
 
 const stage = document.querySelector('#workshop-stage');
@@ -22,11 +21,6 @@ const interactionHint = document.querySelector('#interaction-hint');
 const reducedQuery = matchMedia('(prefers-reduced-motion: reduce)');
 const titleHost = document.querySelector('#machine-title');
 const titleEntries = [...titleHost.querySelectorAll('[data-machine-title]')];
-const backdropButtons = [...document.querySelectorAll('[data-backdrop-mode]')];
-const requestedBackdrop = new URLSearchParams(location.search).get('background');
-const initialBackdrop = BACKDROP_MODES.some(mode => mode.id === requestedBackdrop) ? requestedBackdrop : 'studio';
-const backdrop = createWorkshopBackdrop(document.querySelector('#workshop-backdrop'), { mode: initialBackdrop, reducedMotion: reducedQuery.matches });
-backdrop.setHidden(document.hidden);
 // Use the dominant body paint; the laser uses its actual orange accent paint.
 for (const title of titleEntries) {
   const id = title.dataset.machineTitle;
@@ -37,14 +31,6 @@ for (const title of titleEntries) {
   title.style.setProperty('--machine-panel', id === 'mill' ? palette.motorPaint : id === 'laser' ? palette.body : '#f8f9f6');
   title.dataset.paintRole = role;
 }
-function setBackdrop(mode) {
-  if (!BACKDROP_MODES.some(entry => entry.id === mode)) return false;
-  backdrop.setMode(mode);
-  stage.dataset.backdrop = mode;
-  for (const button of backdropButtons) button.setAttribute('aria-pressed', String(button.dataset.backdropMode === mode));
-  return true;
-}
-setBackdrop(initialBackdrop);
 const stageNames = { arrival: '旋转飞入', vortex: '中央旋绕', assembly: '旋转组装', complete: '装配完成' };
 // One fixed viewpoint for every screen and stage: the classic mill view angle.
 // Fitting may only move the target and distance, never tilt or orbit the eye.
@@ -291,9 +277,7 @@ function updatePresentation() {
     title.classList.toggle('is-visible', visible);
     title.setAttribute('aria-hidden', String(!visible));
   }
-  backdrop.update({ progress, stage: state.stage,
-    complete: completionLatch, showcasePhase: display?.phase || 0, moving: display?.moving || false,
-    paused: display?.paused || false, frontId: front });
+
 }
 
 function applyReduced() {
@@ -433,7 +417,6 @@ function noteFallback(error) {
   titleHost.hidden = true;
   titleHost.dataset.machine = '';
   for (const title of titleEntries) { title.classList.remove('is-visible'); title.setAttribute('aria-hidden', 'true'); }
-  backdrop.setHidden(true);
   phaseName.textContent = '三维画面不可用';
   interactionHint.hidden = false;
   interactionHint.textContent = '可在下方阅读三台设备的结构';
@@ -720,8 +703,6 @@ try {
 } catch (error) { noteFallback(error); }
 
 window.__workshopDemo = {
-  setBackdrop,
-  getBackdropState: () => backdrop.getState(),
   setProgress,
   getShowcaseState: () => showcase?.state(),
   pickMachineAt,
@@ -741,7 +722,6 @@ window.__workshopDemo = {
 };
 
 slider.addEventListener('input', () => setProgress(Number(slider.value) / 1000 * VORTEX_TIMING.assemblyEnd), { signal: eventScope.signal });
-for (const button of backdropButtons) button.addEventListener('click', () => setBackdrop(button.dataset.backdropMode), { signal: eventScope.signal });
 document.querySelector('#replay').addEventListener('click', replay, { signal: eventScope.signal });
 document.querySelector('#complete').addEventListener('click', () => setProgress(1), { signal: eventScope.signal });
 document.querySelector('#inspect').addEventListener('click', () => setInspection(!inspection), { signal: eventScope.signal });
@@ -751,7 +731,6 @@ window.addEventListener('resize', onResize, { signal: eventScope.signal });
 function updateMotionPreference() {
   document.body.dataset.motion = reducedQuery.matches ? 'reduced' : 'full';
   showcase?.setReduced(reducedQuery.matches);
-  backdrop.setReduced(reducedQuery.matches);
   armWake();
   invalidate();
 }
@@ -772,7 +751,6 @@ if (ready) {
 document.addEventListener('visibilitychange', () => {
   endPointer(null, true);
   showcase?.setHidden(document.hidden);
-  backdrop.setHidden(document.hidden || !ready);
   if (document.hidden) { clearWake(); cancelAnimationFrame(frame); frame = 0; }
   else invalidate();
 }, { signal: eventScope.signal });
@@ -784,7 +762,6 @@ window.addEventListener('pagehide', () => {
   eventScope.abort();
   clearWake();
   showcase?.dispose();
-  backdrop.dispose();
   cancelAnimationFrame(frame);
   frame = 0;
   model?.root.removeFromParent();

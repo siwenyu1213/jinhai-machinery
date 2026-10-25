@@ -1,5 +1,7 @@
 # 金海机械 · 网站学习练习
 
+2026-10-25 本地新版：参考 RiskSolved 的三维首屏、居中字标、米白大标题与橙色操作，整体调整官网。三个机台逐个轮换，完整飞入装配位于 `machines.html`；先前的三套生成背景已删除。运行 `npm run build`、`npm run preview` 后打开 `http://127.0.0.1:4173/jinhai-machinery/`。设计依据见 [设计参考.md](设计参考.md)，模型静态图记录见 [machine-hero.json](site/public/images/generated/machine-hero.json)。本轮未上传或发布。下方三爪卡盘记录属于历史版本。
+
 原生 HTML/CSS/JavaScript、Vite、GSAP 与 Three.js 构建的静态展示网站。仅供学习，不用于商业接单，不收集真实客户需求。
 
 2026-10-20 新增三爪卡盘拆装展示：位于主营业务之后，用 Three.js 呈现可独立运动的金属卡爪、导向面盘、平面螺纹盘、壳体、后盖和紧固件。下滑依次展开、展示、组合，反向滚动可连续回看；也可用整体、拆解、组合按钮或键盘进度条查看。

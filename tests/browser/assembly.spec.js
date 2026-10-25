@@ -1,176 +1,74 @@
 import { test, expect } from '@playwright/test';
-
-async function openAssembly(page) {
+test.describe.configure({ timeout: 45000 });
+async function ready(page, reduced = true) {
+  await page.emulateMedia({ reducedMotion: reduced ? 'reduce' : 'no-preference' });
   await page.goto('./');
-  await page.evaluate(() => {
-    const section = document.querySelector('#assembly');
-    const header = document.querySelector('.site-header').getBoundingClientRect().height;
-    window.scrollTo({ top: window.scrollY + section.getBoundingClientRect().top - header, behavior: 'instant' });
-  });
-  await expect(page.locator('#assembly')).toHaveAttribute('data-renderer', 'webgl');
-  await expect.poll(() => page.locator('.assembly-viewport').getAttribute('data-frames')).not.toBeNull();
+  await expect(page.locator('.hero')).toHaveAttribute('data-renderer', 'ready', {timeout:20000});
 }
-
-test('a direct assembly fragment opens the model after motion initialization', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'no-preference' });
-  // Exercise the load/refresh ordering with a late hero image as well.
-  await page.route('**/images/lathe.webp', async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 350));
-    await route.continue();
-  });
-  await page.goto('./#assembly');
-  await expect(page.locator('html')).toHaveAttribute('data-motion', 'full');
-  await expect(page.locator('#assembly-title')).toBeInViewport();
-  await expect(page.locator('#assembly')).toHaveAttribute('data-renderer', 'webgl');
-  await page.getByRole('button', { name: '拆解', exact: true }).click();
-  await expect(page.locator('#assembly')).toHaveAttribute('data-progress', '0.550');
+async function selected(page, id) {
+  await expect.poll(() => page.evaluate(() => window.__machineHero.getState().active)).toBe(id);
+  await expect(page.locator('.hero')).toHaveAttribute('data-machine', id);
+}
+test('the website renders the actual three machines and all 91 model parts', async ({page}) => {
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));await ready(page);
+  const actual=await page.evaluate(()=>({state:window.__machineHero.getState(),models:window.__machineHero.getModels().map(m=>({id:m.id,count:m.parts.length,visible:m.group.visible}))}));
+  expect(actual.state.totalParts).toBe(91);expect(actual.models.map(m=>m.count)).toEqual([34,31,26]);
+  expect(actual.models.filter(m=>m.visible)).toHaveLength(1);await expect(page.locator('#hero-machine-canvas canvas')).toBeVisible();expect(errors).toEqual([]);
 });
-
-test('metal assembly renders real geometry on demand and supports keyboard scrubbing', async ({ page }) => {
-  const errors = [];
-  page.on('pageerror', (error) => errors.push(error.message));
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await openAssembly(page);
-  const canvas = page.locator('.assembly-canvas');
-  await expect(canvas).toBeVisible();
-  const calls = Number(await page.locator('.assembly-viewport').getAttribute('data-draw-calls'));
-  expect(calls).toBeGreaterThan(20);
-  expect(calls).toBeLessThan(90);
-  await page.getByRole('button', { name: '拆解', exact: true }).click();
-  await expect(page.locator('#assembly')).toHaveAttribute('data-spread', '1.000');
-  await expect(page.locator('#assembly-state')).toHaveText('展开，看到里面');
-  const range = page.getByRole('slider', { name: '卡盘拆装进度' });
-  await range.focus();
-  await page.keyboard.press('End');
-  await expect(page.locator('#assembly')).toHaveAttribute('data-progress', '1.000');
-  await expect(page.locator('#assembly')).toHaveAttribute('data-spread', '0.000');
-  await expect(range).toHaveAttribute('aria-valuetext', /100%.*回到/);
-  await page.keyboard.press('Home');
-  await expect(page.locator('#assembly')).toHaveAttribute('data-progress', '0.000');
-  // No permanent requestAnimationFrame loop: two settled animation frames
-  // later the renderer must not have drawn another unchanged scene.
-  const settled = await page.evaluate(async () => {
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    const host = document.querySelector('.assembly-viewport');
-    const frames = host.dataset.frames;
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    return frames === host.dataset.frames;
-  });
-  expect(settled).toBe(true);
-  expect(errors).toEqual([]);
+test('keyboard and rapid manual choices select the real model and matching title', async ({page})=>{
+  await ready(page);const buttons=page.locator('.hero-controls [data-hero-machine]');
+  await buttons.nth(0).focus();await page.keyboard.press('ArrowRight');await selected(page,'lathe');
+  await page.keyboard.press('End');await selected(page,'laser');
+  await buttons.nth(0).click();await buttons.nth(2).click();await buttons.nth(1).click();await selected(page,'lathe');
+  await expect(page.locator('#hero-machine-name')).toHaveText('车床');
+  await expect(page.locator('#hero-machine-name')).toHaveCSS('color','rgb(40, 95, 85)');
 });
-
-test('native scroll continuously explodes, reassembles and reverses the chuck', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await openAssembly(page);
-  await expect(page.locator('html')).toHaveAttribute('data-motion', 'full');
-  const dimensions = await page.evaluate(() => ({
-    start: document.querySelector('#assembly').getBoundingClientRect().top + scrollY - document.querySelector('.site-header').getBoundingClientRect().height,
-    distance: Math.round(innerHeight * (innerWidth <= 760 ? 1.15 : 1.75)),
-  }));
-  for (const progress of [0, .25, .55, .85, 1, .55, 0]) {
-    await page.evaluate(({ top }) => window.scrollTo({ top, behavior: 'instant' }), { top: dimensions.start + dimensions.distance * progress });
-    await expect.poll(async () => Math.abs(Number(await page.locator('#assembly').getAttribute('data-progress')) - progress)).toBeLessThan(.025);
-    if (progress === .55) await expect(page.locator('#assembly')).toHaveAttribute('data-spread', '1.000');
-    if (progress === 0 || progress === 1) await expect(page.locator('#assembly')).toHaveAttribute('data-spread', '0.000');
-    const box = await page.locator('.assembly-stage').boundingBox();
-    expect(box.y).toBeGreaterThanOrEqual(70);
-    expect(box.y + box.height).toBeLessThanOrEqual(page.viewportSize().height + 1);
-    const controls = await page.locator('.assembly-controls').boundingBox();
-    expect(controls.y + controls.height).toBeLessThanOrEqual(box.y + box.height - 12);
-  }
+test('real five-second autoplay advances a model and pause freezes all scene drawing', async ({page})=>{
+  await ready(page,false);await selected(page,'mill');
+  await expect.poll(()=>page.evaluate(()=>window.__machineHero.getState().active),{timeout:10000}).toBe('lathe');
+  await page.locator('#hero-pause').click();await expect.poll(()=>page.evaluate(()=>window.__machineHero.getState().moving)).toBe(false);
+  await page.waitForTimeout(150);const before=await page.evaluate(()=>window.__machineHero.getRenderStats().frames);
+  await page.waitForTimeout(400);expect(await page.evaluate(()=>window.__machineHero.getRenderStats().frames)).toBe(before);
+  await page.locator('.hero-controls [data-hero-machine="laser"]').click();await selected(page,'laser');
 });
-
-test('manual state selection survives refresh and active scrolling can take over again', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await openAssembly(page);
-  await page.getByRole('button', { name: '拆解', exact: true }).click();
-  await expect(page.locator('#assembly')).toHaveAttribute('data-progress', '0.550');
-  await page.evaluate(() => window.dispatchEvent(new Event('resize')));
-  await expect(page.locator('#assembly')).toHaveAttribute('data-progress', '0.550');
-  await page.getByRole('button', { name: '组合', exact: true }).click();
-  await expect(page.locator('#assembly')).toHaveAttribute('data-progress', '1.000');
-  await page.getByRole('button', { name: '整体', exact: true }).click();
-  await expect(page.locator('#assembly')).toHaveAttribute('data-progress', '0.000');
-  await page.evaluate(() => window.scrollBy({ top: 220, behavior: 'instant' }));
-  await expect.poll(async () => Number(await page.locator('#assembly').getAttribute('data-progress'))).toBeGreaterThan(.04);
+test('reduced motion keeps manual controls but no autonomous model loop', async ({page})=>{
+  await ready(page);await page.locator('.hero-controls [data-hero-machine="laser"]').click();await selected(page,'laser');
+  await page.waitForTimeout(150);const before=await page.evaluate(()=>window.__machineHero.getRenderStats().frames);
+  await page.waitForTimeout(350);expect(await page.evaluate(()=>window.__machineHero.getRenderStats().frames)).toBe(before);
+  expect(await page.evaluate(()=>window.__machineHero.getState().reducedMotion)).toBe(true);
 });
-
-test('reduced motion removes pinning and keeps the same renderer with immediate controls', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await openAssembly(page);
-  await page.locator('html').evaluate(() => document.querySelector('#motion-toggle').click());
-  await expect(page.locator('html')).toHaveAttribute('data-motion', 'reduced');
-  await expect(page.locator('.pin-spacer:has(.assembly-stage)')).toHaveCount(0);
-  await page.getByRole('button', { name: '拆解', exact: true }).click();
-  await expect(page.locator('#assembly')).toHaveAttribute('data-progress', '0.550');
-  await expect(page.locator('.assembly-canvas')).toHaveCount(1);
-  await page.locator('html').evaluate(() => document.querySelector('#motion-toggle').click());
-  await expect(page.locator('html')).toHaveAttribute('data-motion', 'full');
-  await expect(page.locator('.assembly-canvas')).toHaveCount(1);
-  await expect(page.locator('.pin-spacer:has(.assembly-stage)')).toHaveCount(1);
+test('leaving the opening stops its animation and repeated switches keep GPU resources stable', async ({page})=>{
+  await ready(page);for(const id of ['mill','lathe','laser'])await page.evaluate(value=>window.__machineHero.select(value,true),id);
+  await page.waitForTimeout(200);const before=await page.evaluate(()=>window.__machineHero.getRenderStats());
+  for(let i=0;i<12;i++)await page.evaluate(id=>window.__machineHero.select(id,true),['mill','lathe','laser'][i%3]);
+  await page.waitForTimeout(200);const after=await page.evaluate(()=>window.__machineHero.getRenderStats());
+  expect(after.geometries).toBeLessThanOrEqual(before.geometries);expect(after.textures).toBeLessThanOrEqual(before.textures);
+  await page.locator('#equipment').scrollIntoViewIfNeeded();await expect.poll(()=>page.evaluate(()=>window.__machineHero.getState().visible)).toBe(false);
+  await page.waitForTimeout(150);const frames=await page.evaluate(()=>window.__machineHero.getRenderStats().frames);
+  await page.waitForTimeout(350);expect(await page.evaluate(()=>window.__machineHero.getRenderStats().frames)).toBe(frames);
 });
-
-test('3D chunk failure shows the local model poster without a dead pinned region', async ({ page }) => {
-  await page.route('**/assets/chuck-scene-*.js', (route) => route.abort());
-  await page.goto('./');
-  await page.locator('#assembly').scrollIntoViewIfNeeded();
-  await expect(page.locator('#assembly')).toHaveAttribute('data-renderer', 'fallback');
-  await expect(page.locator('.assembly-poster')).toHaveCSS('opacity', '1');
-  await expect.poll(() => page.locator('.assembly-poster').evaluate((image) => image.complete && image.naturalWidth > 0)).toBe(true);
-  await expect(page.locator('.assembly-controls')).toBeHidden();
-  await expect(page.locator('.pin-spacer:has(.assembly-stage)')).toHaveCount(0);
-  await expect(page.locator('#assembly-state')).toHaveText('展开，看到里面');
-  await page.locator('.hero-actions [data-contact]').click();
-  await expect(page.locator('#contact-dialog')).toBeVisible();
+test('a blocked model chunk preserves local model posters and functioning selections', async ({page})=>{
+  await page.route('**/machine-hero-*.js',route=>route.abort());await page.goto('./');
+  await expect(page.locator('.hero')).toHaveAttribute('data-renderer','fallback');
+  await expect(page.locator('#hero-poster')).toBeVisible();
+  await page.locator('.hero-controls [data-hero-machine="laser"]').click();
+  await expect(page.locator('#hero-poster')).toHaveAttribute('src',/laser-hero/);await expect(page.locator('#hero-machine-name')).toHaveText('激光切割机');
 });
-
-test('WebGL unavailability preserves the static assembly and contact path', async ({ page }) => {
-  await page.addInitScript(() => {
-    const original = HTMLCanvasElement.prototype.getContext;
-    HTMLCanvasElement.prototype.getContext = function (name, ...args) {
-      if (String(name).includes('webgl')) return null;
-      return original.call(this, name, ...args);
-    };
-  });
-  await page.goto('./');
-  await page.locator('#assembly').scrollIntoViewIfNeeded();
-  await expect(page.locator('#assembly')).toHaveAttribute('data-renderer', 'fallback');
-  await expect(page.locator('.assembly-controls')).toBeHidden();
-  await expect(page.locator('.pin-spacer:has(.assembly-stage)')).toHaveCount(0);
-  await expect(page.locator('#assembly-title')).toBeVisible();
+test('WebGL failure retains a usable poster and real business content', async ({page})=>{
+  await page.addInitScript(()=>{const get=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,...args){return /webgl/i.test(type)?null:get.call(this,type,...args);};});
+  await page.goto('./');await expect(page.locator('.hero')).toHaveAttribute('data-renderer','fallback');
+  await expect(page.locator('#hero-poster')).toBeVisible();await expect(page.locator('#services')).toContainText('大件需沟通');
 });
-
-test('context loss reveals the poster and restoration rebuilds the reflective scene', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await openAssembly(page);
-  await page.evaluate(() => {
-    const gl = document.querySelector('.assembly-canvas').getContext('webgl2');
-    window.__contextLoss = gl.getExtension('WEBGL_lose_context');
-    window.__contextLoss.loseContext();
-  });
-  await expect(page.locator('#assembly')).toHaveAttribute('data-renderer', 'fallback');
-  await expect(page.locator('.assembly-controls')).toBeHidden();
-  await expect(page.locator('.assembly-poster')).toHaveCSS('opacity', '1');
-  await page.evaluate(() => window.__contextLoss.restoreContext());
-  await expect(page.locator('#assembly')).toHaveAttribute('data-renderer', 'webgl');
-  await page.getByRole('button', { name: '拆解', exact: true }).click();
-  await expect(page.locator('#assembly')).toHaveAttribute('data-spread', '1.000');
-  await expect(page.locator('.assembly-canvas')).toHaveCount(1);
+test('context loss displays the poster and context restoration rebuilds the same selected model', async ({page})=>{
+  await ready(page);
+  await page.locator('.hero-controls [data-hero-machine="lathe"]').click();await selected(page,'lathe');
+  await page.evaluate(()=>{const c=document.querySelector('#hero-machine-canvas canvas');window.testLostContext=c.getContext('webgl2').getExtension('WEBGL_lose_context');window.testLostContext.loseContext();});
+  await expect(page.locator('.hero')).toHaveAttribute('data-renderer','fallback');await expect(page.locator('#hero-poster')).toBeVisible();
+  await page.evaluate(()=>window.testLostContext.restoreContext());await expect(page.locator('.hero')).toHaveAttribute('data-renderer','ready',{timeout:20000});await selected(page,'lathe');
 });
-
-test('new model assets stay local and the poster remains useful without JavaScript', async ({ browser, baseURL }) => {
-  const context = await browser.newContext({ javaScriptEnabled: false });
-  const page = await context.newPage();
-  await page.goto(baseURL);
-  const poster = page.locator('.assembly-poster');
-  await poster.scrollIntoViewIfNeeded();
-  await expect(poster).toBeVisible();
-  await expect(poster).toHaveAttribute('src', /images\/generated\/chuck-assembly\.webp$/);
-  await expect.poll(() => poster.evaluate((image) => image.complete && image.naturalWidth >= 1200)).toBe(true);
-  await expect(page.locator('#assembly')).toContainText('非本厂产品或客户案例');
-  await expect(page.locator('.assembly-controls')).toBeHidden();
-  const metadata = await (await page.request.get('./images/generated/chuck-assembly.json')).json();
-  expect(metadata.kind).toBe('procedural-render');
-  await context.close();
+test('the full assembly page is shipped with the site and contains no removed background controls', async ({page})=>{
+  await page.goto('./machines.html');await expect(page.locator('#workshop-stage')).toHaveAttribute('data-renderer','ready',{timeout:20000});
+  await expect(page.locator('#total-count')).toHaveText('91');await expect(page.locator('[data-backdrop-mode], #workshop-backdrop')).toHaveCount(0);
+  await page.locator('#complete').click();await expect(page.locator('#machine-labels')).toBeVisible();
+  await page.locator('.machine-home-link').click();await expect(page.locator('#hero-title')).toBeVisible();
 });

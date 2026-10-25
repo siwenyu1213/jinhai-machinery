@@ -5,7 +5,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 // its name. No camera or model manipulation is used for these acceptance views.
 const directory = 'artifacts/tmp/workshop-backgrounds';
 const origin = process.env.MILL_DEMO_ORIGIN || 'http://127.0.0.1:4175';
-const modes = ['studio', 'airflow', 'blueprint'];
+const modes = ['neutral'];
 await mkdir(directory, { recursive: true });
 const browser = await chromium.launch({ channel: process.platform === 'win32' ? 'msedge' : undefined });
 const report = { captures: [], errors: [] };
@@ -14,7 +14,7 @@ try {
     const page = await browser.newPage({ viewport: { width, height }, reducedMotion: 'no-preference' });
     page.on('pageerror', error => report.errors.push(error.message));
     for (const mode of modes) {
-      await page.goto(`${origin}/workshop.html?background=${mode}`);
+      await page.goto(`${origin}/workshop.html`);
       await page.locator('#workshop-stage[data-renderer="ready"]').waitFor();
       await page.evaluate(() => window.__workshopDemo.setProgress(.55));
       const swirlPath = `${directory}/${width}-${mode}-vortex.png`;
@@ -30,7 +30,6 @@ try {
         await page.screenshot({ path });
         report.captures.push({ width, height, mode, machine: id, path,
           state: await page.evaluate(() => window.__workshopDemo.getState()),
-          backdrop: await page.evaluate(() => window.__workshopDemo.getBackdropState()),
           stats: await page.evaluate(() => window.__workshopDemo.getRenderStats()),
         });
       }

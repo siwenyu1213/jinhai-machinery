@@ -1,19 +1,11 @@
 /* Shared tokens, stage, controls, fallback and scroll track live in style.css. */
 @import './style.css';
-@import './workshop-backdrop.css';
 
-/* §2.1 / §8.3: the machines stay primary; background controls form one quiet
-   row. Reuse paper/ink/line and machine-paint tokens rather than a new theme. */
+/* §2.1: the machines stay primary; names have their own quiet reading area.
+   Reuse paper/ink/line and machine-paint tokens. */
 .workshop-heading { display: flex; gap: 24px; }
 .workshop-heading > div { position: relative; isolation: isolate; }
 .workshop-heading > div::before { content: ''; position: absolute; inset: -12px; background: rgb(248 249 246 / 92%); z-index: -1; }
-.backdrop-switcher { position: absolute; left: 0; top: 72px; display: flex; gap: 8px; width: max-content; max-width: 100%; pointer-events: auto; }
-.backdrop-switcher button {
-  min-height: 44px; padding: 8px 16px; font-size: 13px; line-height: 1.5;
-  border: 1px solid transparent; border-radius: 4px; background: rgb(248 249 246 / 94%); color: var(--muted);
-}
-.backdrop-switcher button:hover { background: var(--paper); color: var(--ink); }
-.backdrop-switcher button[aria-pressed="true"] { border-color: var(--line); background: var(--paper); color: var(--ink); font-weight: 600; }
 #workshop-scene { z-index: 1; }
 #workshop-stage .first-hint, #workshop-stage .active-part { z-index: 2; }
 #workshop-stage .first-hint { padding: 24px; background: rgb(248 249 246 / 94%); }
@@ -62,8 +54,6 @@
 
 @media (max-width: 600px) {
   .workshop-heading { gap: 8px; }
-  .backdrop-switcher { top: 60px; gap: 4px; }
-  .backdrop-switcher button { font-size: 12px; padding: 8px 12px; }
   .machine-title-slot { position: static; height: 64px; }
   .machine-title { height: 56px; font-size: clamp(28px, 8vw, 36px); }
   .machine-title > span { padding: 4px 12px; }
