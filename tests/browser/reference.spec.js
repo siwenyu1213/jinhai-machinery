@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 test.describe.configure({ timeout: 45000 });
 
-test('dark sections use near-black green surfaces with readable text',async({page})=>{
+test('dark sections are predominantly black with only a restrained green tint and readable text',async({page})=>{
   await page.emulateMedia({reducedMotion:'reduce'});await page.goto('./');
   const surfaces=await page.locator('.machine-section,.process-section,.about-section,.site-footer').evaluateAll(elements=>{
     const channels=color=>color.match(/[\d.]+/g).slice(0,3).map(Number);
@@ -9,8 +9,8 @@ test('dark sections use near-black green surfaces with readable text',async({pag
     return elements.map(node=>{const style=getComputedStyle(node),rgb=channels(style.backgroundColor),background=luminance(style.backgroundColor),foreground=luminance(style.color);return {rgb,background,contrast:(foreground+.05)/(background+.05)};});
   });
   expect(surfaces).toHaveLength(4);
-  for(const surface of surfaces){expect(surface.rgb[1]).toBeGreaterThan(surface.rgb[0]);expect(surface.rgb[1]).toBeGreaterThan(surface.rgb[2]);expect(surface.background).toBeLessThan(.015);expect(surface.contrast).toBeGreaterThan(7);}
-  await expect(page.locator('.hero')).toHaveCSS('background-image',/rgb\(38, 58, 48\).*rgb\(21, 37, 30\).*rgb\(10, 21, 18\)/);
+  for(const surface of surfaces){expect(surface.rgb[1]).toBeGreaterThan(surface.rgb[0]);expect(surface.rgb[1]).toBeGreaterThan(surface.rgb[2]);expect(Math.max(...surface.rgb)-Math.min(...surface.rgb)).toBeLessThanOrEqual(6);expect(surface.background).toBeLessThan(.01);expect(surface.contrast).toBeGreaterThan(7);}
+  await expect(page.locator('.hero')).toHaveCSS('background-image',/rgb\(34, 39, 36\).*rgb\(20, 26, 22\).*rgb\(11, 14, 13\)/);
   await expect(page.locator('.contact-section')).toHaveCSS('background-color','rgb(238, 84, 40)');
 });
 test('immersive model opening uses the reference palette, large type and centered desktop wordmark',async({page})=>{

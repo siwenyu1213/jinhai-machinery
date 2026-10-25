@@ -2,13 +2,13 @@
    large cream typography, warm orange actions and dark/light section rhythm.
    Primary: the machine + one headline. Secondary: business / model controls.
    Tertiary: honest learning and imagery notes. Native tokens, no UI library. */
-:root { --navy: #0a1512; --dark-surface: #0b1713; --dark-raised: #101e18; --blue: #314d4b; --ink: #172323; --muted: #56635f; --paper: #f2e9d6; --surface: #e6dfcd; --line: #c8c5b6; --orange: #ad3719; --orange-light: #ee5428; --max-width: 1400px; --space: clamp(24px, 4.4vw, 72px); }
+:root { --navy: #0b0e0d; --dark-surface: #0e1210; --dark-raised: #141a16; --blue: #314d4b; --ink: #172323; --muted: #56635f; --paper: #f2e9d6; --surface: #e6dfcd; --line: #c8c5b6; --orange: #ad3719; --orange-light: #ee5428; --max-width: 1400px; --space: clamp(24px, 4.4vw, 72px); }
 ::selection { background: #ee5428; color: #182122; }
 .section { padding-block: clamp(80px, 10vw, 144px); }
 h2 { font-size: clamp(36px, 4.3vw, 64px); font-weight: 600; line-height: 1.15; letter-spacing: -.045em; }
 .section-heading { margin-bottom: 64px; }
 .site-header { border: 0; }
-.site-header.is-scrolled, .site-header.menu-open, .site-header:focus-within { background: rgb(10 21 18 / 98%); color: var(--paper); border: 0; }
+.site-header.is-scrolled, .site-header.menu-open, .site-header:focus-within { background: rgb(11 14 13 / 98%); color: var(--paper); border: 0; }
 .header-inner { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); min-height: 100px; gap: 32px; }
 .site-header .brand { order: 2; justify-self: center; font-size: 25px; letter-spacing: -.035em; text-align: center; }
 .site-header .brand > svg { display: none; }
@@ -20,12 +20,12 @@ h2 { font-size: clamp(36px, 4.3vw, 64px); font-weight: 600; line-height: 1.15; l
 .site-header .header-contact { display: inline-flex; order: 3; justify-self: end; border-radius: 32px; border-color: #f2e9d65c; color: var(--paper); min-width: 140px; }
 .button { border-radius: 8px; font-weight: 600; min-height: 52px; }
 .button-orange { background: var(--orange-light); color: #172323; }
-.hero { min-height: 760px; height: 100svh; max-height: 1120px; background: linear-gradient(150deg, #263a30 0%, #15251e 45%, var(--navy) 86%); }
+.hero { min-height: 760px; height: 100svh; max-height: 1120px; background: linear-gradient(150deg, #222724 0%, #141a16 45%, var(--navy) 86%); }
 .hero-art { z-index: 0; }
 .hero-machine-canvas, .hero-poster { position: absolute; inset: 0; width: 100%; height: 100%; }
 .hero-machine-canvas canvas { display: block; width: 100%; height: 100%; }
 .hero-poster { object-fit: contain; }
-.hero-art::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, #0a151230, #0a151240 40%, #06100b8c 76%, #040d09cf); pointer-events: none; }
+.hero-art::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, #0b0e0d30, #0b0e0d40 40%, #0609078c 76%, #040605cf); pointer-events: none; }
 .hero-layout { padding-block: 110px 230px; }
 .hero-copy { position: relative; z-index: 2; }
 .hero-intro { font-size: 15px; letter-spacing: .08em; color: var(--paper); margin-bottom: 20px; }
@@ -99,7 +99,7 @@ h2 { font-size: clamp(36px, 4.3vw, 64px); font-weight: 600; line-height: 1.15; l
 .contact-section h2 { font-size: clamp(38px, 4.6vw, 68px); }
 .contact-section p { color: #172323; }
 .contact-section .button { background: var(--paper); color: var(--ink); min-height: 64px; padding-inline: 30px; }
-.site-footer { background: #060e0a; padding-block: 90px 32px; color: #ccd3c7; }
+.site-footer { background: #070908; padding-block: 90px 32px; color: #ccd3c7; }
 .footer-top .brand { font-size: clamp(42px, 5.7vw, 80px); font-weight: 600; letter-spacing: -.055em; }
 .footer-links { gap: 76px; font-size: 14px; }
 .footer-main { padding-top: 30px; border-color: #3c4b48; }
