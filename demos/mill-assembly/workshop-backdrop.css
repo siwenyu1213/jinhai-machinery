@@ -1,0 +1,32 @@
+/* Generated photographic plates carry the design. CSS gives the imagery
+   quiet drift and scroll parallax; it draws no grids, particles or ribbons. */
+#workshop-backdrop { position: absolute; inset: 0; overflow: hidden; pointer-events: none; background: #9da4a3; }
+.workshop-backdrop-content { position: absolute; inset: 0; overflow: hidden; --backdrop-parallax: 0px; }
+.backdrop-layer { display: none; position: absolute; inset: 0; overflow: hidden; }
+[data-mode="studio"] > .backdrop-studio,
+[data-mode="airflow"] > .backdrop-airflow,
+[data-mode="blueprint"] > .backdrop-blueprint { display: block; }
+.backdrop-studio { background: #9da4a3; }
+.backdrop-airflow { background: #424441; }
+.backdrop-blueprint { background: #a8b0b2; }
+.backdrop-photo-frame { position: absolute; inset: -2%; transform: translate3d(0, calc(var(--backdrop-parallax) * .25), 0); }
+.backdrop-photo { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 50% 54%; user-select: none; animation: workshop-photo-drift 28s ease-in-out infinite alternate; }
+.backdrop-airflow .backdrop-photo { animation-name: workshop-photo-breathe; animation-duration: 18s; }
+.backdrop-blueprint .backdrop-photo { object-position: 50% 55%; animation-duration: 34s; }
+@keyframes workshop-photo-drift {
+  from { transform: translate3d(-.5%, -.2%, 0) scale(1.012); }
+  to { transform: translate3d(.5%, .2%, 0) scale(1.035); }
+}
+@keyframes workshop-photo-breathe {
+  from { transform: translate3d(-.3%, .4%, 0) scale(1.015); }
+  to { transform: translate3d(.3%, -.4%, 0) scale(1.055); }
+}
+.workshop-backdrop-content[data-still="true"] * { animation-play-state: paused !important; }
+.workshop-backdrop-content[data-reduced="true"] * { animation: none !important; transition: none !important; }
+@media (max-width: 600px) {
+  .backdrop-photo { object-position: 50% 50%; }
+  .backdrop-blueprint .backdrop-photo { object-position: 56% 54%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workshop-backdrop-content * { animation: none !important; transition: none !important; }
+}

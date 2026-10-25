@@ -1,19 +1,57 @@
 /* Shared tokens, stage, controls, fallback and scroll track live in style.css. */
 @import './style.css';
+@import './workshop-backdrop.css';
+
+/* §2.1 / §8.3: the machines stay primary; background controls form one quiet
+   row. Reuse paper/ink/line and machine-paint tokens rather than a new theme. */
+.workshop-heading { display: flex; gap: 24px; }
+.workshop-heading > div { position: relative; isolation: isolate; }
+.workshop-heading > div::before { content: ''; position: absolute; inset: -12px; background: rgb(248 249 246 / 92%); z-index: -1; }
+.backdrop-switcher { position: absolute; left: 0; top: 72px; display: flex; gap: 8px; width: max-content; max-width: 100%; pointer-events: auto; }
+.backdrop-switcher button {
+  min-height: 44px; padding: 8px 16px; font-size: 13px; line-height: 1.5;
+  border: 1px solid transparent; border-radius: 4px; background: rgb(248 249 246 / 94%); color: var(--muted);
+}
+.backdrop-switcher button:hover { background: var(--paper); color: var(--ink); }
+.backdrop-switcher button[aria-pressed="true"] { border-color: var(--line); background: var(--paper); color: var(--ink); font-weight: 600; }
+#workshop-scene { z-index: 1; }
+#workshop-stage .first-hint, #workshop-stage .active-part { z-index: 2; }
+#workshop-stage .first-hint { padding: 24px; background: rgb(248 249 246 / 94%); }
+#workshop-stage .active-part { bottom: 142px; padding: 4px 8px; background: rgb(248 249 246 / 92%); }
+#workshop-stage .active-part:empty { display: none; }
+#workshop-stage .fallback { z-index: 5; }
+
+/* §5.6: real pale paint needs a dark backing. Each name borrows its panel
+   color from that machine, while the lettering keeps the exact paint input. */
+.machine-title {
+  position: relative; width: 100%; height: 72px;
+  margin: 0; pointer-events: none; font-weight: 600; font-size: 48px;
+  line-height: 1.1; letter-spacing: -.045em;
+}
+.machine-title-slot { position: absolute; left: 0; bottom: calc(100% + 16px); width: 100%; height: 72px; pointer-events: none; }
+#workshop-stage .controls { background: rgb(248 249 246 / 92%); }
+.machine-title > span {
+  position: absolute; left: 0; top: 0; display: block; width: max-content; max-width: 100%;
+  padding: 4px 12px; white-space: nowrap; color: var(--machine-paint); background: var(--machine-panel);
+  opacity: 0; transform: translate3d(0, 12px, 0);
+  transition: opacity 320ms ease, transform 480ms cubic-bezier(.2,.7,.2,1);
+}
+.machine-title > .is-visible { opacity: 1; transform: translate3d(0, 0, 0); }
+#workshop-stage[data-complete="true"] .active-part { visibility: hidden; }
 
 /* The stage is the render host. The page header, body and controls stay the
-   stable frame; only the labels above the canvas ever move. Before the
+   stable frame; labels track their machines and names reveal in their slot. Before the
    showcase the canvas is invisible to pointers so the page keeps scrolling. */
 .workshop-heading,
-.controls { z-index: 1; }
+.controls { z-index: 4; }
 #workshop-scene { pointer-events: none; max-width: 100%; }
 #workshop-scene canvas.is-showcase { pointer-events: auto; touch-action: none; cursor: grab; }
 #workshop-scene canvas.is-dragging { cursor: grabbing; }
 
-.machine-labels { position: absolute; inset: 0; margin: 0; padding: 0; list-style: none; pointer-events: none; z-index: 1; }
+.machine-labels { position: absolute; inset: 0; margin: 0; padding: 0; list-style: none; pointer-events: none; z-index: 3; }
 .machine-label { position: absolute; left: 0; top: 0; width: max-content; transform: translate(-50%, -50%); pointer-events: auto; }
 .machine-label button {
-  display: block; min-height: 44px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 4px;
+  display: block; min-height: 48px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 4px;
   background: rgb(248 249 246 / 92%); color: var(--ink); font-size: 13px; line-height: 1.5; white-space: nowrap;
 }
 .machine-label button:hover { background: var(--surface); }
@@ -23,5 +61,15 @@
 #toggle-showcase[aria-pressed="true"] { background: var(--surface); border-color: var(--line); }
 
 @media (max-width: 600px) {
-  .machine-label button { min-height: 44px; padding: 6px 10px; font-size: 12px; }
+  .workshop-heading { gap: 8px; }
+  .backdrop-switcher { top: 60px; gap: 4px; }
+  .backdrop-switcher button { font-size: 12px; padding: 8px 12px; }
+  .machine-title-slot { position: static; height: 64px; }
+  .machine-title { height: 56px; font-size: clamp(28px, 8vw, 36px); }
+  .machine-title > span { padding: 4px 12px; }
+  #workshop-stage .active-part { bottom: 192px; }
+  .machine-label button { min-height: 48px; padding: 6px 10px; font-size: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .machine-title > span { transition: none; transform: none; }
 }
