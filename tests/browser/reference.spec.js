@@ -1,5 +1,18 @@
 import { test, expect } from '@playwright/test';
 test.describe.configure({ timeout: 45000 });
+
+test('dark sections use near-black green surfaces with readable text',async({page})=>{
+  await page.emulateMedia({reducedMotion:'reduce'});await page.goto('./');
+  const surfaces=await page.locator('.machine-section,.process-section,.about-section,.site-footer').evaluateAll(elements=>{
+    const channels=color=>color.match(/[\d.]+/g).slice(0,3).map(Number);
+    const luminance=color=>channels(color).map(value=>{const c=value/255;return c<=.04045?c/12.92:((c+.055)/1.055)**2.4;}).reduce((sum,value,index)=>sum+value*[.2126,.7152,.0722][index],0);
+    return elements.map(node=>{const style=getComputedStyle(node),rgb=channels(style.backgroundColor),background=luminance(style.backgroundColor),foreground=luminance(style.color);return {rgb,background,contrast:(foreground+.05)/(background+.05)};});
+  });
+  expect(surfaces).toHaveLength(4);
+  for(const surface of surfaces){expect(surface.rgb[1]).toBeGreaterThan(surface.rgb[0]);expect(surface.rgb[1]).toBeGreaterThan(surface.rgb[2]);expect(surface.background).toBeLessThan(.015);expect(surface.contrast).toBeGreaterThan(7);}
+  await expect(page.locator('.hero')).toHaveCSS('background-image',/rgb\(38, 58, 48\).*rgb\(21, 37, 30\).*rgb\(10, 21, 18\)/);
+  await expect(page.locator('.contact-section')).toHaveCSS('background-color','rgb(238, 84, 40)');
+});
 test('immersive model opening uses the reference palette, large type and centered desktop wordmark',async({page})=>{
   await page.emulateMedia({reducedMotion:'reduce'});await page.goto('./');
   await expect(page.locator('.hero')).toHaveAttribute('data-renderer','ready',{timeout:20000});
