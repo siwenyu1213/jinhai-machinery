@@ -38,3 +38,10 @@ class SiteFontTests(unittest.TestCase):
         faces = (ROOT / 'site/src/styles/font-faces.css').read_text(encoding='utf-8')
         self.assertEqual(faces.count('font-display: swap'), 5)
         self.assertNotIn('https://', faces)
+
+    def test_body_subsets_cover_both_scroll_transition_titles(self):
+        manifest = json.loads((FONTS / 'sources.json').read_text(encoding='utf-8'))
+        text = '我们有哪些机台？我们还有更多……'
+        for font in manifest['fonts']:
+            if font['family'] == 'Jinhai Text':
+                self.assertTrue({ord(char) for char in text}.issubset(font['codepoints']))

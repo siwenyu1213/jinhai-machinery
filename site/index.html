@@ -29,7 +29,7 @@ No scene photographs, copied brand assets, fabricated claims or external runtime
       </a>
       <button class="menu-toggle" aria-expanded="false" aria-controls="main-nav" hidden>菜单 <span aria-hidden="true">☰</span></button>
       <nav id="main-nav" aria-label="主导航">
-        <a href="#equipment">设备能力</a><a href="#services">主营业务</a><a href="#assembly">机台展示</a><a href="#process">加工细节</a><a href="#work">机械影像</a><a href="#scope">维修范围</a>
+        <a href="#assembly">机台展示</a><a href="#equipment">设备能力</a><a href="#services">主营业务</a><a href="#process">加工细节</a><a href="#work">机械影像</a><a href="#scope">维修范围</a>
       </nav>
       <button class="button button-small header-contact" data-contact>联系演示 <span aria-hidden="true">↗</span></button>
     </div>
@@ -53,9 +53,24 @@ No scene photographs, copied brand assets, fabricated claims or external runtime
         <button type="button" data-hero-machine="laser" aria-pressed="false">激光切割机</button>
         <button id="hero-pause" type="button" aria-pressed="false" hidden>暂停轮换</button>
       </div>
-      <div class="hero-bottom wrap"><span>食品 · 印刷 · 包装</span><a href="#equipment">向下，了解金海 <span aria-hidden="true">↓</span></a></div>
+      <div class="hero-bottom wrap"><span>食品 · 印刷 · 包装</span><a href="#assembly">向下，了解金海 <span aria-hidden="true">↓</span></a></div>
     </section>
     <section class="risk-intro wrap" aria-label="业务方向"><p>非标零配件与设备定制、钣金定制、维修服务。<span>面向食品、印刷与包装行业。</span></p></section>
+
+    <!-- Primary: entrance-written headline, then the shared 91-part flight.
+         Secondary: machine captions, then a returning title leading to equipment.
+         Tertiary: provenance. Existing near-black / cream tokens and type only. -->
+    <section class="section machine-section assembly-inline" id="assembly" data-renderer="poster" aria-labelledby="assembly-title">
+      <div class="assembly-sticky"><div class="wrap assembly-composition">
+        <h2 id="assembly-title" aria-label="我们有哪些机台？" data-outro="我们还有更多……"><span class="assembly-title-target" aria-hidden="true">我们有哪些机台？</span><span class="assembly-title-letters" aria-hidden="true"></span></h2>
+        <div class="inline-assembly-canvas" role="img" aria-label="铣床、车床与激光切割机的零件随滚动旋转装配，最终并排排列"></div>
+        <div class="machine-preview-grid">
+          <article class="machine-preview" data-assembly-machine="mill"><img src="./images/generated/mill-hero.webp" width="1280" height="900" alt="通用铣床三维模型，展示工作台、立柱和铣头" loading="lazy"><h3>铣床</h3><p>工作台、立柱与主轴。</p></article>
+          <article class="machine-preview" data-assembly-machine="lathe"><img src="./images/generated/lathe-hero.webp" width="1280" height="900" alt="通用车床三维模型，展示床身、卡盘和尾座" loading="lazy"><h3>车床</h3><p>床身、卡盘与刀架。</p></article>
+          <article class="machine-preview" data-assembly-machine="laser"><img src="./images/generated/laser-hero.webp" width="1280" height="900" alt="通用激光切割机三维模型，展示龙门、切割头与工作台" loading="lazy"><h3>激光切割机</h3><p>龙门、切割头与工作台。</p></article>
+        </div><p class="caption-note">通用模型，非本厂产品或客户案例。</p>
+      </div></div>
+    </section>
 
     <section class="section wrap equipment-section" id="equipment" aria-labelledby="equipment-title">
       <div class="section-heading"><h2 id="equipment-title">设备与工艺</h2><p>加工材料、尺寸、精度需沟通确认。</p></div>
@@ -84,21 +99,6 @@ No scene photographs, copied brand assets, fabricated claims or external runtime
           <figcaption><strong id="service-caption">非标零配件与设备定制</strong><p id="service-detail" aria-live="polite">提供图纸或照片、尺寸、材料、数量。设备定制范围另行确认。</p><a id="service-credit" aria-label="摄影来源：Matt Richmond / Unsplash，非本厂实拍" class="caption-note photo-credit" href="https://unsplash.com/photos/a-pile-of-metal-parts-sitting-next-to-each-other-fx-F1sWUW0Y" target="_blank" rel="noopener noreferrer">图库参考，非本厂实拍 ↗</a></figcaption>
         </figure>
       </div>
-    </section>
-
-    <!-- Primary: scroll-written headline, then the shared 91-part flight.
-         Secondary: three assembled machines in a row, then their captions.
-         Tertiary: provenance. Existing near-black / cream tokens and type only. -->
-    <section class="section machine-section assembly-inline" id="assembly" data-renderer="poster" aria-labelledby="assembly-title">
-      <div class="assembly-sticky"><div class="wrap assembly-composition">
-        <h2 id="assembly-title" aria-label="从结构，看懂机台。"><span class="assembly-title-target" aria-hidden="true">从结构，看懂机台。</span><span class="assembly-title-letters" aria-hidden="true"></span></h2>
-        <div class="inline-assembly-canvas" role="img" aria-label="铣床、车床与激光切割机的零件随滚动旋转装配，最终并排排列"></div>
-        <div class="machine-preview-grid">
-          <article class="machine-preview" data-assembly-machine="mill"><img src="./images/generated/mill-hero.webp" width="1280" height="900" alt="通用铣床三维模型，展示工作台、立柱和铣头" loading="lazy"><h3>铣床</h3><p>工作台、立柱与主轴。</p></article>
-          <article class="machine-preview" data-assembly-machine="lathe"><img src="./images/generated/lathe-hero.webp" width="1280" height="900" alt="通用车床三维模型，展示床身、卡盘和尾座" loading="lazy"><h3>车床</h3><p>床身、卡盘与刀架。</p></article>
-          <article class="machine-preview" data-assembly-machine="laser"><img src="./images/generated/laser-hero.webp" width="1280" height="900" alt="通用激光切割机三维模型，展示龙门、切割头与工作台" loading="lazy"><h3>激光切割机</h3><p>龙门、切割头与工作台。</p></article>
-        </div><p class="caption-note">通用模型，非本厂产品或客户案例。</p>
-      </div></div>
     </section>
 
     <section class="process-section" id="process" aria-labelledby="process-title">

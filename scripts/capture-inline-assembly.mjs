@@ -12,10 +12,10 @@ try {
     await page.locator('#assembly').scrollIntoViewIfNeeded();
     await page.locator('#assembly[data-renderer="ready"]').waitFor({ timeout: 30000 });
     await page.evaluate(() => document.fonts.ready);
-    for (const progress of [0, .12, .22, .35, .48, .62, .78, .89, .95, 1]) {
+    for (const progress of [0, .075, .12, .21, .35, .48, .62, .695, .735, .79, .85, .9, .95, 1]) {
       await page.evaluate(value => {
-        const section = document.querySelector('#assembly');
-        window.scrollTo({ top: scrollY + section.getBoundingClientRect().top + value * (section.offsetHeight - section.querySelector('.assembly-sticky').offsetHeight), behavior: 'instant' });
+        const section = document.querySelector('#assembly'), height = section.querySelector('.assembly-sticky').offsetHeight, lead = height * .85;
+        window.scrollTo({ top: scrollY + section.getBoundingClientRect().top - lead + value * (section.offsetHeight - height + lead), behavior: 'instant' });
       }, progress);
       await page.waitForFunction(value => Math.abs(window.__inlineAssembly.getState().progress - value) < .001, progress, { timeout: 10000 });
       const path = `${directory}/${width}-${Math.round(progress * 100)}.png`;

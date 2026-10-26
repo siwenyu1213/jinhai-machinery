@@ -7,9 +7,21 @@ async function ready(page, reduced = false) {
   await page.evaluate(() => document.fonts.ready);
 }
 async function seek(page, value) {
-  await page.evaluate(progress => { const section = document.querySelector('#assembly'); window.scrollTo({ top: scrollY + section.getBoundingClientRect().top + progress * (section.offsetHeight - section.querySelector('.assembly-sticky').offsetHeight), behavior: 'instant' }); }, value);
+  await page.evaluate(progress => { const section = document.querySelector('#assembly'), height = section.querySelector('.assembly-sticky').offsetHeight, lead = height * .85; window.scrollTo({ top: scrollY + section.getBoundingClientRect().top - lead + progress * (section.offsetHeight - height + lead), behavior: 'instant' }); }, value);
   await expect.poll(() => page.evaluate(expected => Math.abs(window.__inlineAssembly.getState().progress - expected), value), { timeout: 15000 }).toBeLessThan(.0003);
+  await expect.poll(() => page.evaluate(() => { const state = window.__inlineAssembly.getState(); return Math.abs(state.progress - state.target); }), { timeout: 15000 }).toBeLessThan(.000001);
 }
+test('the section precedes equipment and starts writing while the previous page is still visible', async ({ page }) => {
+  await ready(page); await seek(page, .075);
+  expect(await page.locator('#assembly').evaluate(node => node.nextElementSibling.id)).toBe('equipment');
+  const section = await page.locator('#assembly').boundingBox();
+  expect(section.y).toBeGreaterThan(0); expect(section.y).toBeLessThan(page.viewportSize().height);
+  const first = page.locator('.assembly-title-letters > span').first();
+  const box = await first.boundingBox(), opacity = await first.evaluate(node => +getComputedStyle(node).opacity);
+  expect(opacity).toBeGreaterThan(0); expect(opacity).toBeLessThan(1);
+  expect(box.y).toBeLessThan(page.viewportSize().height); expect(box.y + box.height).toBeGreaterThan(section.y);
+  expect(await page.locator('.assembly-title-letters > span').last().evaluate(node => +getComputedStyle(node).opacity)).toBe(0);
+});
 test('the oversized vertical text writes first and flies while the actual shared model is moving', async ({ page }) => {
   const errors = []; page.on('pageerror', error => errors.push(error.message)); await ready(page);
   await seek(page, .1);
@@ -33,13 +45,13 @@ test('the oversized vertical text writes first and flies while the actual shared
   expect(Math.abs(viewport.y - sticky.y)).toBeLessThan(1); expect(viewport.height).toBe(sticky.height);
 });
 test('completion makes one readable row, then raises captions, and sleeps without a showcase loop', async ({ page }) => {
-  await ready(page); await seek(page, .895);
+  await ready(page); await seek(page, .695);
   expect(await page.evaluate(() => window.__inlineAssembly.getState().scene.assembledCount)).toBe(91);
   await expect(page.locator('.machine-preview').first()).toHaveCSS('opacity', '0');
-  await seek(page, .95);
+  await seek(page, .735);
   const early = await page.locator('.machine-preview').first().evaluate(node => ({ y: node.getBoundingClientRect().y, opacity: +getComputedStyle(node).opacity }));
   expect(early.opacity).toBeGreaterThan(0); expect(early.opacity).toBeLessThan(1);
-  await seek(page, 1);
+  await seek(page, .79);
   const late = await page.locator('.machine-preview').first().boundingBox(); expect(late.y).toBeLessThan(early.y);
   await expect(page.locator('.machine-preview').first()).toHaveCSS('opacity', '1');
   const projected = await page.evaluate(() => {
@@ -53,6 +65,38 @@ test('completion makes one readable row, then raises captions, and sleeps withou
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   const frames = await page.evaluate(() => window.__inlineAssembly.getRenderStats().frames);
   await page.waitForTimeout(350); expect(await page.evaluate(() => window.__inlineAssembly.getRenderStats().frames)).toBe(frames);
+});
+test('after the captions finish, the title returns and changes while the models and captions fade', async ({ page }) => {
+  await ready(page); await seek(page, .80);
+  await expect(page.locator('.machine-preview').first()).toHaveCSS('opacity', '1');
+  await expect(page.locator('#assembly-title')).toHaveAttribute('aria-label', '我们有哪些机台？');
+  const title = page.locator('.assembly-title-letters > span').first(), before = await title.boundingBox();
+  await seek(page, .9);
+  const middle = await title.boundingBox();
+  expect(middle.x + middle.width / 2).toBeGreaterThan(before.x + before.width / 2);
+  expect(middle.y + middle.height / 2).toBeGreaterThan(before.y + before.height / 2);
+  const opacity = await page.locator('.inline-assembly-canvas,.machine-preview').evaluateAll(nodes => nodes.map(node => +getComputedStyle(node).opacity));
+  expect(opacity.every(value => value > 0 && value < 1)).toBe(true);
+  const morph = await page.locator('.assembly-title-letters > span').nth(2).locator('.assembly-letter-out').evaluate(node => +getComputedStyle(node).opacity);
+  expect(morph).toBeGreaterThan(0); expect(morph).toBeLessThan(1);
+  const boxes = await page.locator('.assembly-title-letters > span').evaluateAll(nodes => nodes.map(node => { const b = node.getBoundingClientRect(); return { left: b.left, right: b.right, top: b.top, bottom: b.bottom }; }));
+  for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+    const x = Math.min(boxes[i].right, boxes[j].right) - Math.max(boxes[i].left, boxes[j].left);
+    const y = Math.min(boxes[i].bottom, boxes[j].bottom) - Math.max(boxes[i].top, boxes[j].top);
+    expect(x <= 1 || y <= 1).toBe(true);
+  }
+  await seek(page, 1);
+  await expect(page.locator('#assembly-title')).toHaveAttribute('aria-label', '我们还有更多……');
+  await expect(page.locator('.inline-assembly-canvas')).toHaveCSS('opacity', '0');
+  await expect(page.locator('.machine-preview').first()).toHaveCSS('opacity', '0');
+  expect(await page.locator('.assembly-letter-out').allTextContents()).toEqual([... '我们还有更多……']);
+  const final = await page.locator('.assembly-title-letters > span').evaluateAll(nodes => nodes.map(node => { const b = node.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; }));
+  expect(Math.abs((final[0].x + final[3].x) / 2 - page.viewportSize().width / 2)).toBeLessThan(2);
+  expect(Math.abs(final[0].y - final[3].y)).toBeLessThan(2); expect(final[4].y).toBeGreaterThan(final[0].y);
+  await seek(page, .8);
+  await expect(page.locator('#assembly-title')).toHaveAttribute('aria-label', '我们有哪些机台？');
+  await expect(page.locator('.inline-assembly-canvas')).toHaveCSS('opacity', '1');
+  await expect(page.locator('.machine-preview').first()).toHaveCSS('opacity', '1');
 });
 test('native wheel motion keeps moving after input, reverse travel restores the same model pose', async ({ page }) => {
   await ready(page); await seek(page, .48);
@@ -78,5 +122,5 @@ test('reduced motion and missing WebGL keep complete readable content without pi
   await expect(page.locator('#assembly')).toHaveAttribute('data-renderer', 'fallback');
   await expect(page.locator('#assembly')).not.toHaveClass(/is-enhanced/);
   for (const image of await page.locator('.machine-preview img').all()) await expect(image).toBeVisible();
-  await expect(page.getByRole('heading', { name: '从结构，看懂机台。' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '我们有哪些机台？' })).toBeVisible();
 });

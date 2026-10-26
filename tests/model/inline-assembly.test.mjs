@@ -4,7 +4,7 @@ import { PerspectiveCamera, Vector3 } from 'three';
 import { createWorkshop } from '../../demos/mill-assembly/workshop-model.js';
 import { createWorkshopFlight } from '../../demos/mill-assembly/workshop-motion.js';
 import { arrangeAssemblyRow, ASSEMBLY_EYE, ASSEMBLY_RIGHT, boxCorners } from '../../site/src/three/machine-assembly-layout.js';
-import { assemblyTimeline, dampAssemblyScroll, letterPose } from '../../site/src/motion/assembly-timeline.js';
+import { assemblyScrollRange, assemblyTimeline, dampAssemblyScroll, letterPose } from '../../site/src/motion/assembly-timeline.js';
 
 test('the homepage row places all three machines on the floor in reading order without intersecting slots', () => {
   const model = arrangeAssemblyRow(createWorkshop());
@@ -26,10 +26,22 @@ test('the homepage row places all three machines on the floor in reading order w
 test('the title flight overlaps model arrival and captions wait for all model travel', () => {
   assert.equal(assemblyTimeline(.22).flightScroll, 0);
   assert.ok(assemblyTimeline(.4).flightScroll > 0);
-  assert.equal(assemblyTimeline(.89).flightScroll, 1);
-  assert.equal(assemblyTimeline(.89).captions, 0);
-  assert.equal(assemblyTimeline(1).captions, 1);
+  assert.equal(assemblyTimeline(.695).flightScroll, 1);
+  assert.equal(assemblyTimeline(.69).captions, 0);
+  assert.equal(assemblyTimeline(.78).captions, 1);
+  assert.equal(assemblyTimeline(.78).models, 1);
   assert.equal(assemblyTimeline(2).progress, 1);
+});
+test('the clock starts as the section enters, and departure waits for the complete captions', () => {
+  const { lead, length } = assemblyScrollRange(900, 4500);
+  const entering = (lead - 400) / length;
+  assert.ok(entering > 0 && letterPose(entering, 0, { x: 0, y: 0 }, { x: 0, y: 0 }, 100, 40).opacity > 0);
+  assert.equal(assemblyTimeline(.80).departure, 0);
+  const middle = assemblyTimeline(.9);
+  assert.ok(middle.models > 0 && middle.models < 1);
+  assert.ok(middle.captions > 0 && middle.captions < 1);
+  assert.equal(assemblyTimeline(1).models, 0); assert.equal(assemblyTimeline(1).captions, 0);
+  assert.equal(assemblyTimeline(1).flightScroll, 1);
 });
 test('scroll inertia continues after input and follows the same clock at different frame rates', () => {
   const simulate = fps => { let value = 0; for (let i = 0; i < fps; i++) value = dampAssemblyScroll(value, 1, 1 / fps); return value; };
@@ -41,14 +53,28 @@ test('scroll inertia continues after input and follows the same clock at differe
 test('each letter follows a quarter ellipse with an obvious acceleration peak and converges exactly', () => {
   const start = { x: 600, y: 600 }, end = { x: 60, y: 150 };
   const at = t => letterPose(t, 0, start, end, 140, 48);
-  for (const t of [.24, .3, .4, .5, .58]) {
+  for (const t of [.23, .27, .36, .45, .5]) {
     const pose = at(t), x = (pose.x - end.x) / (start.x - end.x), y = (pose.y - start.y) / (end.y - start.y);
     assert.ok(Math.abs(x * x + y * y - 1) < 1e-10);
   }
   const speed = t => Math.hypot(at(t + .001).x - at(t).x, at(t + .001).y - at(t).y);
-  assert.ok(speed(.4) > speed(.24) * 10 && speed(.4) > speed(.58) * 10);
-  assert.equal(at(.22).travel, 0); assert.equal(at(.6).travel, 1);
+  assert.ok(speed(.36) > speed(.23) * 10 && speed(.36) > speed(.5) * 10);
+  assert.equal(at(.22).travel, 0); assert.equal(at(.52).travel, 1);
   assert.ok(Math.abs(at(1).x - end.x) < 1e-7); assert.equal(at(1).y, end.y);
   assert.ok(letterPose(.4, 1, start, end, 140, 48).travel < at(.4).travel);
   assert.equal(at(.22).opacity, 1);
+});
+test('letters grow and change wording during the return arc, with deterministic reverse poses', () => {
+  const start = { x: 600, y: 600 }, end = { x: 60, y: 150 }, outro = { x: 500, y: 440, size: 100 };
+  const at = t => letterPose(t, 3, start, end, 140, 48, outro);
+  assert.equal(at(.80).returnTravel, 0); assert.equal(at(.80).morph, 0);
+  const middle = at(.9);
+  assert.ok(middle.x > end.x && middle.x < outro.x && middle.y > end.y && middle.y < outro.y);
+  assert.ok(middle.morph > 0 && middle.morph < 1 && middle.scale > 1);
+  assert.ok(middle.beforeOpacity < .05 && middle.afterOpacity > .05);
+  const final = at(1);
+  assert.ok(Math.abs(final.x - outro.x) < 1e-7 && Math.abs(final.y - outro.y) < 1e-7);
+  assert.equal(final.morph, 1); assert.equal(final.scale, 100 / 48);
+  for (const t of [.9, .85, .96, 1]) at(t);
+  assert.deepEqual(at(.9), middle);
 });
