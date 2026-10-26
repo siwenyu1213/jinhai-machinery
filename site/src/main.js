@@ -4,9 +4,11 @@ import { initGallery } from './ui/gallery.js';
 import { initWorkbench } from './ui/workbench.js';
 import { initScopeMap } from './ui/scope-map.js';
 import { initHero } from './ui/hero.js';
+import { initInlineAssembly } from './ui/inline-assembly.js';
 
 initNavigation();
 initHero();
+initInlineAssembly();
 initContact();
 initGallery();
 initWorkbench();

@@ -1,0 +1,38 @@
+/* §2.1 / §3.6: one full-screen event, then one aligned row of models/captions.
+   Existing dark surface, cream type and locally approved faces are retained. */
+.assembly-inline { position: relative; padding: 0; }
+.assembly-sticky { position: relative; min-height: 760px; height: 100svh; overflow: clip; }
+.assembly-composition { position: relative; height: 100%; padding-top: clamp(124px, 15vh, 160px); }
+#assembly-title { font-family: var(--font-body); font-size: clamp(30px, 3.75vw, 48px); font-weight: 600; line-height: 1.3; letter-spacing: 0; }
+.assembly-title-target { display: inline-block; white-space: nowrap; }
+.assembly-title-target > span { display: inline-block; }
+.assembly-title-letters { display: none; position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.assembly-title-letters > span { position: absolute; top: 0; left: 0; display: block; width: 1em; text-align: center; line-height: 1.3; transform-origin: center; will-change: transform, opacity; }
+.inline-assembly-canvas { position: absolute; top: 0; bottom: 0; left: calc(-1 * var(--space)); right: calc(-1 * var(--space)); pointer-events: none; }
+.inline-assembly-canvas canvas { width: 100%; height: 100%; display: block; }
+.assembly-inline .machine-preview-grid { position: absolute; left: 0; right: 0; top: 72%; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px; }
+.assembly-inline .machine-preview { display: block; padding: 0 0 24px; border-color: #53625f; }
+.assembly-inline .machine-preview h3 { font-family: var(--font-display); font-weight: 400; font-size: clamp(24px, 2.5vw, 36px); margin-top: 0; }
+.assembly-inline .machine-preview p { font-size: 14px; margin-top: 10px; }
+.assembly-inline .machine-preview img { height: 240px; transform: none; transition: none; }
+.assembly-inline:not(.is-ready) .machine-preview-grid { top: 32%; }
+.assembly-inline .caption-note { position: absolute; left: 0; bottom: 24px; margin: 0; font-size: 11px; }
+.assembly-inline.is-ready .machine-preview img { display: none; }
+.assembly-inline.is-enhanced { height: 460svh; }
+.assembly-inline.is-enhanced .assembly-sticky { position: sticky; top: 0; }
+.is-enhanced .assembly-title-target { opacity: 0; }
+.is-enhanced .assembly-title-letters { display: block; }
+.is-enhanced .machine-preview { opacity: var(--assembly-captions, 0); transform: translate3d(0, calc((1 - var(--assembly-captions, 0)) * 32px), 0); will-change: transform, opacity; }
+@media (min-width: 1560px) { .inline-assembly-canvas { left: calc((1400px - 100vw) / 2); right: calc((1400px - 100vw) / 2); } }
+@media (max-width: 760px) {
+  .assembly-sticky { min-height: 660px; }
+  .assembly-composition { padding-top: 120px; }
+  #assembly-title { font-size: clamp(23px, 6.1vw, 36px); }
+  .assembly-inline .machine-preview-grid { gap: 16px; top: 67%; }
+  .assembly-inline .machine-preview h3 { font-size: clamp(17px, 4.4vw, 26px); line-height: 1.4; }
+  .assembly-inline .machine-preview p { font-size: 11px; line-height: 1.8; margin-top: 12px; }
+  .assembly-inline .machine-preview img { height: 160px; }
+  .assembly-inline .caption-note { max-width: 100%; bottom: 32px; font-size: 10px; }
+  .assembly-inline.is-enhanced { height: 400svh; }
+}
+@media (prefers-reduced-motion: reduce) { .assembly-inline.is-enhanced { height: auto; } .assembly-inline.is-enhanced .assembly-sticky { position: relative; } }

@@ -1,5 +1,7 @@
 # 金海机械 · 网站学习练习
 
+2026-10-26 首页机台区改为直接随滚动装配：大号双列竖排标题逐字出现，沿四分之一椭圆逐字收向左上角；同一时间线驱动原有 91 个零件的飞入、旋绕和装配，落点为铣床、车床、激光切割机并排。名称与说明在装配后上浮，不再接三角形自动展示；右上角装配入口已移除。减少动效时直接显示完成状态，3D 不可用时保留三张模型图。`machines.html` 仍保留为独立完整演示。运行 `node scripts/capture-inline-assembly.mjs` 可录制桌面、手机的十个进度及视频，结果位于忽略目录 `artifacts/tmp/inline-assembly/`。本轮仅本地修改。
+
 2026-10-25 字体方案已确认并应用：首页及三机装配页使用得意黑标题、Plex 中文正文和窄体数字。本地 WOFF2 子集合计约 286 KB，来源、许可和重建方式见 [字体说明](site/public/fonts/README.md)。原始完整字库与对照预览保留在 [字体提案](design-previews/typography/README.md)，不会随网站发布。
 
 2026-10-25 本地新版：参考 RiskSolved 的三维首屏、居中字标、米白大标题与橙色操作，整体调整官网。三个机台逐个轮换，完整飞入装配位于 `machines.html`；先前的三套生成背景已删除。运行 `npm run build`、`npm run preview` 后打开 `http://127.0.0.1:4173/jinhai-machinery/`。设计依据见 [设计参考.md](设计参考.md)，模型静态图记录见 [machine-hero.json](site/public/images/generated/machine-hero.json)。本轮未上传或发布。下方三爪卡盘记录属于历史版本。

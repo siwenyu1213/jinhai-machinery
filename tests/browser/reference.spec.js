@@ -29,11 +29,14 @@ test('navigation anchors clear the fixed header and the phone menu supports Esca
   await page.locator('#main-nav a[href="#equipment"]').click();await expect(page.locator('.site-header')).toHaveClass(/is-scrolled/);
   const title=await page.locator('#equipment-title').boundingBox(),bar=await page.locator('.site-header').boundingBox();expect(title.y).toBeGreaterThanOrEqual(bar.y+bar.height-1);
 });
-test('machine preview cards and the complete assembly entry point to actual models',async({page})=>{
+test('the homepage assembly uses a real inline model row and retains readable fallback posters',async({page})=>{
   await page.emulateMedia({reducedMotion:'reduce'});await page.goto('./');await expect(page.locator('.hero')).toHaveAttribute('data-renderer','ready',{timeout:20000});
-  await expect(page.locator('.machine-preview img')).toHaveCount(3);for(const image of await page.locator('.machine-preview img').all()) { await image.scrollIntoViewIfNeeded(); await expect.poll(()=>image.evaluate(node=>node.complete&&node.naturalWidth>0)).toBe(true); }
-  await page.locator('.machine-preview[data-hero-machine="laser"]').click();
-  await expect.poll(()=>page.evaluate(()=>window.__machineHero.getState().active)).toBe('laser');await expect(page.locator('#hero-title')).toBeInViewport();
+  await page.locator('#assembly').scrollIntoViewIfNeeded();
+  await expect(page.locator('#assembly')).toHaveAttribute('data-renderer','ready',{timeout:20000});
+  await expect(page.locator('.machine-preview')).toHaveCount(3);
+  await expect(page.locator('.inline-assembly-canvas canvas')).toBeVisible();
+  await expect(page.locator('#assembly a')).toHaveCount(0);
+  expect(await page.evaluate(()=>window.__inlineAssembly.getState().scene.assembledCount)).toBe(91);
   const response=await page.request.get('./machines.html');expect(response.ok()).toBe(true);
 });
 test('the old scenic images are absent and all model assets load from the same origin',async({page})=>{
