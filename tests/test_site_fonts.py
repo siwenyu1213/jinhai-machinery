@@ -41,7 +41,7 @@ class SiteFontTests(unittest.TestCase):
 
     def test_body_subsets_cover_both_scroll_transition_titles(self):
         manifest = json.loads((FONTS / 'sources.json').read_text(encoding='utf-8'))
-        text = '我们有哪些机台？我们还有更多……'
+        text = '我们有什么我们还有设备与工艺'
         for font in manifest['fonts']:
             if font['family'] == 'Jinhai Text':
                 self.assertTrue({ord(char) for char in text}.issubset(font['codepoints']))

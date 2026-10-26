@@ -4,7 +4,7 @@ import { PerspectiveCamera, Vector3 } from 'three';
 import { createWorkshop } from '../../demos/mill-assembly/workshop-model.js';
 import { createWorkshopFlight } from '../../demos/mill-assembly/workshop-motion.js';
 import { arrangeAssemblyRow, ASSEMBLY_EYE, ASSEMBLY_RIGHT, boxCorners } from '../../site/src/three/machine-assembly-layout.js';
-import { assemblyScrollRange, assemblyTimeline, dampAssemblyScroll, letterPose } from '../../site/src/motion/assembly-timeline.js';
+import { assemblyScrollRange, assemblyTimeline, dampAssemblyScroll, equipmentLetterPose, letterPose } from '../../site/src/motion/assembly-timeline.js';
 
 test('the homepage row places all three machines on the floor in reading order without intersecting slots', () => {
   const model = arrangeAssemblyRow(createWorkshop());
@@ -24,20 +24,20 @@ test('the homepage row places all three machines on the floor in reading order w
   model.dispose();
 });
 test('the title flight overlaps model arrival and captions wait for all model travel', () => {
-  assert.equal(assemblyTimeline(.22).flightScroll, 0);
-  assert.ok(assemblyTimeline(.4).flightScroll > 0);
-  assert.equal(assemblyTimeline(.695).flightScroll, 1);
-  assert.equal(assemblyTimeline(.69).captions, 0);
-  assert.equal(assemblyTimeline(.78).captions, 1);
-  assert.equal(assemblyTimeline(.78).models, 1);
+  assert.equal(assemblyTimeline(.165).flightScroll, 0);
+  assert.ok(assemblyTimeline(.3).flightScroll > 0);
+  assert.equal(assemblyTimeline(.522).flightScroll, 1);
+  assert.equal(assemblyTimeline(.5175).captions, 0);
+  assert.equal(assemblyTimeline(.5925).captions, 1);
+  assert.equal(assemblyTimeline(.5925).models, 1);
   assert.equal(assemblyTimeline(2).progress, 1);
 });
 test('the clock starts as the section enters, and departure waits for the complete captions', () => {
   const { lead, length } = assemblyScrollRange(900, 4500);
   const entering = (lead - 400) / length;
   assert.ok(entering > 0 && letterPose(entering, 0, { x: 0, y: 0 }, { x: 0, y: 0 }, 100, 40).opacity > 0);
-  assert.equal(assemblyTimeline(.80).departure, 0);
-  const middle = assemblyTimeline(.9);
+  assert.equal(assemblyTimeline(.60).departure, 0);
+  const middle = assemblyTimeline(.675);
   assert.ok(middle.models > 0 && middle.models < 1);
   assert.ok(middle.captions > 0 && middle.captions < 1);
   assert.equal(assemblyTimeline(1).models, 0); assert.equal(assemblyTimeline(1).captions, 0);
@@ -77,4 +77,20 @@ test('letters grow and change wording during the return arc, with deterministic 
   assert.equal(final.morph, 1); assert.equal(final.scale, 100 / 48);
   for (const t of [.9, .85, .96, 1]) at(t);
   assert.deepEqual(at(.9), middle);
+});
+test('the four-letter interlude has a long hold before a reversible downward handoff', () => {
+  for (const value of [.75, .8, .86]) {
+    const state = assemblyTimeline(value);
+    assert.equal(state.content, 1); assert.equal(state.transfer, 0); assert.equal(state.phase, 'title-hold');
+    assert.equal(state.models, 0); assert.equal(state.captions, 0);
+  }
+  const start = { x: 600, y: 420, size: 100 }, end = { x: 80, y: 720, size: 48 };
+  const at = value => equipmentLetterPose(assemblyTimeline(value).transfer, 0, start, end, 48);
+  assert.equal(at(.86).y, start.y);
+  assert.ok(at(.94).y > start.y && at(.94).y < end.y);
+  assert.equal(at(1).x, end.x); assert.equal(at(1).y, end.y); assert.equal(at(1).scale, 1);
+  assert.equal(at(1).beforeOpacity, 0); assert.equal(at(1).afterOpacity, 1);
+  const range = assemblyScrollRange(900, 5400);
+  assert.equal(range.tail, 405);
+  assert.ok((.87 - .75) * range.length > 700);
 });

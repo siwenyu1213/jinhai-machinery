@@ -10,7 +10,7 @@
 
 使用已审阅的原文件，通过 fontTools 4.60.1 生成 WOFF2 子集，保留所需字形轮廓、布局特性、版权和许可名称表。为了遵守原字体保留名称规则，派生文件内部名称改为上表中的 Jinhai 名称；这些名称用于技术标识，不代表重新设计了原字形。
 
-五个文件合计 289000 字节，原始五个字体合计 9114456 字节。首屏只预载 `jinhai-display.woff2` 与 `jinhai-text-regular.woff2`；其他字重正常随样式加载，全部采用 `font-display: swap`。字体请求失败或出现子集未覆盖的新字时，浏览器回退到系统中文字体。
+五个文件合计 289092 字节，原始五个字体合计 9114456 字节。首屏只预载 `jinhai-display.woff2` 与 `jinhai-text-regular.woff2`；其他字重正常随样式加载，全部采用 `font-display: swap`。字体请求失败或出现子集未覆盖的新字时，浏览器回退到系统中文字体。
 
 来源、原始文件和输出 SHA-256、覆盖字符见 [sources.json](sources.json)。完整许可见 [得意黑 OFL](SmileySans-LICENSE.txt) 与 [IBM Plex OFL](IBMPlex-LICENSE.txt)。官方来源保存在原始提案的 [来源清单](../../../design-previews/typography/sources.json)。
 

@@ -9,7 +9,11 @@
 .assembly-title-letters { display: none; position: absolute; inset: 0; pointer-events: none; z-index: 2; }
 .assembly-title-letters > span { position: absolute; top: 0; left: 0; display: block; width: 1em; height: 1.3em; text-align: center; line-height: 1.3; transform-origin: center; will-change: transform, opacity; }
 .assembly-title-letters > span > span { position: absolute; inset: 0; }
-.assembly-title-letters .assembly-letter-out { opacity: 0; }
+.assembly-title-letters .assembly-letter-out, .assembly-title-letters .assembly-letter-next { opacity: 0; }
+.assembly-title-letters.is-transferring { display: block; position: fixed; inset: 0; overflow: clip; z-index: 3; font-family: var(--font-body); font-weight: 600; line-height: 1.3; letter-spacing: 0; }
+.assembly-title-letters.is-transferring > span > span { background: linear-gradient(to bottom, var(--paper) 0, var(--paper) var(--assembly-cut), var(--ink) var(--assembly-cut), var(--ink) 100%); background-clip: text; -webkit-background-clip: text; color: transparent; }
+.assembly-equipment-char { display: inline-block; }
+.assembly-handoff-hidden { opacity: 0; }
 .inline-assembly-canvas { position: absolute; top: 0; bottom: 0; left: calc(-1 * var(--space)); right: calc(-1 * var(--space)); pointer-events: none; }
 .inline-assembly-canvas canvas { width: 100%; height: 100%; display: block; }
 .assembly-inline .machine-preview-grid { position: absolute; left: 0; right: 0; top: 72%; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px; }
@@ -20,7 +24,7 @@
 .assembly-inline:not(.is-ready) .machine-preview-grid { top: 32%; }
 .assembly-inline .caption-note { position: absolute; left: 0; bottom: 24px; margin: 0; font-size: 11px; }
 .assembly-inline.is-ready .machine-preview img { display: none; }
-.assembly-inline.is-enhanced { height: 600svh; }
+.assembly-inline.is-enhanced { height: 700svh; }
 .assembly-inline.is-enhanced .assembly-sticky { position: sticky; top: 0; }
 .is-enhanced .assembly-title-target { opacity: 0; }
 .is-enhanced .assembly-title-letters { display: block; }
@@ -36,6 +40,6 @@
   .assembly-inline .machine-preview p { font-size: 11px; line-height: 1.8; margin-top: 12px; }
   .assembly-inline .machine-preview img { height: 160px; }
   .assembly-inline .caption-note { max-width: 100%; bottom: 32px; font-size: 10px; }
-  .assembly-inline.is-enhanced { height: 540svh; }
+  .assembly-inline.is-enhanced { height: 640svh; }
 }
 @media (prefers-reduced-motion: reduce) { .assembly-inline.is-enhanced { height: auto; } .assembly-inline.is-enhanced .assembly-sticky { position: relative; } }

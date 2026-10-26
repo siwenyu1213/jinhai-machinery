@@ -11,19 +11,34 @@ export function dampAssemblyScroll(current, target, elapsed) {
 }
 // Start while the next page is entering, rather than waiting for sticky pinning.
 export function assemblyScrollRange(stickyHeight, pinnedTravel) {
-  const lead = stickyHeight * .85;
-  return { lead, length: Math.max(1, pinnedTravel) + lead };
+  const lead = stickyHeight * .85, tail = stickyHeight * .45;
+  return { lead, tail, length: Math.max(1, pinnedTravel) + lead + tail };
 }
 export function assemblyTimeline(value) {
   const t = clamp(value);
-  const departure = smooth((t - .81) / .165);
+  const content = clamp(t / .75), transfer = smooth((t - .87) / .13);
+  const departure = smooth((content - .81) / .165);
   return {
     progress: t,
-    flightScroll: clamp((t - .25) / .44),
+    content,
+    transfer,
+    flightScroll: clamp((content - .25) / .44),
     models: 1 - departure,
-    captions: smooth((t - .70) / .07) * (1 - departure),
+    captions: smooth((content - .70) / .07) * (1 - departure),
     departure,
-    phase: t < .22 ? 'writing' : t < .57 ? 'title-flight' : t < .70 ? 'assembling' : t < .77 ? 'captions' : t < .81 ? 'reading' : t < .995 ? 'title-return' : 'complete',
+    phase: t >= 1 ? 'complete' : t >= .87 ? 'equipment-flight' : t >= .75 ? 'title-hold' : content < .22 ? 'writing' : content < .57 ? 'title-flight' : content < .70 ? 'assembling' : content < .77 ? 'captions' : content < .81 ? 'reading' : 'title-return',
+  };
+}
+// The destination is the real equipment heading at the final native scroll
+// position. A fixed text layer bridges the sticky release without a jump.
+export function equipmentLetterPose(transfer, index, start, end, baseSize) {
+  const t = clamp(transfer), morph = smooth((t - .12 - index * .012) / .68);
+  return {
+    x: start.x + (end.x - start.x) * t,
+    y: start.y + (end.y - start.y) * t,
+    scale: (start.size + (end.size - start.size) * t) / baseSize,
+    beforeOpacity: 1 - smooth(morph / .55),
+    afterOpacity: smooth((morph - .45) / .55),
   };
 }
 export function letterPose(value, index, start, end, startSize, endSize, outro) {

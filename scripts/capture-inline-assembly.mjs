@@ -12,12 +12,13 @@ try {
     await page.locator('#assembly').scrollIntoViewIfNeeded();
     await page.locator('#assembly[data-renderer="ready"]').waitFor({ timeout: 30000 });
     await page.evaluate(() => document.fonts.ready);
-    for (const progress of [0, .075, .12, .21, .35, .48, .62, .695, .735, .79, .85, .9, .95, 1]) {
+    for (const progress of [0, .055, .10, .16, .27, .36, .465, .522, .552, .5925, .675, .75, .8, .85, .905, .94, .97, 1]) {
       await page.evaluate(value => {
-        const section = document.querySelector('#assembly'), height = section.querySelector('.assembly-sticky').offsetHeight, lead = height * .85;
-        window.scrollTo({ top: scrollY + section.getBoundingClientRect().top - lead + value * (section.offsetHeight - height + lead), behavior: 'instant' });
+        const section = document.querySelector('#assembly'), { lead, length } = window.__inlineAssembly.getState().range;
+        window.scrollTo({ top: scrollY + section.getBoundingClientRect().top - lead + value * length, behavior: 'instant' });
       }, progress);
       await page.waitForFunction(value => Math.abs(window.__inlineAssembly.getState().progress - value) < .001, progress, { timeout: 10000 });
+      await page.waitForFunction(() => { const state = window.__inlineAssembly.getState(); return Math.abs(state.progress - state.target) < .000001; }, null, { timeout: 10000 });
       const path = `${directory}/${width}-${Math.round(progress * 100)}.png`;
       await page.screenshot({ path });
       report.captures.push({ path, width, progress, state: await page.evaluate(() => window.__inlineAssembly.getState()) });
