@@ -8,9 +8,12 @@ export function initInlineAssembly() {
   const equipment = document.querySelector('#equipment'), equipmentTitle = equipment.querySelector('h2');
   const equipmentText = equipmentTitle.textContent;
   const text = targetTitle.textContent, outro = heading.dataset.outro, captions = [...section.querySelectorAll('.machine-preview')];
+  // Keep three literal dots in one typographic slot, so the original five
+  // characters still map one-to-one to the five-character equipment heading.
+  const outroLetters = outro.endsWith('...') ? [...outro.slice(0, -3), '...'] : [...outro];
   const letters = [...text].map((character, index) => {
     const node = document.createElement('span'), before = document.createElement('span'), after = document.createElement('span'), next = document.createElement('span');
-    before.textContent = character; after.textContent = [...outro][index] || '';
+    before.textContent = character; after.textContent = outroLetters[index] || '';
     next.textContent = [...equipmentText][index] || '';
     before.className = 'assembly-letter-in'; after.className = 'assembly-letter-out'; next.className = 'assembly-letter-next';
     node.append(before, after, next); lettersHost.append(node); return { node, before, after, next };
@@ -22,6 +25,13 @@ export function initInlineAssembly() {
   let geometry = [], generation = 0, lastScene = -1;
   const reduced = () => media.matches || document.documentElement.dataset.motion === 'reduced';
   const animated = () => Boolean(scene && !reduced() && section.dataset.renderer === 'ready');
+  function setEnhanced() {
+    const enabled = animated(), changed = section.classList.contains('is-enhanced') !== enabled;
+    section.classList.toggle('is-enhanced', enabled);
+    // The lazy 3D section grows from one viewport to several. Downstream
+    // entrance triggers must measure that new document layout immediately.
+    if (changed) document.dispatchEvent(new CustomEvent('assemblylayoutchange'));
+  }
   function scrollRange() {
     const height = section.querySelector('.assembly-sticky').offsetHeight;
     return assemblyScrollRange(height, section.offsetHeight - height);
@@ -39,7 +49,7 @@ export function initInlineAssembly() {
       const end = node.getBoundingClientRect(), destination = equipmentTitle.children[index].getBoundingClientRect();
       return { start: { x: box.width / 2, y: top + index * step + size / 2 },
         end: { x: end.left - box.left + end.width / 2, y: end.top - box.top + end.height / 2 }, size, endSize,
-        outro: { x: box.width / 2 + (index - (outro.length - 1) / 2) * outroSize * 1.06,
+        outro: { x: box.width / 2 + (index - (outroLetters.length - 1) / 2) * outroSize * 1.06,
           y: height * .47, size: outroSize },
         dock: { x: destination.left + destination.width / 2,
           y: height - tail + destination.top - bottom + destination.height / 2, size: destinationSize } };
@@ -93,7 +103,7 @@ export function initInlineAssembly() {
   }
   function wake() { if (!frame && visible && !document.hidden && !disposed) { lastTime = 0; frame = requestAnimationFrame(tick); } }
   function sync() {
-    section.classList.toggle('is-enhanced', animated());
+    setEnhanced();
     if (!animated()) current = 1;
     measure(); scrollTarget(); paint(); wake();
   }
@@ -103,16 +113,16 @@ export function initInlineAssembly() {
     try {
       const { createInlineAssembly } = await import('../three/machine-assembly.js');
       const candidate = await createInlineAssembly(host, {
-        onLost() { section.dataset.renderer = 'fallback'; section.classList.remove('is-ready', 'is-enhanced'); sync(); },
+        onLost() { section.dataset.renderer = 'fallback'; section.classList.remove('is-ready'); sync(); },
         onRestore() { scene?.dispose(); scene = null; boot(); },
       });
       if (disposed || request !== generation) { candidate.dispose(); return; }
       scene?.dispose(); scene = candidate; section.dataset.renderer = 'ready'; section.classList.add('is-ready');
       await document.fonts.ready;
-      section.classList.toggle('is-enhanced', !reduced());
+      setEnhanced();
       measure(); scrollTarget(); current = target; paint(); wake();
     } catch {
-      section.dataset.renderer = 'fallback'; section.classList.remove('is-ready', 'is-enhanced'); sync();
+      section.dataset.renderer = 'fallback'; section.classList.remove('is-ready'); sync();
     } finally { loading = false; }
   }
   const prefetch = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) { boot(); prefetch.disconnect(); } }, { rootMargin: '1000px' }); prefetch.observe(section);

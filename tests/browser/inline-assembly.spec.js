@@ -86,13 +86,13 @@ test('after the captions finish, the title returns and changes while the models 
     expect(x <= 1 || y <= 1).toBe(true);
   }
   await seek(page, .75);
-  await expect(page.locator('#assembly-title')).toHaveAttribute('aria-label', '我们还有');
+  await expect(page.locator('#assembly-title')).toHaveAttribute('aria-label', '我们还有...');
   await expect(page.locator('.inline-assembly-canvas')).toHaveCSS('opacity', '0');
   await expect(page.locator('.machine-preview').first()).toHaveCSS('opacity', '0');
-  expect((await page.locator('.assembly-letter-out').allTextContents()).join('')).toBe('我们还有');
+  expect((await page.locator('.assembly-letter-out').allTextContents()).join('')).toBe('我们还有...');
   const held = await title.boundingBox();
   const final = await page.locator('.assembly-title-letters > span').evaluateAll(nodes => nodes.map(node => { const b = node.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; }));
-  expect(Math.abs((final[0].x + final[3].x) / 2 - page.viewportSize().width / 2)).toBeLessThan(2);
+  expect(Math.abs((final[0].x + final[4].x) / 2 - page.viewportSize().width / 2)).toBeLessThan(2);
   expect(Math.abs(final[0].y - final[3].y)).toBeLessThan(2);
   await seek(page, .85);
   expect(await title.boundingBox()).toEqual(held);
@@ -119,7 +119,7 @@ test('native wheel motion keeps moving after input, reverse travel restores the 
 test('the held interlude flies down into the real equipment heading and reverses without a duplicate', async ({ page }) => {
   await ready(page); await seek(page, .85);
   const title = page.locator('.assembly-title-letters > span').first(), start = await title.boundingBox();
-  await expect(page.locator('#assembly-title')).toHaveAttribute('aria-label', '我们还有');
+  await expect(page.locator('#assembly-title')).toHaveAttribute('aria-label', '我们还有...');
   await seek(page, .94);
   const moving = await title.boundingBox();
   expect(moving.y + moving.height / 2).toBeGreaterThan(start.y + start.height / 2);
@@ -130,16 +130,27 @@ test('the held interlude flies down into the real equipment heading and reverses
   const boxes = await page.locator('.assembly-title-letters > span').evaluateAll(nodes => nodes.map(node => { const b = node.getBoundingClientRect(); return { left: b.left, right: b.right }; }));
   for (let i = 0; i < boxes.length - 1; i++) expect(boxes[i].right - boxes[i + 1].left).toBeLessThan(1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await seek(page, .98);
+  const landed = await title.boundingBox();
+  await seek(page, .999);
+  const held = await title.boundingBox();
+  // The changed heading has already landed; more scroll must not drag it.
+  expect(Math.abs(landed.x - held.x)).toBeLessThan(.1);
+  expect(Math.abs(landed.y - held.y)).toBeLessThan(.1);
+  await expect(page.locator('#equipment > .section-heading')).toHaveCSS('transform', 'none');
   await seek(page, 1);
   await expect(page.locator('#equipment-title')).toHaveCSS('opacity', '1');
   await expect(page.locator('#equipment-title')).toHaveText('设备与工艺');
   await expect(page.locator('#equipment').getByRole('heading', { name: '设备与工艺', exact: true })).toBeVisible();
   await expect(page.locator('body > .assembly-title-letters')).toHaveCount(0);
   await expect(page.locator('.assembly-title-letters')).toHaveCSS('opacity', '0');
+  const destination = await page.locator('#equipment-title > span').first().boundingBox();
+  expect(Math.abs(destination.x - held.x)).toBeLessThan(1.5);
+  expect(Math.abs(destination.y - held.y)).toBeLessThan(1.5);
   expect((await page.locator('#equipment-title').boundingBox()).y).toBeGreaterThan(page.viewportSize().height / 2);
   await seek(page, .85);
   await expect(page.locator('.assembly-title-letters')).toHaveCSS('opacity', '1');
-  await expect(page.locator('#assembly-title')).toHaveAttribute('aria-label', '我们还有');
+  await expect(page.locator('#assembly-title')).toHaveAttribute('aria-label', '我们还有...');
   await seek(page, .94);
   await page.locator('#process').scrollIntoViewIfNeeded();
   await expect(page.locator('#equipment-title')).toHaveCSS('opacity', '1');

@@ -1,0 +1,43 @@
+/* §2.1 / §3.6 / §4.4: strong equipment names, compact facts, joined units.
+   Existing ink/orange/paper and approved type families; no new palette. */
+.equipment-highlights { grid-template-columns: 1fr 1fr 1.05fr; gap: 40px; }
+.equipment-highlights > div { padding-right: 32px; }
+.equipment-section .equipment-name { font-family: var(--font-body); font-size: 24px; font-weight: 600; line-height: 1.4; color: var(--ink); letter-spacing: -.02em; }
+.equipment-section .equipment-value { display: flex; flex-wrap: nowrap; align-items: baseline; gap: 2px; width: max-content; max-width: 100%; margin: 16px 0 0; font-family: var(--font-numbers); font-size: clamp(80px, 9vw, 132px); font-weight: 600; line-height: 1.1; letter-spacing: -.025em; color: var(--orange); -webkit-text-stroke: 0; white-space: nowrap; transform-origin: center bottom; }
+.equipment-section .equipment-value > span { display: inline; flex: 0 0 auto; margin: 0; font-family: var(--font-body); font-size: 24px; font-weight: 600; line-height: 1; letter-spacing: 0; color: inherit; -webkit-text-stroke: 0; }
+.equipment-section .equipment-metric > p { color: var(--muted); font-size: 14px; margin-top: 12px; line-height: 1.6; }
+.equipment-highlights .equipment-summary { display: grid; grid-template-columns: 1fr; gap: 24px; }
+.equipment-summary .equipment-metric { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; column-gap: 16px; }
+.equipment-summary .equipment-name { font-size: 22px; }
+.equipment-summary .equipment-value { grid-column: 2; grid-row: 1 / 3; align-self: center; font-size: 56px; margin: 0; }
+.equipment-summary .equipment-value > span { font-size: 18px; }
+.equipment-section .equipment-summary .equipment-metric > p { grid-column: 1; margin-top: 4px; font-size: 12px; }
+.equipment-section .welding { margin: 0 0 32px; gap: 40px; }
+.equipment-section .welding .equipment-name { white-space: nowrap; }
+.equipment-details { overflow-anchor: none; }
+.equipment-details summary { cursor: pointer; }
+.equipment-details summary > span { transition: transform 220ms var(--ease); }
+.equipment-details[data-state=closing] summary > span { transform: rotate(0); }
+.equipment-details-panel { display: flow-root; }
+@media (max-width: 1100px) {
+  .equipment-highlights { gap: 24px; }
+  .equipment-highlights > div { padding-right: 24px; }
+  .equipment-section .equipment-name { font-size: 20px; }
+  .equipment-section .equipment-value { font-size: 80px; }
+  .equipment-section .equipment-value > span { font-size: 20px; }
+  .equipment-summary .equipment-value { font-size: 48px; }
+  .equipment-summary .equipment-value > span { font-size: 16px; }
+}
+@media (max-width: 760px) {
+  .equipment-highlights { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px 20px; }
+  .equipment-highlights > div { padding-right: 0; border-right: 0; }
+  .equipment-section .equipment-name { font-size: 18px; }
+  .equipment-section .equipment-value { font-size: clamp(48px, 14vw, 72px); margin-top: 16px; }
+  .equipment-section .equipment-value > span { font-size: 18px; }
+  .equipment-highlights .equipment-summary { grid-column: 1 / -1; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding: 24px 0 0; }
+  .equipment-summary .equipment-metric { display: block; }
+  .equipment-summary .equipment-value { font-size: 48px; margin-top: 12px; }
+  .equipment-summary .equipment-value > span { font-size: 16px; }
+  .equipment-section .equipment-summary .equipment-metric > p { margin-top: 8px; font-size: 11px; }
+  .equipment-section .welding { margin-bottom: 32px; }
+}

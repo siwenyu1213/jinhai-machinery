@@ -78,7 +78,7 @@ test('letters grow and change wording during the return arc, with deterministic 
   for (const t of [.9, .85, .96, 1]) at(t);
   assert.deepEqual(at(.9), middle);
 });
-test('the four-letter interlude has a long hold before a reversible downward handoff', () => {
+test('the interlude has a long hold and a fixed landing before the document handoff', () => {
   for (const value of [.75, .8, .86]) {
     const state = assemblyTimeline(value);
     assert.equal(state.content, 1); assert.equal(state.transfer, 0); assert.equal(state.phase, 'title-hold');
@@ -90,6 +90,7 @@ test('the four-letter interlude has a long hold before a reversible downward han
   assert.ok(at(.94).y > start.y && at(.94).y < end.y);
   assert.equal(at(1).x, end.x); assert.equal(at(1).y, end.y); assert.equal(at(1).scale, 1);
   assert.equal(at(1).beforeOpacity, 0); assert.equal(at(1).afterOpacity, 1);
+  assert.deepEqual(at(.98), at(.999));
   const range = assemblyScrollRange(900, 5400);
   assert.equal(range.tail, 405);
   assert.ok((.87 - .75) * range.length > 700);

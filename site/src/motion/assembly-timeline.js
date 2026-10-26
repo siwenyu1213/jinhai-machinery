@@ -33,10 +33,14 @@ export function assemblyTimeline(value) {
 // position. A fixed text layer bridges the sticky release without a jump.
 export function equipmentLetterPose(transfer, index, start, end, baseSize) {
   const t = clamp(transfer), morph = smooth((t - .12 - index * .012) / .68);
+  // Land before the native document takes over. The fully changed heading
+  // holds at one measured viewport position instead of drifting with each
+  // wheel input during the last part of the handoff.
+  const travel = smooth(t / .82);
   return {
-    x: start.x + (end.x - start.x) * t,
-    y: start.y + (end.y - start.y) * t,
-    scale: (start.size + (end.size - start.size) * t) / baseSize,
+    x: start.x + (end.x - start.x) * travel,
+    y: start.y + (end.y - start.y) * travel,
+    scale: (start.size + (end.size - start.size) * travel) / baseSize,
     beforeOpacity: 1 - smooth(morph / .55),
     afterOpacity: smooth((morph - .45) / .55),
   };

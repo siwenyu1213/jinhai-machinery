@@ -5,6 +5,7 @@ import { initWorkbench } from './ui/workbench.js';
 import { initScopeMap } from './ui/scope-map.js';
 import { initHero } from './ui/hero.js';
 import { initInlineAssembly } from './ui/inline-assembly.js';
+import { initEquipment } from './ui/equipment.js';
 
 initNavigation();
 initHero();
@@ -12,6 +13,7 @@ initInlineAssembly();
 initContact();
 initGallery();
 initWorkbench();
+initEquipment();
 initScopeMap();
 document.documentElement.dataset.ready = 'true';
 

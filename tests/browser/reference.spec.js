@@ -56,6 +56,6 @@ test('equipment values retain aligned readable units in the two-column metric la
   await expect(units).toHaveCount(2);
   const boxes=await units.evaluateAll(elements=>elements.map(node=>({top:node.getBoundingClientRect().top,display:getComputedStyle(node).display,text:node.textContent.trim()})));
   expect(boxes.map(box=>box.text)).toEqual(['W','吨']);
-  expect(boxes.every(box=>box.display==='block')).toBe(true);
+  expect(boxes.every(box=>box.display==='block'||box.display==='inline')).toBe(true);
   expect(Math.abs(boxes[0].top-boxes[1].top)).toBeLessThan(2);
 });
