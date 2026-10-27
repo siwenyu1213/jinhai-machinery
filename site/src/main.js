@@ -25,10 +25,13 @@ let cleanup;
 let generation = 0;
 const initialAnchor = window.location.hash;
 let initialAnchorPending = Boolean(initialAnchor);
+document.documentElement.dataset.anchorRestoring = String(initialAnchorPending);
 const anchorEvents = ['wheel', 'touchstart', 'pointerdown', 'keydown'];
 const cancelInitialAnchor = () => {
   initialAnchorPending = false;
+  document.documentElement.dataset.anchorRestoring = 'false';
   anchorEvents.forEach((name) => window.removeEventListener(name, cancelInitialAnchor, true));
+  document.dispatchEvent(new CustomEvent('initialanchorrestored'));
 };
 if (initialAnchorPending) anchorEvents.forEach((name) => window.addEventListener(name, cancelInitialAnchor, { capture: true, passive: true }));
 function restoreInitialAnchor() {

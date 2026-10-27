@@ -1,6 +1,6 @@
 import { chromium } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
-const directory = 'artifacts/tmp/equipment-entrance';
+const directory = 'artifacts/tmp/scroll-impacts';
 await mkdir(directory, { recursive: true });
 const browser = await chromium.launch({ channel: process.platform === 'win32' ? 'msedge' : undefined });
 const report = { captures: [], runs: [], errors: [] };
@@ -9,6 +9,18 @@ try {
     const page = await browser.newPage({ viewport: { width, height }, reducedMotion: 'no-preference', recordVideo: { dir: `${directory}/video`, size: { width, height } } });
     page.on('pageerror', error => report.errors.push(error.message));
     await page.goto('http://127.0.0.1:4173/jinhai-machinery/#home');
+    await page.evaluate(() => document.fonts.ready);
+    for (const progress of [.15, .5, 1]) {
+      await page.evaluate(progress => { const box = document.querySelector('.risk-intro').getBoundingClientRect(); scrollTo({ top: scrollY + box.top - innerHeight * .65 + box.height * progress, behavior: 'instant' }); }, progress);
+      await page.waitForTimeout(500); const path = `${directory}/${width}-business-${progress}.png`;
+      await page.screenshot({path}); report.captures.push(path);
+    }
+    await page.evaluate(() => {
+      const top = document.querySelector('.risk-intro').getBoundingClientRect().top + scrollY;
+      scrollTo({ top: top - document.querySelector('.site-header').offsetHeight - 12, behavior: 'instant' });
+    });
+    await page.waitForTimeout(500);
+    const centered = `${directory}/${width}-business-centered.png`; await page.screenshot({ path: centered }); report.captures.push(centered);
     await page.locator('#assembly').scrollIntoViewIfNeeded();
     await page.locator('#assembly[data-renderer="ready"]').waitFor({ timeout: 30000 });
     await page.evaluate(() => document.fonts.ready);
@@ -26,15 +38,23 @@ try {
         window.__entranceFrames.push({ ...state, time: now - begin, scroll: scrollY, title: +getComputedStyle(heading).opacity, titleTop: heading.getBoundingClientRect().top,
           flyingTop: document.querySelector('body > .assembly-title-letters > span')?.getBoundingClientRect().top ?? null,
           values: [...document.querySelectorAll('.equipment-value')].map(node => +getComputedStyle(node).opacity) });
-        if (now - begin < 15000 && state.state !== 'complete') requestAnimationFrame(sample);
+        if (now - begin < 25000 && state.state !== 'complete') requestAnimationFrame(sample);
       } requestAnimationFrame(sample);
     });
     await page.mouse.move(200, 350); await page.mouse.wheel(0, 3200);
     await page.waitForFunction(() => window.__equipmentIntro.getState().state === 'waiting-title');
     await capture('02-waiting-title');
     for (let index = 0; index < 4; index++) { await page.mouse.wheel(0, 1800); await page.waitForTimeout(60); }
-    await page.waitForFunction(() => { const nodes = [...document.querySelectorAll('.equipment-value')]; return +getComputedStyle(nodes[0]).opacity > .5 && +getComputedStyle(nodes[4]).opacity === 0; });
-    await capture('03-impacts');
+    await page.waitForFunction(() => window.__equipmentIntro.getState().state === 'awaiting-input');
+    await capture('03-ready-no-numbers');
+    await page.waitForTimeout(800);
+    if (await page.evaluate(() => window.__equipmentIntro.getState().triggered) !== 0) report.errors.push('Numbers played without scroll');
+    for (let index = 0; index < 5; index++) {
+      await page.mouse.wheel(0, 120); await page.waitForTimeout(180);
+      await capture(`impact-${index + 1}`);
+      await page.waitForFunction(count => window.__equipmentIntro.getState().landed === count, index + 1);
+      if (index < 4) { await page.waitForTimeout(350); if (await page.evaluate(() => window.__equipmentIntro.getState().triggered) !== index + 1) report.errors.push('A scroll step revealed extra values'); }
+    }
     await page.waitForFunction(() => window.__equipmentIntro.getState().landed === 5);
     await capture('04-all-landed');
     await page.waitForFunction(() => window.__equipmentIntro.getState().state === 'complete');

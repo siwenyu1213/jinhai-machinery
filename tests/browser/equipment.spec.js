@@ -40,10 +40,18 @@ async function assemblyReady(page) {
 }
 async function introComplete(page) {
   await page.evaluate(() => scrollTo({ top: window.__equipmentIntro.getState().anchor + 800, behavior: 'instant' }));
-  await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'complete', { timeout: 15000 });
+  await finishSteps(page);
+}
+async function finishSteps(page, start = 0) {
+  for (let index = start; index < 5; index++) {
+    await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'awaiting-input', { timeout: 15000 });
+    await page.mouse.wheel(0, 120);
+    await expect.poll(() => page.evaluate(() => window.__equipmentIntro.getState().landed)).toBe(index + 1);
+  }
+  await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'complete');
 }
 
-test('a fast wheel burst holds the equipment page until the title and all five impacts finish', async ({ page }) => {
+test('scroll steps reveal one impact at a time, with a hard stop, two shakes and dust', async ({ page }) => {
   await assemblyReady(page);
   await expect(page.locator('.equipment-value').first()).toHaveCSS('opacity', '0');
   await page.evaluate(() => {
@@ -62,14 +70,23 @@ test('a fast wheel burst holds the equipment page until the title and all five i
   const anchor = await page.evaluate(() => window.__equipmentIntro.getState().anchor);
   for (let i = 0; i < 5; i++) { await page.mouse.wheel(0, 1800); await page.waitForTimeout(60); }
   expect(Math.abs(await page.evaluate(() => scrollY) - anchor)).toBeLessThan(2);
-  await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'numbers', { timeout: 12000 });
+  await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'awaiting-input', { timeout: 12000 });
+  await page.waitForTimeout(800);
+  expect(await page.evaluate(() => window.__equipmentIntro.getState().triggered)).toBe(0);
   await expect(page.locator('#equipment-title')).toHaveCSS('opacity', '1');
   await expect(page.locator('body > .assembly-title-letters')).toHaveCount(0);
   const title = await page.locator('#equipment-title').boundingBox(), header = await page.locator('.site-header').boundingBox();
   expect(title.y).toBeGreaterThanOrEqual(header.height + 22); expect(title.y).toBeLessThan(header.height + 26);
-  await page.mouse.wheel(0, 2400); await page.waitForTimeout(150);
+  await page.mouse.wheel(0, 2400); await page.waitForTimeout(170);
+  const dust = await page.locator('.equipment-dust i').evaluateAll(nodes => nodes.map(node => +getComputedStyle(node).opacity));
+  expect(dust.some(opacity => opacity > .05)).toBe(true);
+  await page.mouse.wheel(0, 2400);
   expect(Math.abs(await page.evaluate(() => scrollY) - anchor)).toBeLessThan(2);
-  await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'complete');
+  await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'awaiting-input');
+  await page.waitForTimeout(700);
+  expect(await page.evaluate(() => window.__equipmentIntro.getState().landed)).toBe(1);
+  for (let i = 1; i < 5; i++) await expect(page.locator('.equipment-value').nth(i)).toHaveCSS('opacity', '0');
+  await finishSteps(page, 1);
   const frames = await page.evaluate(() => window.__introFrames);
   expect(frames.some(frame => frame.state === 'waiting-title')).toBe(true);
   expect(frames.some(frame => frame.values[0].opacity > .8 && frame.values[4].opacity === 0)).toBe(true);
@@ -82,7 +99,8 @@ test('a fast wheel burst holds the equipment page until the title and all five i
   const impacts = frames.flatMap(frame => frame.values);
   expect(Math.min(...impacts.map(value => value.y))).toBeGreaterThanOrEqual(-28.1);
   expect(Math.max(...impacts.map(value => value.y))).toBeLessThanOrEqual(2.1);
-  expect(impacts.some(value => value.y > 0 && value.scale < .99)).toBe(true);
+  expect(impacts.some(value => value.y < -.2 && value.y > -2)).toBe(true);
+  expect(impacts.some(value => value.y > .2)).toBe(true);
   expect(await page.evaluate(() => window.__equipmentIntro.getState().landed)).toBe(5);
   for (const value of await page.locator('.equipment-value').all()) { await expect(value).toHaveCSS('opacity', '1'); await expect(value).toHaveCSS('transform', 'none'); }
   const names = await page.locator('.equipment-name').all();
@@ -93,7 +111,7 @@ test('a fast wheel burst holds the equipment page until the title and all five i
 
 test('direct equipment navigation docks before impacts while a later-section link skips the hold', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' }); await page.goto('./#equipment');
-  await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'complete', { timeout: 15000 });
+  await finishSteps(page);
   const title = await page.locator('#equipment-title').boundingBox(), header = await page.locator('.site-header').boundingBox();
   expect(Math.abs(title.y - header.height - 24)).toBeLessThan(2);
   await expect(page.locator('.equipment-value').last()).toHaveCSS('opacity', '1');
@@ -127,12 +145,12 @@ test('the list extends over a visible smooth interval, with a slower document fo
   });
   await page.locator('.equipment-details summary').click();
   await expect(page.locator('.equipment-details')).toHaveAttribute('data-state', 'opening');
-  await page.waitForTimeout(450); await expect(page.locator('.equipment-details')).toHaveAttribute('data-state', 'opening');
   await expect(page.locator('.equipment-details')).toHaveAttribute('data-state', 'open'); await page.waitForTimeout(1300);
   const frames = await page.evaluate(() => window.__listSamples), first = frames[0], last = frames.at(-1);
   expect(last.height).toBeGreaterThan(first.height + 300);
   expect(frames.filter(frame => frame.height > first.height + 20 && frame.height < last.height - 20).length).toBeGreaterThan(8);
   const opened = frames.find(frame => frame.state === 'open');
+  expect(opened.time - frames.find(frame => frame.state === 'opening').time).toBeGreaterThan(650);
   expect(opened.scroll).toBeLessThan(last.scroll - 20); expect(last.scroll).toBeGreaterThan(first.scroll + 50);
   await page.getByRole('group', { name: '设备分类' }).getByRole('button', { name: '车床', exact: true }).click();
   await expect(page.locator('.equipment-table tbody tr:visible')).toHaveCount(4);

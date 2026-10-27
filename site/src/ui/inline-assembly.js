@@ -24,7 +24,7 @@ export function initInlineAssembly() {
   const scope = new AbortController(), media = matchMedia('(prefers-reduced-motion: reduce)');
   let scene, loading = false, disposed = false, visible = false, frame = 0, current = 0, target = 0, lastTime = 0;
   let geometry = [], generation = 0, lastScene = -1;
-  const reduced = () => media.matches || document.documentElement.dataset.motion === 'reduced';
+  const reduced = () => media.matches || ['reduced', 'unavailable'].includes(document.documentElement.dataset.motion);
   const animated = () => Boolean(scene && !reduced() && section.dataset.renderer === 'ready');
   const intro = createEquipmentIntro({ section: equipment, reduced,
     titleReady: () => !animated() || current === 1,

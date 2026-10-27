@@ -43,9 +43,10 @@ h2 { font-size: clamp(36px, 4.3vw, 64px); font-weight: 600; line-height: 1.15; l
 .hero-controls button[aria-pressed=true] { color: var(--paper); border-color: var(--paper); background: #172323ac; }
 .hero-controls #hero-pause { min-width: 0; border-color: transparent; background: transparent; padding-inline: 12px; }
 .hero-bottom { min-height: 56px; border-color: #f2e9d63b; color: var(--paper); }
-.risk-intro { padding-block: clamp(96px, 11vw, 160px) 30px; }
-.risk-intro p { max-width: 1100px; font-size: clamp(28px, 3.6vw, 52px); line-height: 1.6; letter-spacing: -.035em; font-weight: 500; }
-.risk-intro p span { color: var(--orange); }
+.risk-intro { min-height: 85svh; display: flex; align-items: center; padding-block: 96px; }
+.risk-intro p { max-width: 1100px; margin-block: 0; font-size: clamp(28px, 3.6vw, 52px); line-height: 1.6; letter-spacing: -.035em; font-weight: 500; }
+.risk-intro p > span { color: var(--orange); }
+.risk-intro .intro-char { color: inherit; }
 .equipment-highlights { gap: 48px; margin-block: 64px; }
 .equipment-highlights > div { border-color: #bcbcab; }
 .equipment-highlights > div > strong { font-size: clamp(86px, 10vw, 152px); line-height: 1.05; letter-spacing: -.075em; color: transparent; -webkit-text-stroke: 1.5px var(--orange); }
@@ -140,7 +141,7 @@ h2 { font-size: clamp(36px, 4.3vw, 64px); font-weight: 600; line-height: 1.15; l
   .hero-controls button { min-width: 0; padding: 10px 14px; font-size: 12px; gap: 0; }
   .hero-controls #hero-pause { font-size: 11px; padding-inline: 6px; }
   #hero-machine-name { font-size: 18px; }
-  .risk-intro { padding-block: 80px 0; }
+  .risk-intro { min-height: 80svh; padding-block: 80px; }
   .risk-intro p { font-size: 28px; line-height: 1.65; }
   .equipment-highlights { margin-block: 36px; gap: 20px; }
   .equipment-highlights > div > strong { font-size: clamp(60px, 17vw, 82px); -webkit-text-stroke-width: 1px; }

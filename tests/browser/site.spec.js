@@ -17,7 +17,7 @@ test('production subpath loads with accurate content and no broken local resourc
 });
 
 test('business and process controls support repeated state changes', async ({ page }) => {
-  await page.goto('./');
+  await page.goto('./#services');
   await page.getByRole('button', { name: '钣金定制' }).click();
   await expect(page.locator('#service-caption')).toHaveText('钣金定制');
   await expect(page.locator('#service-image')).toHaveAttribute('src', /cutting\.webp$/);
@@ -38,7 +38,9 @@ test('business and process controls support repeated state changes', async ({ pa
 });
 
 test('equipment filtering and photographic gallery work', async ({ page }) => {
-  await page.goto('./');
+  // Filtering has its own reduced-motion path; the full scroll/impact story
+  // and the animated disclosure are exercised together in equipment.spec.js.
+  await page.emulateMedia({ reducedMotion: 'reduce' }); await page.goto('./#equipment');
   await page.locator('.equipment-details summary').click();
   await page.getByRole('group', { name: '设备分类' }).getByRole('button', { name: '车床', exact: true }).click();
   await expect(page.locator('.equipment-table tbody tr:visible')).toHaveCount(4);
@@ -58,7 +60,7 @@ test('equipment filtering and photographic gallery work', async ({ page }) => {
 });
 
 test('contact has honest empty state, copy success and denied-copy fallback', async ({ page }) => {
-  await page.goto('./');
+  await page.goto('./#contact');
   await page.locator('.contact-section [data-contact]').click();
   await expect(page.locator('#contact-dialog')).toContainText('尚未提供');
   await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (value) => { window.__copied = value; } } }));
@@ -76,7 +78,9 @@ test('contact has honest empty state, copy success and denied-copy fallback', as
 
 test('motion preference persists and system reduction is respected', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await page.goto('./');
+  // Reach the footer through an explicit later-section destination. The
+  // equipment story now waits for five real scroll steps on a natural visit.
+  await page.goto('./#contact');
   await page.locator('#motion-toggle').click();
   await expect(page.locator('html')).toHaveAttribute('data-motion', 'reduced');
   await page.reload();
@@ -120,6 +124,10 @@ test('mechanical photography replaces drawn models and remains local with attrib
 test('process photography and source follow the last selected step under reduced motion', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('./');
+  // This test checks manual selections. Autoplay has separate timer coverage;
+  // pause it so slow CI image decoding cannot advance a checked selection.
+  await page.locator('#process-playback').click();
+  await expect(page.locator('#process-playback')).toHaveText('继续播放');
   for (const index of [2, 0, 1, 2]) {
     await page.locator(`[data-step="${index}"]`).click();
     await expect(page.locator(`[data-step="${index}"]`)).toHaveAttribute('aria-pressed', 'true');
@@ -136,7 +144,7 @@ test('process photography and source follow the last selected step under reduced
 
 test('photo loading failure preserves business content and contact controls', async ({ page }) => {
   await page.route('**/images/*.webp', (route) => route.abort());
-  await page.goto('./');
+  await page.goto('./#services');
   await expect(page.locator('#hero-poster')).toHaveAttribute('alt', /通用三维/);
   await page.locator('[data-service="repair"]').click();
   await expect(page.locator('#service-detail')).toContainText('丰泽');
