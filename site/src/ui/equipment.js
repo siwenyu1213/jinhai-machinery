@@ -21,9 +21,9 @@ export function initEquipment() {
     const start = scrollY, header = document.querySelector('.site-header').offsetHeight;
     const end = Math.max(start, start + details.getBoundingClientRect().top - header - 24);
     if (end - start < 2) return;
-    const begins = performance.now() + 80;
+    const begins = performance.now() + 220;
     function move(time) {
-      const t = Math.max(0, Math.min(1, (time - begins) / 1000));
+      const t = Math.max(0, Math.min(1, (time - begins) / 1400));
       const ease = t * t * t * (10 - 15 * t + 6 * t * t);
       window.scrollTo({ top: start + (end - start) * ease, behavior: 'instant' });
       scrollFrame = t < 1 ? requestAnimationFrame(move) : 0;
@@ -46,7 +46,7 @@ export function initEquipment() {
     const to = expanded ? details.getBoundingClientRect().height : collapsed;
     details.style.height = `${to}px`; details.style.overflow = 'clip';
     details.dataset.state = expanded ? 'opening' : 'closing';
-    animation = details.animate([{ height: `${from}px` }, { height: `${to}px` }], { duration: expanded ? 380 : 260, easing: 'cubic-bezier(.22,1,.36,1)' });
+    animation = details.animate([{ height: `${from}px` }, { height: `${to}px` }], { duration: expanded ? 820 : 420, easing: 'cubic-bezier(.25,.1,.25,1)' });
     animation.onfinish = finish;
     if (expanded) followList();
   }, { signal: scope.signal });

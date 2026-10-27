@@ -1,4 +1,5 @@
 import { assemblyScrollRange, assemblyTimeline, dampAssemblyScroll, equipmentLetterPose, letterPose } from '../motion/assembly-timeline.js';
+import { createEquipmentIntro } from './equipment-intro.js';
 
 export function initInlineAssembly() {
   const section = document.querySelector('#assembly'); if (!section) return;
@@ -25,6 +26,10 @@ export function initInlineAssembly() {
   let geometry = [], generation = 0, lastScene = -1;
   const reduced = () => media.matches || document.documentElement.dataset.motion === 'reduced';
   const animated = () => Boolean(scene && !reduced() && section.dataset.renderer === 'ready');
+  const intro = createEquipmentIntro({ section: equipment, reduced,
+    titleReady: () => !animated() || current === 1,
+    onHold: () => { scrollTarget(); wake(); },
+  });
   function setEnhanced() {
     const enabled = animated(), changed = section.classList.contains('is-enhanced') !== enabled;
     section.classList.toggle('is-enhanced', enabled);
@@ -65,6 +70,7 @@ export function initInlineAssembly() {
   }
   function paint() {
     const state = assemblyTimeline(current);
+    intro.update(current);
     section.dataset.phase = animated() ? state.phase : 'complete';
     section.style.setProperty('--assembly-captions', animated() ? state.captions : 1);
     section.style.setProperty('--assembly-models', animated() ? state.models : 1);
@@ -76,10 +82,14 @@ export function initInlineAssembly() {
     lettersHost.style.opacity = animated() && state.transfer === 1 ? 0 : 1;
     equipmentTitle.classList.toggle('assembly-handoff-hidden', animated() && state.transfer < 1);
     const box = composition.getBoundingClientRect(), boundary = equipment.getBoundingClientRect().top;
+    // Before the clock finishes, fast wheel input can already move the real
+    // document past its handoff endpoint. Carry the letters by exactly that
+    // document displacement, so they can never trail below the equipment.
+    const { tail } = scrollRange(), overrun = Math.max(0, box.height - tail - boundary);
     for (const [index, { node, before, after, next }] of letters.entries()) {
       const entry = geometry[index]; if (!entry) continue;
       const pose = transferring
-        ? equipmentLetterPose(state.transfer, index, { ...entry.outro, x: entry.outro.x + box.left }, entry.dock, entry.endSize)
+        ? equipmentLetterPose(state.transfer, index, { ...entry.outro, x: entry.outro.x + box.left, y: entry.outro.y - overrun }, { ...entry.dock, y: entry.dock.y - overrun }, entry.endSize)
         : letterPose(state.content, index, entry.start, entry.end, entry.size, entry.endSize, entry.outro);
       node.style.transform = `translate3d(${pose.x}px,${pose.y}px,0) translate(-50%,-50%) scale(${pose.scale})`;
       node.style.opacity = transferring ? 1 : pose.opacity * (after.textContent ? 1 : 1 - pose.morph);
@@ -96,12 +106,12 @@ export function initInlineAssembly() {
     host.setAttribute('aria-hidden', String(animated() && state.models === 0));
   }
   function tick(time) {
-    frame = 0; if (disposed || document.hidden || !visible) return;
+    frame = 0; if (disposed || document.hidden || (!visible && !intro.locked)) return;
     const elapsed = lastTime ? Math.min(.25, (time - lastTime) / 1000) : 1 / 60; lastTime = time;
-    current = animated() ? dampAssemblyScroll(current, target, elapsed) : 1;
+    current = animated() ? dampAssemblyScroll(current, target, elapsed, intro.locked ? .18 : .45) : 1;
     paint(); if (current !== target) frame = requestAnimationFrame(tick);
   }
-  function wake() { if (!frame && visible && !document.hidden && !disposed) { lastTime = 0; frame = requestAnimationFrame(tick); } }
+  function wake() { if (!frame && (visible || intro.locked) && !document.hidden && !disposed) { lastTime = 0; frame = requestAnimationFrame(tick); } }
   function sync() {
     setEnhanced();
     if (!animated()) current = 1;
@@ -126,10 +136,10 @@ export function initInlineAssembly() {
     } finally { loading = false; }
   }
   const prefetch = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) { boot(); prefetch.disconnect(); } }, { rootMargin: '1000px' }); prefetch.observe(section);
-  const intersection = new IntersectionObserver(entries => { visible = entries[0].isIntersecting; scrollTarget(); if (visible) wake(); else { cancelAnimationFrame(frame); frame = 0; current = target; paint(); } }); intersection.observe(section);
+  const intersection = new IntersectionObserver(entries => { visible = entries[0].isIntersecting; scrollTarget(); if (visible || intro.locked) wake(); else { cancelAnimationFrame(frame); frame = 0; current = target; paint(); } }); intersection.observe(section);
   const resize = new ResizeObserver(() => { measure(); scrollTarget(); wake(); }); resize.observe(composition);
   const motion = new MutationObserver(sync); motion.observe(document.documentElement, { attributes: true, attributeFilter: ['data-motion'] });
-  window.addEventListener('scroll', () => { scrollTarget(); if (!visible && current !== target) { current = target; paint(); } else wake(); }, { passive: true, signal: scope.signal });
+  window.addEventListener('scroll', () => { scrollTarget(); if (!visible && !intro.locked && current !== target) { current = target; paint(); } else wake(); }, { passive: true, signal: scope.signal });
   document.addEventListener('visibilitychange', () => { if (document.hidden) { cancelAnimationFrame(frame); frame = 0; } else { scrollTarget(); wake(); } }, { signal: scope.signal });
   media.addEventListener('change', sync, { signal: scope.signal });
   document.fonts.ready.then(() => { if (!disposed) { measure(); wake(); } });
@@ -137,5 +147,6 @@ export function initInlineAssembly() {
     getState: () => ({ ...assemblyTimeline(current), target, range: scrollRange(), ready: Boolean(scene), visible, reduced: reduced(), renderer: section.dataset.renderer, scene: scene?.getState() }),
     getModel: () => scene?.getModel(), getCamera: () => scene?.getCamera(), getRenderStats: () => scene?.getRenderStats(),
   };
-  window.addEventListener('pagehide', () => { disposed = true; generation++; cancelAnimationFrame(frame); scope.abort(); prefetch.disconnect(); intersection.disconnect(); resize.disconnect(); motion.disconnect(); if (lettersHost.parentElement === document.body) lettersHost.remove(); scene?.dispose(); }, { once: true });
+  window.__equipmentIntro = { getState: intro.getState };
+  window.addEventListener('pagehide', () => { disposed = true; generation++; cancelAnimationFrame(frame); scope.abort(); prefetch.disconnect(); intersection.disconnect(); resize.disconnect(); motion.disconnect(); intro.dispose(); if (lettersHost.parentElement === document.body) lettersHost.remove(); scene?.dispose(); }, { once: true });
 }

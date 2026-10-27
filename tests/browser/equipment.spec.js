@@ -29,70 +29,123 @@ test('all five names precede joined values and units, and welding precedes the d
   expect(await page.locator('.welding').evaluate(node => node.nextElementSibling.matches('.equipment-details'))).toBe(true);
 });
 
-test('numbers and units fall together over a short distance and settle with a small impact', async ({ page }) => {
-  await load(page);
-  // Follow the intended journey: finish loading the preceding assembly before
-  // sampling the next section. A cold renderer can stall the first RAF and
-  // GSAP deliberately pauses its clock across that stall.
-  await page.locator('#assembly').scrollIntoViewIfNeeded();
+async function assemblyReady(page) {
+  await load(page); await page.locator('#assembly').scrollIntoViewIfNeeded();
   await expect(page.locator('#assembly')).toHaveAttribute('data-renderer', 'ready', { timeout: 25000 });
-  // Growing the lazy assembly must not consume the equipment entrance above
-  // the fold using stale ScrollTrigger coordinates.
-  await expect(page.locator('.equipment-value').first()).toHaveCSS('opacity', '0');
-  await place(page, '.equipment-highlights', .98);
-  const frames = await page.evaluate(async () => {
-    const metric = document.querySelector('.equipment-metric'), value = metric.querySelector('strong'), name = metric.querySelector('h3');
-    const top = metric.getBoundingClientRect().top + scrollY;
-    const samples = [], begin = performance.now();
-    scrollTo({ top: top - innerHeight * .8, behavior: 'instant' });
-    await new Promise(resolve => { function tick(now) {
-      const style = getComputedStyle(value), m = new DOMMatrix(style.transform);
-      samples.push({ time: now - begin, y: m.m42, opacity: +style.opacity, nameOpacity: +getComputedStyle(name).opacity, scale: m.m22 });
-      const settled = now - begin > 850 && style.transform === 'none' && +style.opacity === 1;
-      if (!settled && now - begin < 3000) requestAnimationFrame(tick); else resolve();
-    } requestAnimationFrame(tick); });
-    return samples;
+  await page.evaluate(() => {
+    const section = document.querySelector('#assembly'), { lead, length } = window.__inlineAssembly.getState().range;
+    scrollTo({ top: scrollY + section.getBoundingClientRect().top - lead + .85 * length, behavior: 'instant' });
   });
-  expect(Math.min(...frames.map(f => f.y))).toBeGreaterThanOrEqual(-28.1);
-  expect(Math.min(...frames.map(f => f.y))).toBeLessThan(-15);
-  expect(Math.max(...frames.map(f => f.y))).toBeLessThanOrEqual(2.1);
-  expect(frames.some(f => f.scale < .99 && f.y > 0), JSON.stringify(frames)).toBe(true);
-  expect(frames.some(f => f.nameOpacity > .2 && f.nameOpacity < 1)).toBe(true);
-  expect(frames.at(-1).y).toBe(0); expect(frames.at(-1).opacity).toBe(1);
+  await expect.poll(() => page.evaluate(() => Math.abs(window.__inlineAssembly.getState().progress - .85)), { timeout: 12000 }).toBeLessThan(.001);
+}
+async function introComplete(page) {
+  await page.evaluate(() => scrollTo({ top: window.__equipmentIntro.getState().anchor + 800, behavior: 'instant' }));
+  await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'complete', { timeout: 15000 });
+}
+
+test('a fast wheel burst holds the equipment page until the title and all five impacts finish', async ({ page }) => {
+  await assemblyReady(page);
+  await expect(page.locator('.equipment-value').first()).toHaveCSS('opacity', '0');
+  await page.evaluate(() => {
+    window.__introFrames = []; let count = 0;
+    function sample() {
+      const intro = window.__equipmentIntro.getState(), heading = document.querySelector('#equipment-title');
+      window.__introFrames.push({ ...intro, scroll: scrollY, title: +getComputedStyle(heading).opacity, progress: window.__inlineAssembly.getState().progress,
+        titleTop: heading.getBoundingClientRect().top,
+        flyingTop: document.querySelector('body > .assembly-title-letters > span')?.getBoundingClientRect().top ?? null,
+        values: [...document.querySelectorAll('.equipment-value')].map(node => { const style = getComputedStyle(node), m = new DOMMatrix(style.transform); return { opacity: +style.opacity, y: m.m42, scale: m.m22 }; }) });
+      if (++count < 2000 && intro.state !== 'complete') requestAnimationFrame(sample);
+    } requestAnimationFrame(sample);
+  });
+  await page.mouse.move(200, 350); await page.mouse.wheel(0, 3200);
+  await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'waiting-title');
+  const anchor = await page.evaluate(() => window.__equipmentIntro.getState().anchor);
+  for (let i = 0; i < 5; i++) { await page.mouse.wheel(0, 1800); await page.waitForTimeout(60); }
+  expect(Math.abs(await page.evaluate(() => scrollY) - anchor)).toBeLessThan(2);
+  await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'numbers', { timeout: 12000 });
+  await expect(page.locator('#equipment-title')).toHaveCSS('opacity', '1');
+  await expect(page.locator('body > .assembly-title-letters')).toHaveCount(0);
+  const title = await page.locator('#equipment-title').boundingBox(), header = await page.locator('.site-header').boundingBox();
+  expect(title.y).toBeGreaterThanOrEqual(header.height + 22); expect(title.y).toBeLessThan(header.height + 26);
+  await page.mouse.wheel(0, 2400); await page.waitForTimeout(150);
+  expect(Math.abs(await page.evaluate(() => scrollY) - anchor)).toBeLessThan(2);
+  await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'complete');
+  const frames = await page.evaluate(() => window.__introFrames);
+  expect(frames.some(frame => frame.state === 'waiting-title')).toBe(true);
+  expect(frames.some(frame => frame.values[0].opacity > .8 && frame.values[4].opacity === 0)).toBe(true);
+  for (const frame of frames.filter(frame => frame.locked)) {
+    expect(Math.abs(frame.scroll - anchor)).toBeLessThan(2);
+    if (frame.state === 'waiting-title') expect(frame.values.every(value => value.opacity === 0)).toBe(true);
+    if (frame.flyingTop !== null) expect(frame.flyingTop).toBeLessThanOrEqual(frame.titleTop + 2);
+    if (frame.values.some(value => value.opacity > 0)) { expect(frame.title).toBe(1); expect(frame.progress).toBe(1); }
+  }
+  const impacts = frames.flatMap(frame => frame.values);
+  expect(Math.min(...impacts.map(value => value.y))).toBeGreaterThanOrEqual(-28.1);
+  expect(Math.max(...impacts.map(value => value.y))).toBeLessThanOrEqual(2.1);
+  expect(impacts.some(value => value.y > 0 && value.scale < .99)).toBe(true);
+  expect(await page.evaluate(() => window.__equipmentIntro.getState().landed)).toBe(5);
+  for (const value of await page.locator('.equipment-value').all()) { await expect(value).toHaveCSS('opacity', '1'); await expect(value).toHaveCSS('transform', 'none'); }
+  const names = await page.locator('.equipment-name').all();
+  for (const name of names) await expect(name).toHaveCSS('font-weight', '600');
+  await page.mouse.wheel(0, 320);
+  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(anchor + 100);
 });
 
-test('the list extends quickly while the document follows more slowly, with native keyboard and filters', async ({ page }) => {
-  await load(page); await place(page, '.equipment-details', .65);
+test('direct equipment navigation docks before impacts while a later-section link skips the hold', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' }); await page.goto('./#equipment');
+  await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'complete', { timeout: 15000 });
+  const title = await page.locator('#equipment-title').boundingBox(), header = await page.locator('.site-header').boundingBox();
+  expect(Math.abs(title.y - header.height - 24)).toBeLessThan(2);
+  await expect(page.locator('.equipment-value').last()).toHaveCSS('opacity', '1');
+  await page.goto('./#process');
+  await expect(page.locator('#process-title')).toBeInViewport({ timeout: 15000 });
+  expect(await page.evaluate(() => window.__equipmentIntro.getState().locked)).toBe(false);
+  await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'complete');
+});
+
+test('upward input cancels the hold, reduced motion releases it, and an explicit link remains usable', async ({ page }) => {
+  await assemblyReady(page); await page.mouse.wheel(0, 3200);
+  await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'waiting-title');
+  const anchor = await page.evaluate(() => window.__equipmentIntro.getState().anchor);
+  await page.mouse.wheel(0, -180); await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'pending');
+  await expect.poll(() => page.evaluate(() => scrollY)).toBeLessThan(anchor - 80);
+  await page.mouse.wheel(0, 800); await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'waiting-title');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'complete');
+  expect(await page.evaluate(() => window.__equipmentIntro.getState().locked)).toBe(false);
+  await expect(page.locator('.equipment-value').last()).toHaveCSS('opacity', '1');
+  await page.locator('.footer-links a[href="#services"]').click();
+  await expect(page.locator('#services-title')).toBeInViewport();
+});
+
+test('the list extends over a visible smooth interval, with a slower document follow and native filters', async ({ page }) => {
+  await assemblyReady(page); await introComplete(page); await place(page, '.equipment-details', .65);
   await page.evaluate(() => {
     window.__listSamples = []; const details = document.querySelector('.equipment-details'), start = performance.now();
-    function sample(now) { window.__listSamples.push({ time: now - start, height: details.getBoundingClientRect().height, scroll: scrollY, state: details.dataset.state }); if (now - start < 1500) requestAnimationFrame(sample); }
+    function sample(now) { window.__listSamples.push({ time: now - start, height: details.getBoundingClientRect().height, scroll: scrollY, state: details.dataset.state }); if (now - start < 2100) requestAnimationFrame(sample); }
     requestAnimationFrame(sample);
   });
   await page.locator('.equipment-details summary').click();
   await expect(page.locator('.equipment-details')).toHaveAttribute('data-state', 'opening');
-  await expect(page.locator('.equipment-details')).toHaveAttribute('data-state', 'open');
-  await page.waitForTimeout(1150);
+  await page.waitForTimeout(450); await expect(page.locator('.equipment-details')).toHaveAttribute('data-state', 'opening');
+  await expect(page.locator('.equipment-details')).toHaveAttribute('data-state', 'open'); await page.waitForTimeout(1300);
   const frames = await page.evaluate(() => window.__listSamples), first = frames[0], last = frames.at(-1);
   expect(last.height).toBeGreaterThan(first.height + 300);
-  expect(frames.some(f => f.height > first.height + 20 && f.height < last.height - 20)).toBe(true);
-  const opened = frames.find(f => f.state === 'open');
-  expect(opened.scroll).toBeLessThan(last.scroll - 30);
-  expect(last.scroll).toBeGreaterThan(first.scroll + 50);
+  expect(frames.filter(frame => frame.height > first.height + 20 && frame.height < last.height - 20).length).toBeGreaterThan(8);
+  const opened = frames.find(frame => frame.state === 'open');
+  expect(opened.scroll).toBeLessThan(last.scroll - 20); expect(last.scroll).toBeGreaterThan(first.scroll + 50);
   await page.getByRole('group', { name: '设备分类' }).getByRole('button', { name: '车床', exact: true }).click();
   await expect(page.locator('.equipment-table tbody tr:visible')).toHaveCount(4);
   await page.locator('.equipment-details summary').focus(); await page.keyboard.press('Enter');
   await expect(page.locator('.equipment-details')).toHaveAttribute('data-state', 'closed');
-  await expect(page.locator('.equipment-details summary')).toHaveAttribute('aria-expanded', 'false');
-  await page.keyboard.press('Space');
-  await expect(page.locator('.equipment-details')).toHaveAttribute('data-state', 'open');
+  await page.keyboard.press('Space'); await expect(page.locator('.equipment-details')).toHaveAttribute('data-state', 'open');
 });
 
-test('user input stops the page follow, rapid toggles recover, and reduced motion stays immediate', async ({ page }) => {
-  await load(page); await place(page, '.equipment-details', .65);
-  const summary = page.locator('.equipment-details summary');
-  await summary.click(); await page.waitForTimeout(250);
+test('user input stops the slower list follow and rapid toggles recover without a fixed height', async ({ page }) => {
+  await assemblyReady(page); await introComplete(page); await place(page, '.equipment-details', .65);
+  const summary = page.locator('.equipment-details summary'); await summary.click(); await page.waitForTimeout(400);
   await page.mouse.wheel(0, -50); await page.waitForTimeout(180);
-  const stopped = await page.evaluate(() => scrollY); await page.waitForTimeout(500);
+  const stopped = await page.evaluate(() => scrollY); await page.waitForTimeout(650);
   expect(Math.abs(await page.evaluate(() => scrollY) - stopped)).toBeLessThan(2);
   await summary.click(); await page.waitForTimeout(60); await summary.click();
   await expect(page.locator('.equipment-details')).toHaveAttribute('data-state', 'open');

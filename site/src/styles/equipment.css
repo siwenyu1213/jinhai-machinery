@@ -19,6 +19,7 @@
 .equipment-details summary > span { transition: transform 220ms var(--ease); }
 .equipment-details[data-state=closing] summary > span { transform: rotate(0); }
 .equipment-details-panel { display: flow-root; }
+.equipment-section[data-intro]:not([data-intro=complete]) .equipment-value { opacity: 0; transform: translateY(-28px); }
 @media (max-width: 1100px) {
   .equipment-highlights { gap: 24px; }
   .equipment-highlights > div { padding-right: 24px; }

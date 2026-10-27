@@ -4,9 +4,9 @@ export const clamp = value => Math.max(0, Math.min(1, Number.isFinite(value) ? v
 export const smooth = value => { const t = clamp(value); return t ** 3 * (10 - 15 * t + 6 * t * t); };
 // Same .45-second damping as the standalone assembly, kept free of Three.js so
 // the homepage controller does not eagerly import the rendering engine.
-export function dampAssemblyScroll(current, target, elapsed) {
+export function dampAssemblyScroll(current, target, elapsed, damping = .45) {
   const end = clamp(target), start = clamp(current);
-  const next = start + (end - start) * -Math.expm1(-Math.max(0, elapsed) / .45);
+  const next = start + (end - start) * -Math.expm1(-Math.max(0, elapsed) / damping);
   return Math.abs(end - next) < .0001 ? end : next;
 }
 // Start while the next page is entering, rather than waiting for sticky pinning.

@@ -49,6 +49,8 @@ test('scroll inertia continues after input and follows the same clock at differe
   const first = dampAssemblyScroll(0, 1, .1), second = dampAssemblyScroll(first, 1, .1);
   assert.ok(first > 0 && first < second && second < 1);
   assert.equal(dampAssemblyScroll(1, 1, .1), 1);
+  const fast = dampAssemblyScroll(0, 1, .1, .18);
+  assert.ok(fast > first && fast < 1, 'the finite equipment hold catches the title up without removing easing');
 });
 test('each letter follows a quarter ellipse with an obvious acceleration peak and converges exactly', () => {
   const start = { x: 600, y: 600 }, end = { x: 60, y: 150 };
