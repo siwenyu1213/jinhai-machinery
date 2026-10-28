@@ -18,7 +18,9 @@ export function createMotion() {
   const context = gsap.context(() => {
     gsap.fromTo(chars, { color: getComputedStyle(paragraph).getPropertyValue('--line').trim() }, {
       color: index => colors[index], duration: 1, stagger: .09, ease: 'none',
-      scrollTrigger: { trigger: '.risk-intro', start: 'top 65%', end: 'bottom 65%', scrub: .25 },
+      scrollTrigger: { id: 'business-reading', trigger: '.risk-intro',
+        start: () => `top ${document.querySelector('.site-header').offsetHeight}px`,
+        end: () => `+=${Math.max(560, innerHeight * .95)}`, pin: true, scrub: .25, invalidateOnRefresh: true },
     });
     gsap.from('.hero-copy > *', { y: 15, opacity: .35, duration: .65, stagger: .07, ease: 'power2.out', clearProps: 'transform,opacity' });
     gsap.utils.toArray('.section-heading').forEach((heading) => {
@@ -28,11 +30,23 @@ export function createMotion() {
       gsap.from(heading, { scrollTrigger: { trigger: heading, start: 'top 92%', once: true }, y: 24, opacity: .4, duration: .7, ease: 'power2.out', clearProps: 'transform,opacity' });
     });
   });
+  window.__businessIntro = { getState: () => {
+    const trigger = ScrollTrigger.getById('business-reading');
+    return { start: trigger.start, end: trigger.end, progress: trigger.progress, active: trigger.isActive };
+  } };
   const change = () => {
     gsap.killTweensOf('#service-image');
     gsap.fromTo('#service-image', { opacity: .55, y: 8 }, { opacity: 1, y: 0, duration: .22, ease: 'power2.out', clearProps: 'transform,opacity' });
   };
   const refresh = () => ScrollTrigger.refresh();
+  let width = innerWidth, height = innerHeight, resizeFrame = 0;
+  const resize = () => {
+    if (width === innerWidth && height === innerHeight) return;
+    width = innerWidth; height = innerHeight;
+    cancelAnimationFrame(resizeFrame); resizeFrame = requestAnimationFrame(refresh);
+  };
+  const viewport = new ResizeObserver(resize); viewport.observe(document.documentElement);
+  window.addEventListener('resize', resize);
   document.addEventListener('servicechange', change);
   document.addEventListener('equipmentlayoutchange', refresh);
   document.addEventListener('assemblylayoutchange', refresh);
@@ -43,6 +57,8 @@ export function createMotion() {
     gsap.killTweensOf('#service-image');
     gsap.set('#service-image', { clearProps: 'transform,opacity' });
     context.revert();
+    cancelAnimationFrame(resizeFrame); viewport.disconnect(); window.removeEventListener('resize', resize);
     paragraph.innerHTML = original;
+    delete window.__businessIntro;
   };
 }

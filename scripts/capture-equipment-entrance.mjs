@@ -1,8 +1,8 @@
 import { chromium } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
-const directory = 'artifacts/tmp/scroll-impacts';
+const directory = 'artifacts/tmp/pinned-reading-welding';
 await mkdir(directory, { recursive: true });
-const browser = await chromium.launch({ channel: process.platform === 'win32' ? 'msedge' : undefined });
+const browser = await chromium.launch({ channel: process.platform === 'win32' ? 'msedge' : undefined, ignoreDefaultArgs: ['--hide-scrollbars'] });
 const report = { captures: [], runs: [], errors: [] };
 try {
   for (const [width, height] of [[1280, 900], [375, 812]]) {
@@ -11,16 +11,11 @@ try {
     await page.goto('http://127.0.0.1:4173/jinhai-machinery/#home');
     await page.evaluate(() => document.fonts.ready);
     for (const progress of [.15, .5, 1]) {
-      await page.evaluate(progress => { const box = document.querySelector('.risk-intro').getBoundingClientRect(); scrollTo({ top: scrollY + box.top - innerHeight * .65 + box.height * progress, behavior: 'instant' }); }, progress);
+      await page.waitForFunction(() => window.__businessIntro);
+      await page.evaluate(progress => { const {start, end} = window.__businessIntro.getState(); scrollTo({ top: start + (end - start) * progress, behavior: 'instant' }); }, progress);
       await page.waitForTimeout(500); const path = `${directory}/${width}-business-${progress}.png`;
       await page.screenshot({path}); report.captures.push(path);
     }
-    await page.evaluate(() => {
-      const top = document.querySelector('.risk-intro').getBoundingClientRect().top + scrollY;
-      scrollTo({ top: top - document.querySelector('.site-header').offsetHeight - 12, behavior: 'instant' });
-    });
-    await page.waitForTimeout(500);
-    const centered = `${directory}/${width}-business-centered.png`; await page.screenshot({ path: centered }); report.captures.push(centered);
     await page.locator('#assembly').scrollIntoViewIfNeeded();
     await page.locator('#assembly[data-renderer="ready"]').waitFor({ timeout: 30000 });
     await page.evaluate(() => document.fonts.ready);
@@ -31,11 +26,12 @@ try {
     await page.waitForFunction(() => Math.abs(window.__inlineAssembly.getState().progress - .85) < .001);
     async function capture(label) { const path = `${directory}/${width}-${label}.png`; await page.screenshot({ path }); report.captures.push(path); }
     await capture('01-before');
+    const baseline = await page.evaluate(() => ({ bodyWidth: document.body.clientWidth, headerWidth: document.querySelector('.site-header').getBoundingClientRect().width }));
     await page.evaluate(() => {
       window.__entranceFrames = []; const begin = performance.now();
       function sample(now) {
         const state = window.__equipmentIntro.getState(), heading = document.querySelector('#equipment-title');
-        window.__entranceFrames.push({ ...state, time: now - begin, scroll: scrollY, title: +getComputedStyle(heading).opacity, titleTop: heading.getBoundingClientRect().top,
+        window.__entranceFrames.push({ ...state, time: now - begin, scroll: scrollY, bodyWidth: document.body.clientWidth, headerWidth: document.querySelector('.site-header').getBoundingClientRect().width, title: +getComputedStyle(heading).opacity, titleTop: heading.getBoundingClientRect().top,
           flyingTop: document.querySelector('body > .assembly-title-letters > span')?.getBoundingClientRect().top ?? null,
           values: [...document.querySelectorAll('.equipment-value')].map(node => +getComputedStyle(node).opacity) });
         if (now - begin < 25000 && state.state !== 'complete') requestAnimationFrame(sample);
@@ -45,19 +41,26 @@ try {
     await page.waitForFunction(() => window.__equipmentIntro.getState().state === 'waiting-title');
     await capture('02-waiting-title');
     for (let index = 0; index < 4; index++) { await page.mouse.wheel(0, 1800); await page.waitForTimeout(60); }
-    await page.waitForFunction(() => window.__equipmentIntro.getState().state === 'awaiting-input');
-    await capture('03-ready-no-numbers');
-    await page.waitForTimeout(800);
-    if (await page.evaluate(() => window.__equipmentIntro.getState().triggered) !== 0) report.errors.push('Numbers played without scroll');
-    for (let index = 0; index < 5; index++) {
+    await page.waitForFunction(() => window.__equipmentIntro.getState().landed === 1);
+    await capture('03-first-landed');
+    await page.waitForTimeout(500);
+    if (await page.evaluate(() => window.__equipmentIntro.getState().triggered) !== 1) report.errors.push('Numbers played without a new scroll');
+    for (let index = 1; index < 5; index++) {
       await page.mouse.wheel(0, 120); await page.waitForTimeout(180);
       await capture(`impact-${index + 1}`);
       await page.waitForFunction(count => window.__equipmentIntro.getState().landed === count, index + 1);
-      if (index < 4) { await page.waitForTimeout(350); if (await page.evaluate(() => window.__equipmentIntro.getState().triggered) !== index + 1) report.errors.push('A scroll step revealed extra values'); }
+      if (index < 4) { await page.waitForTimeout(200); if (await page.evaluate(() => window.__equipmentIntro.getState().triggered) !== index + 1) report.errors.push('A scroll step revealed extra values'); }
     }
-    await page.waitForFunction(() => window.__equipmentIntro.getState().landed === 5);
-    await capture('04-all-landed');
+    await capture('04-welding-reveal');
+    await page.waitForFunction(() => window.__equipmentIntro.getState().state === 'welding-color');
+    await capture('05-welding-red');
+    let steps = 0;
+    while (await page.evaluate(() => window.__equipmentIntro.getState().weldingTarget < 1)) {
+      await page.mouse.wheel(0, 120); await page.waitForTimeout(220);
+      if (++steps === 1) await capture('06-welding-color');
+    }
     await page.waitForFunction(() => window.__equipmentIntro.getState().state === 'complete');
+    await capture('07-welding-ink');
     await page.mouse.wheel(0, 320); await page.waitForTimeout(350);
     await capture('05-released');
     await page.evaluate(() => { const details = document.querySelector('.equipment-details'); scrollTo({ top: details.getBoundingClientRect().top + scrollY - innerHeight * .65, behavior: 'instant' }); });
@@ -72,8 +75,9 @@ try {
       earlyNumbers: held.some(frame => frame.state === 'waiting-title' && frame.values.some(value => value > 0)),
       numbersBeforeTitle: held.some(frame => frame.values.some(value => value > 0) && frame.title !== 1),
       misplacedTitle: held.some(frame => frame.flyingTop !== null && frame.flyingTop > frame.titleTop + 2),
+      layoutDrift: Math.max(...held.map(frame => Math.max(Math.abs(frame.bodyWidth - baseline.bodyWidth), Math.abs(frame.headerWidth - baseline.headerWidth)))),
     };
-    if (metrics.heldScrollDrift > 2 || metrics.earlyNumbers || metrics.numbersBeforeTitle || metrics.misplacedTitle) report.errors.push(`Entrance sequence failed at ${width}px`);
+    if (metrics.heldScrollDrift > 2 || metrics.layoutDrift > 1 || metrics.earlyNumbers || metrics.numbersBeforeTitle || metrics.misplacedTitle) report.errors.push(`Entrance sequence failed at ${width}px`);
     report.runs.push({ ...metrics, timeline: frames });
     await page.close(); await page.video().saveAs(`${directory}/${width}-fast-scroll-and-intro.webm`);
   }

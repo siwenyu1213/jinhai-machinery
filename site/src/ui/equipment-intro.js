@@ -7,7 +7,23 @@ export function createEquipmentIntro({ section, reduced, titleReady, onHold }) {
   let state = 'pending', locked = false, anchor = 0, previous = scrollY, armed = true;
   let frame = 0, generation = 0, animations = [], readyAt = 0, finishedAt = 0, touchY = 0, navigationTimer = 0;
   const landed = new Set();
-  let input = 0, triggered = 0, active = false;
+  let input = 0, triggered = 0, active = false, firstRequested = false, lastTime = 0, weldingProgress = 0, weldingTarget = 0;
+  const welding = section.querySelector('.welding'), weldingOriginal = welding.innerHTML;
+  const walker = document.createTreeWalker(welding, NodeFilter.SHOW_TEXT), texts = [];
+  while (walker.nextNode()) texts.push(walker.currentNode);
+  texts.forEach(text => text.replaceWith(...[...text.textContent].map(character => {
+    const node = document.createElement('span'); node.className = 'welding-char'; node.textContent = character; return node;
+  })));
+  const weldingChars = [...welding.querySelectorAll('.welding-char')];
+  const color = name => getComputedStyle(section).getPropertyValue(name).match(/[\da-f]{2}/gi).map(v => parseInt(v, 16));
+  const red = color('--orange'), ink = color('--ink');
+  function paintWelding(progress) {
+    weldingChars.forEach((node, index) => {
+      const t = Math.max(0, Math.min(1, (progress - index / weldingChars.length * .65) / .35));
+      const ease = t * t * (3 - 2 * t);
+      node.style.color = `rgb(${red.map((c, i) => Math.round(c + (ink[i] - c) * ease)).join(',')})`;
+    });
+  }
   const dust = values.map(value => {
     const cloud = document.createElement('i'); cloud.className = 'equipment-dust'; cloud.setAttribute('aria-hidden', 'true');
     for (let i = 0; i < 7; i++) cloud.append(document.createElement('i'));
@@ -19,10 +35,16 @@ export function createEquipmentIntro({ section, reduced, titleReady, onHold }) {
   function clearAnimations() { generation++; animations.forEach(animation => animation.cancel()); animations = []; }
   function finish() {
     locked = false; cancelAnimationFrame(frame); frame = 0;
+    delete document.documentElement.dataset.equipmentHold;
+    document.documentElement.style.removeProperty('--equipment-scrollbar');
+    active = false; paintWelding(1);
     setState('complete'); clearAnimations(); previous = scrollY;
   }
   function reset() {
     locked = false; cancelAnimationFrame(frame); frame = 0; clearAnimations();
+    delete document.documentElement.dataset.equipmentHold;
+    document.documentElement.style.removeProperty('--equipment-scrollbar');
+    firstRequested = false; weldingProgress = weldingTarget = 0; paintWelding(0);
     landed.clear(); readyAt = finishedAt = input = triggered = 0; active = false; armed = false; previous = scrollY; setState('pending');
   }
   function playNumber() {
@@ -52,43 +74,71 @@ export function createEquipmentIntro({ section, reduced, titleReady, onHold }) {
       animation.finished.then(() => {
         if (request !== generation) return;
         landed.add(index); active = false; input = 0;
-        if (landed.size === values.length) { finishedAt = performance.now(); setState('settled'); }
+        if (landed.size === values.length) revealWelding();
         else setState('awaiting-input');
       }).catch(() => {});
-    names.filter((_, i) => i === index || (index === 4 && i === 5)).forEach(name => {
+    names.filter((_, i) => i === index).forEach(name => {
       animations.push(name.animate([
         { transform: 'translateY(-6px)', color: getComputedStyle(section).getPropertyValue('--orange').trim(), opacity: .4 },
         { transform: 'translateY(0)', color: getComputedStyle(section).color, opacity: 1 },
       ], { duration: 420 }));
     });
   }
+  function revealWelding() {
+    const request = generation; setState('welding-reveal'); paintWelding(0);
+    const reveals = weldingChars.map((node, index) => node.animate([
+      { opacity: 0, transform: 'translateX(-10px)' }, { opacity: 1, transform: 'translateX(0)' },
+    ], { duration: 320, delay: index * 14, fill: 'both', easing: 'ease-out' }));
+    animations.push(...reveals);
+    Promise.all(reveals.map(animation => animation.finished)).then(() => {
+      if (request === generation) setState('welding-color');
+    }).catch(() => {});
+  }
   function tick(time) {
     frame = 0; if (!locked) return;
     clampScroll();
     if (state === 'waiting-title' && titleReady()) {
-      if (!readyAt) readyAt = time;
-      if (time - readyAt >= 220) { input = 0; setState('awaiting-input'); }
+      input = 0; setState('awaiting-input');
+      if (firstRequested) { firstRequested = false; playNumber(); }
     }
-    if (state === 'settled' && time - finishedAt >= 240) { finish(); return; }
+    if (state === 'welding-color') {
+      const elapsed = Math.min(.05, (time - (lastTime || time - 16)) / 1000);
+      weldingProgress += (weldingTarget - weldingProgress) * -Math.expm1(-elapsed / .14);
+      if (1 - weldingProgress < .001 && weldingTarget === 1) weldingProgress = 1;
+      paintWelding(weldingProgress);
+      if (weldingProgress === 1) { finish(); return; }
+    }
+    lastTime = time;
     frame = requestAnimationFrame(tick);
   }
-  function enter() {
+  function enter(requestFirst = false) {
     if (state !== 'pending' || reduced()) return;
     anchor = naturalAnchor(); locked = true; readyAt = finishedAt = input = triggered = 0; active = false; landed.clear();
+    firstRequested = requestFirst; weldingProgress = weldingTarget = 0; lastTime = 0;
+    document.documentElement.style.setProperty('--equipment-scrollbar', `${innerWidth - document.documentElement.clientWidth}px`);
+    document.documentElement.dataset.equipmentHold = 'true';
     setState('waiting-title'); clampScroll(); previous = anchor; onHold();
     if (!frame) frame = requestAnimationFrame(tick);
   }
   function wheelPixels(event) { return event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? innerHeight : 1); }
   function downInput(event, delta) {
     if (reduced() || state === 'complete') return;
-    if (locked && delta < 0) { reset(); return; }
+    if (locked && delta < 0) {
+      event.preventDefault(); const top = Math.max(0, anchor + delta); reset();
+      scrollTo({ top, behavior: 'instant' }); return;
+    }
     if (locked) {
       event.preventDefault();
+      if (state === 'waiting-title' && delta > 0) firstRequested = true;
       if (state === 'awaiting-input' && delta > 0) { input += delta; if (input >= 32) playNumber(); }
+      if (state === 'welding-color' && delta > 0) {
+        weldingTarget = Math.min(1, weldingTarget + Math.min(delta, 80) / 240);
+        if (weldingTarget > .999) weldingTarget = 1;
+      }
       return;
     }
     const end = naturalAnchor();
-    if (armed && delta > 0 && scrollY < end && scrollY + delta >= end) { event.preventDefault(); enter(); }
+    if (armed && delta > 0 && scrollY < end && scrollY + delta >= end) { event.preventDefault(); enter(true); }
   }
   window.addEventListener('wheel', event => { if (!event.ctrlKey) downInput(event, wheelPixels(event)); }, { passive: false, capture: true, signal: scope.signal });
   window.addEventListener('touchstart', event => { touchY = event.touches[0]?.clientY || 0; }, { passive: true, signal: scope.signal });
@@ -126,9 +176,9 @@ export function createEquipmentIntro({ section, reduced, titleReady, onHold }) {
   }, { capture: true, signal: scope.signal });
   function navigate() {
     clearTimeout(navigationTimer);
-    if (document.documentElement.dataset.anchorRestoring === 'true') return;
     if (!location.hash || ['#home', '#assembly'].includes(location.hash)) return;
     if (location.hash !== '#equipment') { finish(); return; }
+    if (document.documentElement.dataset.anchorRestoring === 'true') return;
     // Let the site's initial fragment restoration finish before docking the
     // equipment title. A direct visit still gets the same numeric entrance.
     navigationTimer = setTimeout(() => { if (location.hash === '#equipment' && state === 'pending' && !reduced()) enter(); }, 450);
@@ -145,12 +195,15 @@ export function createEquipmentIntro({ section, reduced, titleReady, onHold }) {
   const motion = new MutationObserver(() => { if (reduced()) finish(); });
   motion.observe(document.documentElement, { attributes: true, attributeFilter: ['data-motion'] });
   if (reduced() || !Element.prototype.animate) finish(); else setState('pending');
+  // An explicit later-section visit bypasses the story before the browser's
+  // initial fragment scroll, including while optional assets are failing.
+  if (location.hash && !['#home', '#assembly', '#equipment'].includes(location.hash)) finish();
   if (document.readyState === 'complete') navigate();
   else window.addEventListener('load', navigate, { once: true, signal: scope.signal });
   return {
     get locked() { return locked; },
-    update(progress) { if (reduced()) { if (state !== 'complete') finish(); } else if (state === 'complete' && progress < .85 && scrollY < naturalAnchor() - innerHeight * .5) reset(); },
-    getState: () => ({ state, locked, anchor: locked ? anchor : naturalAnchor(), landed: landed.size, triggered, active }),
-    dispose() { clearTimeout(navigationTimer); finish(); scope.abort(); motion.disconnect(); dust.forEach(node => node.remove()); delete section.dataset.intro; },
+    update(progress) { if (reduced()) { if (state !== 'complete') finish(); } else if (['', '#home', '#assembly'].includes(location.hash) && state === 'complete' && progress < .85 && scrollY < naturalAnchor() - innerHeight * .5) reset(); },
+    getState: () => ({ state, locked, anchor: locked ? anchor : naturalAnchor(), landed: landed.size, triggered, active, weldingProgress, weldingTarget }),
+    dispose() { clearTimeout(navigationTimer); finish(); scope.abort(); motion.disconnect(); dust.forEach(node => node.remove()); welding.innerHTML = weldingOriginal; delete section.dataset.intro; },
   };
 }

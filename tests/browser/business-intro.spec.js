@@ -8,18 +8,27 @@ test('business copy is vertically centered and scroll inks characters in reading
   await expect(paragraph).toHaveText(text);
   for (const width of [1280, 375]) {
     await page.setViewportSize({ width, height: 900 });
+    await expect.poll(() => paragraph.evaluate(node => {
+      const copy = node.getBoundingClientRect(), section = node.closest('section').getBoundingClientRect();
+      return Math.abs(copy.y + copy.height / 2 - section.y - section.height / 2);
+    })).toBeLessThan(1);
     const section = await page.locator('.risk-intro').boundingBox(), copy = await paragraph.boundingBox();
     expect(Math.abs((copy.y + copy.height / 2) - (section.y + section.height / 2))).toBeLessThan(1);
     expect(copy.x).toBeGreaterThan(0); expect(copy.x + copy.width).toBeLessThan(width);
   }
   async function seek(fraction) {
     await page.evaluate(fraction => {
-      const box = document.querySelector('.risk-intro').getBoundingClientRect();
-      scrollTo({ top: scrollY + box.top - innerHeight * .65 + box.height * fraction, behavior: 'instant' });
+      const {start, end} = window.__businessIntro.getState();
+      scrollTo({ top: start + (end - start) * fraction, behavior: 'instant' });
     }, fraction); await page.waitForTimeout(500);
     return paragraph.locator('.intro-char').evaluateAll(nodes => nodes.map(node => getComputedStyle(node).color));
   }
-  const before = await seek(0), middle = await seek(.5), after = await seek(1);
+  const before = await seek(0);
+  await seek(.2); const early = await paragraph.boundingBox();
+  const middle = await seek(.5), late = await paragraph.boundingBox();
+  expect(Math.abs(early.y - late.y)).toBeLessThan(1);
+  await seek(.8); expect(Math.abs((await paragraph.boundingBox()).y - late.y)).toBeLessThan(1);
+  const after = await seek(1);
   expect(new Set(before).size).toBe(1);
   expect(middle[0]).toBe(after[0]); expect(middle.at(-1)).toBe(before.at(-1));
   expect(after[0]).not.toBe(before[0]); expect(after.at(-1)).not.toBe(after[0]);

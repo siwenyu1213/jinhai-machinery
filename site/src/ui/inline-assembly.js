@@ -39,7 +39,13 @@ export function initInlineAssembly() {
   }
   function scrollRange() {
     const height = section.querySelector('.assembly-sticky').offsetHeight;
-    return assemblyScrollRange(height, section.offsetHeight - height);
+    const range = assemblyScrollRange(height, section.offsetHeight - height);
+    const padding = equipmentTitle.getBoundingClientRect().top - equipment.getBoundingClientRect().top;
+    // End the title flight at the numeric entrance itself; no extra half-screen
+    // of native travel between the old handoff and the equipment hold.
+    range.tail = height + padding - document.querySelector('.site-header').offsetHeight - 24;
+    range.length = Math.max(1, section.offsetHeight - height) + range.lead + range.tail;
+    return range;
   }
   function measure() {
     const box = composition.getBoundingClientRect(), height = box.height;
@@ -48,7 +54,7 @@ export function initInlineAssembly() {
     const step = size * 1.12, top = Math.max(112, (height - step * letters.length) / 2);
     const outroSize = Math.min(height * .112, box.width / 5.5, 104);
     const destinationSize = parseFloat(getComputedStyle(equipmentTitle).fontSize);
-    const bottom = section.getBoundingClientRect().bottom, { tail } = scrollRange();
+    const bottom = section.getBoundingClientRect().bottom, tail = height * .45;
     lettersHost.style.fontSize = `${endSize}px`;
     geometry = [...targetTitle.children].map((node, index) => {
       const end = node.getBoundingClientRect(), destination = equipmentTitle.children[index].getBoundingClientRect();
@@ -82,16 +88,17 @@ export function initInlineAssembly() {
     lettersHost.style.opacity = animated() && state.transfer === 1 ? 0 : 1;
     equipmentTitle.classList.toggle('assembly-handoff-hidden', animated() && state.transfer < 1);
     const box = composition.getBoundingClientRect(), boundary = equipment.getBoundingClientRect().top;
+    const overlayLeft = transferring ? lettersHost.getBoundingClientRect().left : 0;
     // Before the clock finishes, fast wheel input can already move the real
     // document past its handoff endpoint. Carry the letters by exactly that
     // document displacement, so they can never trail below the equipment.
-    const { tail } = scrollRange(), overrun = Math.max(0, box.height - tail - boundary);
+    const tail = box.height * .45, overrun = Math.max(0, box.height - tail - boundary);
     for (const [index, { node, before, after, next }] of letters.entries()) {
       const entry = geometry[index]; if (!entry) continue;
       const pose = transferring
         ? equipmentLetterPose(state.transfer, index, { ...entry.outro, x: entry.outro.x + box.left, y: entry.outro.y - overrun }, { ...entry.dock, y: entry.dock.y - overrun }, entry.endSize)
         : letterPose(state.content, index, entry.start, entry.end, entry.size, entry.endSize, entry.outro);
-      node.style.transform = `translate3d(${pose.x}px,${pose.y}px,0) translate(-50%,-50%) scale(${pose.scale})`;
+      node.style.transform = `translate3d(${pose.x - overlayLeft}px,${pose.y}px,0) translate(-50%,-50%) scale(${pose.scale})`;
       node.style.opacity = transferring ? 1 : pose.opacity * (after.textContent ? 1 : 1 - pose.morph);
       const unchanged = before.textContent === after.textContent;
       before.style.opacity = transferring ? 0 : unchanged ? 1 : pose.beforeOpacity;

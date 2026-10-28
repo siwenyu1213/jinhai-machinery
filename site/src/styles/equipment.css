@@ -1,5 +1,10 @@
 /* §2.1 / §3.6 / §4.4: strong equipment names, compact facts, joined units.
    Existing ink/orange/paper and approved type families; no new palette. */
+html[data-equipment-hold=true] { overflow: hidden; scroll-behavior: auto; padding-right: var(--equipment-scrollbar, 0px); }
+html[data-equipment-hold=true] .site-header { right: var(--equipment-scrollbar, 0px); }
+.equipment-section[data-intro]:not([data-intro=complete]):not([data-intro^=welding]) .welding { visibility: hidden; }
+.welding-char { display: inline-block; white-space: pre; }
+.equipment-section .welding .welding-char { color: inherit; margin-inline: 0; }
 .equipment-highlights { grid-template-columns: 1fr 1fr 1.05fr; gap: 40px; }
 .equipment-highlights > div { padding-right: 32px; }
 .equipment-section .equipment-name { font-family: var(--font-body); font-size: 24px; font-weight: 600; line-height: 1.4; color: var(--ink); letter-spacing: -.02em; }

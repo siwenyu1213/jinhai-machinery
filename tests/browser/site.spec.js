@@ -124,6 +124,8 @@ test('mechanical photography replaces drawn models and remains local with attrib
 test('process photography and source follow the last selected step under reduced motion', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('./');
+  await page.locator('[data-process-photo]').evaluateAll(images => images.forEach(image => { image.loading = 'eager'; }));
+  await expect.poll(() => page.locator('[data-process-photo]').evaluateAll(images => images.every(image => image.complete && image.naturalWidth > 0)), { timeout: 15000 }).toBe(true);
   // This test checks manual selections. Autoplay has separate timer coverage;
   // pause it so slow CI image decoding cannot advance a checked selection.
   await page.locator('#process-playback').click();

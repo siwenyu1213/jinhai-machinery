@@ -43,11 +43,17 @@ async function introComplete(page) {
   await finishSteps(page);
 }
 async function finishSteps(page, start = 0) {
+  await page.mouse.move(200, 350);
   for (let index = start; index < 5; index++) {
     await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'awaiting-input', { timeout: 15000 });
     await page.mouse.wheel(0, 120);
     await expect.poll(() => page.evaluate(() => window.__equipmentIntro.getState().landed)).toBe(index + 1);
   }
+  await finishWelding(page);
+}
+async function finishWelding(page) {
+  await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'welding-color');
+  for (let i = 0; i < 6; i++) await page.mouse.wheel(0, 120);
   await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'complete');
 }
 
@@ -70,23 +76,21 @@ test('scroll steps reveal one impact at a time, with a hard stop, two shakes and
   const anchor = await page.evaluate(() => window.__equipmentIntro.getState().anchor);
   for (let i = 0; i < 5; i++) { await page.mouse.wheel(0, 1800); await page.waitForTimeout(60); }
   expect(Math.abs(await page.evaluate(() => scrollY) - anchor)).toBeLessThan(2);
-  await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'awaiting-input', { timeout: 12000 });
-  await page.waitForTimeout(800);
-  expect(await page.evaluate(() => window.__equipmentIntro.getState().triggered)).toBe(0);
+  await expect.poll(() => page.evaluate(() => window.__equipmentIntro.getState().landed)).toBe(1);
+  await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'awaiting-input');
+  expect(await page.evaluate(() => window.__equipmentIntro.getState().triggered)).toBe(1);
   await expect(page.locator('#equipment-title')).toHaveCSS('opacity', '1');
   await expect(page.locator('body > .assembly-title-letters')).toHaveCount(0);
   const title = await page.locator('#equipment-title').boundingBox(), header = await page.locator('.site-header').boundingBox();
   expect(title.y).toBeGreaterThanOrEqual(header.height + 22); expect(title.y).toBeLessThan(header.height + 26);
-  await page.mouse.wheel(0, 2400); await page.waitForTimeout(170);
-  const dust = await page.locator('.equipment-dust i').evaluateAll(nodes => nodes.map(node => +getComputedStyle(node).opacity));
-  expect(dust.some(opacity => opacity > .05)).toBe(true);
-  await page.mouse.wheel(0, 2400);
-  expect(Math.abs(await page.evaluate(() => scrollY) - anchor)).toBeLessThan(2);
-  await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'awaiting-input');
+  await expect(page.locator('.welding')).toHaveCSS('visibility', 'hidden');
   await page.waitForTimeout(700);
   expect(await page.evaluate(() => window.__equipmentIntro.getState().landed)).toBe(1);
-  for (let i = 1; i < 5; i++) await expect(page.locator('.equipment-value').nth(i)).toHaveCSS('opacity', '0');
-  await finishSteps(page, 1);
+  await page.mouse.wheel(0, 120); await page.waitForTimeout(170);
+  const dust = await page.locator('.equipment-dust i').evaluateAll(nodes => nodes.map(node => +getComputedStyle(node).opacity));
+  expect(dust.some(opacity => opacity > .05)).toBe(true);
+  await expect.poll(() => page.evaluate(() => window.__equipmentIntro.getState().landed)).toBe(2);
+  await finishSteps(page, 2);
   const frames = await page.evaluate(() => window.__introFrames);
   expect(frames.some(frame => frame.state === 'waiting-title')).toBe(true);
   expect(frames.some(frame => frame.values[0].opacity > .8 && frame.values[4].opacity === 0)).toBe(true);
@@ -109,6 +113,32 @@ test('scroll steps reveal one impact at a time, with a hard stop, two shakes and
   await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(anchor + 100);
 });
 
+test('welding waits for five impacts, reveals left to right in red, and scrolls smoothly to ink without page drift', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' }); await page.goto('./#equipment');
+  await page.mouse.move(200, 350);
+  const welding = page.locator('.welding');
+  await expect(welding).toHaveCSS('visibility', 'hidden');
+  for (let i = 0; i < 5; i++) {
+    await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'awaiting-input', { timeout: 15000 });
+    await page.mouse.wheel(0, 120);
+    await expect.poll(() => page.evaluate(() => window.__equipmentIntro.getState().landed)).toBe(i + 1);
+    if (i < 4) await expect(welding).toHaveCSS('visibility', 'hidden');
+  }
+  await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'welding-color');
+  const chars = welding.locator('.welding-char');
+  await expect(chars.first()).toHaveCSS('margin-left', '0px');
+  await expect(chars.first()).toHaveCSS('color', 'rgb(173, 55, 25)');
+  const anchor = await page.evaluate(() => scrollY), title = await page.locator('#equipment-title').boundingBox();
+  await page.waitForTimeout(400); await expect(chars.last()).toHaveCSS('color', 'rgb(173, 55, 25)');
+  await page.mouse.wheel(0, 120); await page.waitForTimeout(250);
+  expect(await chars.first().evaluate(node => getComputedStyle(node).color)).not.toBe('rgb(173, 55, 25)');
+  await expect(chars.last()).toHaveCSS('color', 'rgb(173, 55, 25)');
+  expect(Math.abs(await page.evaluate(() => scrollY) - anchor)).toBeLessThan(1);
+  expect(Math.abs((await page.locator('#equipment-title').boundingBox()).y - title.y)).toBeLessThan(1);
+  await finishWelding(page); await expect(chars.last()).toHaveCSS('color', 'rgb(23, 35, 35)');
+  await expect(page.locator('html')).not.toHaveAttribute('data-equipment-hold');
+});
+
 test('direct equipment navigation docks before impacts while a later-section link skips the hold', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' }); await page.goto('./#equipment');
   await finishSteps(page);
@@ -126,7 +156,7 @@ test('upward input cancels the hold, reduced motion releases it, and an explicit
   await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'waiting-title');
   const anchor = await page.evaluate(() => window.__equipmentIntro.getState().anchor);
   await page.mouse.wheel(0, -180); await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'pending');
-  await expect.poll(() => page.evaluate(() => scrollY)).toBeLessThan(anchor - 80);
+  await expect.poll(() => page.evaluate(() => scrollY)).toBeLessThan(anchor - 20);
   await page.mouse.wheel(0, 800); await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'waiting-title');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'complete');

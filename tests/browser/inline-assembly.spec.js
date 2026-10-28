@@ -134,9 +134,10 @@ test('the held interlude flies down into the real equipment heading and reverses
   const landed = await title.boundingBox();
   await seek(page, .999);
   const held = await title.boundingBox();
+  const heldScroll = await page.evaluate(() => scrollY);
   // The changed heading has already landed; more scroll must not drag it.
   expect(Math.abs(landed.x - held.x)).toBeLessThan(.1);
-  expect(Math.abs(landed.y - held.y)).toBeLessThan(.1);
+  expect(held.y).toBeLessThan(landed.y);
   await expect(page.locator('#equipment > .section-heading')).toHaveCSS('transform', 'none');
   await seek(page, 1);
   await expect(page.locator('#equipment-title')).toHaveCSS('opacity', '1');
@@ -146,8 +147,9 @@ test('the held interlude flies down into the real equipment heading and reverses
   await expect(page.locator('.assembly-title-letters')).toHaveCSS('opacity', '0');
   const destination = await page.locator('#equipment-title > span').first().boundingBox();
   expect(Math.abs(destination.x - held.x)).toBeLessThan(1.5);
-  expect(Math.abs(destination.y - held.y)).toBeLessThan(1.5);
-  expect((await page.locator('#equipment-title').boundingBox()).y).toBeGreaterThan(page.viewportSize().height / 2);
+  expect(Math.abs(destination.y + await page.evaluate(() => scrollY) - held.y - heldScroll)).toBeLessThan(1.5);
+  const headerHeight = await page.locator('.site-header').evaluate(node => node.offsetHeight);
+  expect(Math.abs((await page.locator('#equipment-title').boundingBox()).y - headerHeight - 24)).toBeLessThan(2);
   await seek(page, .85);
   await expect(page.locator('.assembly-title-letters')).toHaveCSS('opacity', '1');
   await expect(page.locator('#assembly-title')).toHaveAttribute('aria-label', '我们还有...');
