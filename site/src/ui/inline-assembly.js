@@ -89,15 +89,19 @@ export function initInlineAssembly() {
     equipmentTitle.classList.toggle('assembly-handoff-hidden', animated() && state.transfer < 1);
     const box = composition.getBoundingClientRect(), boundary = equipment.getBoundingClientRect().top;
     const overlayLeft = transferring ? lettersHost.getBoundingClientRect().left : 0;
+    // The central interlude stays a hold, but answers every wheel step with a
+    // few dozen pixels of drift instead of a completely frozen 700px stretch.
+    const holdDrift = (animated() ? state.hold : 0) * Math.min(box.height * .045, 44);
     // Before the clock finishes, fast wheel input can already move the real
     // document past its handoff endpoint. Carry the letters by exactly that
     // document displacement, so they can never trail below the equipment.
     const tail = box.height * .45, overrun = Math.max(0, box.height - tail - boundary);
     for (const [index, { node, before, after, next }] of letters.entries()) {
       const entry = geometry[index]; if (!entry) continue;
+      const outro = { ...entry.outro, y: entry.outro.y + holdDrift };
       const pose = transferring
-        ? equipmentLetterPose(state.transfer, index, { ...entry.outro, x: entry.outro.x + box.left, y: entry.outro.y - overrun }, { ...entry.dock, y: entry.dock.y - overrun }, entry.endSize)
-        : letterPose(state.content, index, entry.start, entry.end, entry.size, entry.endSize, entry.outro);
+        ? equipmentLetterPose(state.transfer, index, { ...outro, x: outro.x + box.left, y: outro.y - overrun }, { ...entry.dock, y: entry.dock.y - overrun }, entry.endSize)
+        : letterPose(state.content, index, entry.start, entry.end, entry.size, entry.endSize, outro);
       node.style.transform = `translate3d(${pose.x - overlayLeft}px,${pose.y}px,0) translate(-50%,-50%) scale(${pose.scale})`;
       node.style.opacity = transferring ? 1 : pose.opacity * (after.textContent ? 1 : 1 - pose.morph);
       const unchanged = before.textContent === after.textContent;
@@ -115,7 +119,11 @@ export function initInlineAssembly() {
   function tick(time) {
     frame = 0; if (disposed || document.hidden || (!visible && !intro.locked)) return;
     const elapsed = lastTime ? Math.min(.25, (time - lastTime) / 1000) : 1 / 60; lastTime = time;
-    current = animated() ? dampAssemblyScroll(current, target, elapsed, intro.locked ? .18 : .45) : 1;
+    // Direct manipulation near the handoff should not trail the wheel by the
+    // slower .45s assembly inertia. Keep that inertia for the 3D build-up.
+    const urgent = current >= .75 || target >= .75;
+    const damping = urgent ? .12 : intro.locked ? .18 : .45;
+    current = animated() ? dampAssemblyScroll(current, target, elapsed, damping) : 1;
     paint(); if (current !== target) frame = requestAnimationFrame(tick);
   }
   function wake() { if (!frame && (visible || intro.locked) && !document.hidden && !disposed) { lastTime = 0; frame = requestAnimationFrame(tick); } }

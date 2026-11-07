@@ -16,11 +16,15 @@ export function assemblyScrollRange(stickyHeight, pinnedTravel) {
 }
 export function assemblyTimeline(value) {
   const t = clamp(value);
-  const content = clamp(t / .75), transfer = smooth((t - .87) / .13);
+  const content = clamp(t / .75), hold = clamp((t - .75) / .12);
+  // Linear handoff: the first wheel step already has to move the letters.
+  // Two nested smoothersteps used to leave the opening stretch motionless.
+  const transfer = clamp((t - .87) / .13);
   const departure = smooth((content - .81) / .165);
   return {
     progress: t,
     content,
+    hold,
     transfer,
     flightScroll: clamp((content - .25) / .44),
     models: 1 - departure,
@@ -36,7 +40,9 @@ export function equipmentLetterPose(transfer, index, start, end, baseSize) {
   // Land before the native document takes over. The fully changed heading
   // holds at one measured viewport position instead of drifting with each
   // wheel input during the last part of the handoff.
-  const travel = smooth(t / .82);
+  // Linear through the descent, then hold the landed heading still while the
+  // native document takes over. No easing at the start: the wheel is the clock.
+  const travel = clamp(t / .82);
   return {
     x: start.x + (end.x - start.x) * travel,
     y: start.y + (end.y - start.y) * travel,

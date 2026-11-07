@@ -51,6 +51,8 @@ test('scroll inertia continues after input and follows the same clock at differe
   assert.equal(dampAssemblyScroll(1, 1, .1), 1);
   const fast = dampAssemblyScroll(0, 1, .1, .18);
   assert.ok(fast > first && fast < 1, 'the finite equipment hold catches the title up without removing easing');
+  const urgent = dampAssemblyScroll(0, 1, .1, .12);
+  assert.ok(urgent > fast && urgent < 1, 'the wheel-driven handoff catches up faster than the assembly inertia');
 });
 test('each letter follows a quarter ellipse with an obvious acceleration peak and converges exactly', () => {
   const start = { x: 600, y: 600 }, end = { x: 60, y: 150 };
@@ -86,6 +88,10 @@ test('the interlude has a long hold and a fixed landing before the document hand
     assert.equal(state.content, 1); assert.equal(state.transfer, 0); assert.equal(state.phase, 'title-hold');
     assert.equal(state.models, 0); assert.equal(state.captions, 0);
   }
+  // The hold is still a hold, but it now drifts continuously with the wheel.
+  assert.equal(assemblyTimeline(.75).hold, 0);
+  assert.ok(Math.abs(assemblyTimeline(.81).hold - .5) < 1e-9);
+  assert.equal(assemblyTimeline(.87).hold, 1);
   const start = { x: 600, y: 420, size: 100 }, end = { x: 80, y: 720, size: 48 };
   const at = value => equipmentLetterPose(assemblyTimeline(value).transfer, 0, start, end, 48);
   assert.equal(at(.86).y, start.y);
@@ -96,4 +102,17 @@ test('the interlude has a long hold and a fixed landing before the document hand
   const range = assemblyScrollRange(900, 5400);
   assert.equal(range.tail, 405);
   assert.ok((.87 - .75) * range.length > 700);
+});
+test('the descent starts with the first wheel step and never eases into a dead zone', () => {
+  const start = { x: 600, y: 420, size: 100 }, end = { x: 80, y: 720, size: 48 };
+  const transfer = value => assemblyTimeline(value).transfer;
+  assert.equal(transfer(.87), 0);
+  assert.ok(Math.abs(transfer(.88) - (.88 - .87) / .13) < 1e-9, 'handoff progress is linear in scroll');
+  const step = value => equipmentLetterPose(transfer(value), 0, start, end, 48).y;
+  const positions = [.87, .88, .90, .92, .94].map(step);
+  for (let i = 1; i < positions.length; i++) assert.ok(positions[i] > positions[i - 1]);
+  assert.ok(positions[1] - start.y > (end.y - start.y) * .04, 'the first step moves a visible amount');
+  // Equal wheel steps keep a comparable pace instead of a sluggish opening.
+  const early = positions[2] - positions[1], late = positions[4] - positions[3];
+  assert.ok(early > late * .6 && early < late * 1.6);
 });

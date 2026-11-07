@@ -95,7 +95,9 @@ test('after the captions finish, the title returns and changes while the models 
   expect(Math.abs((final[0].x + final[4].x) / 2 - page.viewportSize().width / 2)).toBeLessThan(2);
   expect(Math.abs(final[0].y - final[3].y)).toBeLessThan(2);
   await seek(page, .85);
-  expect(await title.boundingBox()).toEqual(held);
+  const drifting = await title.boundingBox();
+  expect(drifting.y).toBeGreaterThan(held.y + 1);
+  expect(drifting.y - held.y).toBeLessThan(60);
   await expect(page.locator('#assembly')).toHaveAttribute('data-phase', 'title-hold');
   await seek(page, .60);
   await expect(page.locator('#assembly-title')).toHaveAttribute('aria-label', '我们有什么');
@@ -115,6 +117,46 @@ test('native wheel motion keeps moving after input, reverse travel restores the 
   // Both snapshots have converged to the same native scroll position.
   const after = await page.evaluate(() => window.__inlineAssembly.getModel().parts.map(part => part.object.position.toArray()));
   expect(Math.max(...after.map((position, i) => Math.hypot(...position.map((v, j) => v - before[i][j]))))).toBeLessThan(.04);
+});
+test('the interlude and descent answer every scroll step without a frozen opening', async ({ page }) => {
+  await ready(page);
+  const points = [];
+  // Through .92 the letters travel down the viewport. Past that the fixed
+  // layer compensates the native document scroll, so the exact landing is
+  // asserted by the handoff test below instead of a viewport-relative rule.
+  for (const value of [.75, .80, .85, .87, .88, .90, .92]) {
+    await seek(page, value);
+    const box = await page.locator('.assembly-title-letters > span').first().boundingBox();
+    points.push(box.y + box.height / 2);
+  }
+  // The old build was completely frozen for the first three samples.
+  expect(points[1] - points[0]).toBeGreaterThan(3);
+  expect(points[2] - points[1]).toBeGreaterThan(3);
+  for (let i = 1; i < points.length; i++) {
+    expect(points[i]).toBeGreaterThan(points[0]);
+    // A few pixels of sticky release is native scroll, not a visible jerk.
+    expect(points[i - 1] - points[i]).toBeLessThan(12);
+  }
+  // Handing the letters over to the fixed layer must not jump on the first step.
+  expect(points[4] - points[3]).toBeLessThan(60);
+  expect(points.at(-1) - points[0]).toBeGreaterThan(40);
+  const state = await page.evaluate(() => window.__inlineAssembly.getState());
+  expect(state.transfer).toBeGreaterThan(0);
+  expect(state.transfer).toBeLessThan(1);
+});
+test('wheel input during the descent is followed within a few frames', async ({ page }) => {
+  await ready(page); await seek(page, .82);
+  const before = await page.evaluate(() => window.__inlineAssembly.getState());
+  await page.mouse.move(200, 400); await page.mouse.wheel(0, 160);
+  await expect.poll(() => page.evaluate(() => window.__inlineAssembly.getState().target)).toBeGreaterThan(before.target + .001);
+  const early = await page.evaluate(() => window.__inlineAssembly.getState());
+  await page.waitForTimeout(120);
+  const later = await page.evaluate(() => window.__inlineAssembly.getState());
+  expect(later.progress).toBeGreaterThan(early.progress);
+  await expect.poll(() => page.evaluate(() => {
+    const state = window.__inlineAssembly.getState();
+    return Math.abs(state.progress - state.target);
+  }), { timeout: 3000 }).toBeLessThan(.0005);
 });
 test('the held interlude flies down into the real equipment heading and reverses without a duplicate', async ({ page }) => {
   await ready(page); await seek(page, .85);
