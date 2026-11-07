@@ -97,7 +97,7 @@ test('after the captions finish, the title returns and changes while the models 
   await seek(page, .85);
   const drifting = await title.boundingBox();
   expect(drifting.y).toBeGreaterThan(held.y + 1);
-  expect(drifting.y - held.y).toBeLessThan(60);
+  expect(drifting.y - held.y).toBeLessThan(85);
   await expect(page.locator('#assembly')).toHaveAttribute('data-phase', 'title-hold');
   await seek(page, .60);
   await expect(page.locator('#assembly-title')).toHaveAttribute('aria-label', '我们有什么');

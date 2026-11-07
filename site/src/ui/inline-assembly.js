@@ -90,8 +90,10 @@ export function initInlineAssembly() {
     const box = composition.getBoundingClientRect(), boundary = equipment.getBoundingClientRect().top;
     const overlayLeft = transferring ? lettersHost.getBoundingClientRect().left : 0;
     // The central interlude stays a hold, but answers every wheel step with a
-    // few dozen pixels of drift instead of a completely frozen 700px stretch.
-    const holdDrift = (animated() ? state.hold : 0) * Math.min(box.height * .045, 44);
+    // visible drift instead of a completely frozen 700px stretch. The window
+    // itself is left alone: widening the descent breaks the equipment hold's
+    // fast-scroll guard, which needs the full document-overrun compensation.
+    const holdDrift = (animated() ? state.hold : 0) * Math.min(box.height * .07, 70);
     // Before the clock finishes, fast wheel input can already move the real
     // document past its handoff endpoint. Carry the letters by exactly that
     // document displacement, so they can never trail below the equipment.
@@ -122,7 +124,7 @@ export function initInlineAssembly() {
     // Direct manipulation near the handoff should not trail the wheel by the
     // slower .45s assembly inertia. Keep that inertia for the 3D build-up.
     const urgent = current >= .75 || target >= .75;
-    const damping = urgent ? .12 : intro.locked ? .18 : .45;
+    const damping = urgent ? .09 : intro.locked ? .18 : .45;
     current = animated() ? dampAssemblyScroll(current, target, elapsed, damping) : 1;
     paint(); if (current !== target) frame = requestAnimationFrame(tick);
   }
