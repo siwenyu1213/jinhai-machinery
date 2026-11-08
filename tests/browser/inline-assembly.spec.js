@@ -11,6 +11,24 @@ async function seek(page, value) {
   await expect.poll(() => page.evaluate(expected => Math.abs(window.__inlineAssembly.getState().progress - expected), value), { timeout: 15000 }).toBeLessThan(.0003);
   await expect.poll(() => page.evaluate(() => { const state = window.__inlineAssembly.getState(); return Math.abs(state.progress - state.target); }), { timeout: 15000 }).toBeLessThan(.000001);
 }
+async function wheelFrames(page, delta) {
+  // Capture inside the native scroll callback, before its first animation
+  // frame. A protocol round trip can otherwise miss the entire short descent.
+  await page.evaluate(() => {
+    window.__wheelSamples = [];
+    window.addEventListener('scroll', () => {
+      function sample() {
+        const { progress, target } = window.__inlineAssembly.getState();
+        window.__wheelSamples.push({ progress, target });
+        if (window.__wheelSamples.length < 5) requestAnimationFrame(sample);
+      }
+      sample();
+    }, { once: true });
+  });
+  await page.mouse.move(200, 400); await page.mouse.wheel(0, delta);
+  await expect.poll(() => page.evaluate(() => window.__wheelSamples.length), { timeout: 10000 }).toBe(5);
+  return page.evaluate(() => window.__wheelSamples);
+}
 test('the section precedes equipment and starts writing while the previous page is still visible', async ({ page }) => {
   await ready(page); await seek(page, .055);
   expect(await page.locator('#assembly').evaluate(node => node.nextElementSibling.id)).toBe('equipment');
@@ -107,11 +125,12 @@ test('after the captions finish, the title returns and changes while the models 
 test('native wheel motion keeps moving after input, reverse travel restores the same model pose', async ({ page }) => {
   await ready(page); await seek(page, .36);
   const before = await page.evaluate(() => window.__inlineAssembly.getModel().parts.map(part => part.object.position.toArray()));
-  await page.mouse.move(200, 400); await page.mouse.wheel(0, 240);
-  await expect.poll(() => page.evaluate(() => window.__inlineAssembly.getState().target)).toBeGreaterThan(.38);
-  const early = await page.evaluate(() => window.__inlineAssembly.getState());
+  const samples = await wheelFrames(page, 240), early = samples[0];
+  expect(samples.at(-1).target).toBeGreaterThan(.38);
   expect(early.progress).toBeLessThan(early.target);
-  await page.waitForTimeout(200); expect(await page.evaluate(() => window.__inlineAssembly.getState().progress)).toBeGreaterThan(early.progress);
+  // CPU WebGL may take longer than 200ms to draw one frame. Observe an
+  // actual subsequent update, while still requiring motion after input stops.
+  expect(samples.at(-1).progress).toBeGreaterThan(early.progress);
   await seek(page, .675); await seek(page, .36);
   await expect.poll(() => page.evaluate(() => Math.abs(window.__inlineAssembly.getState().progress - window.__inlineAssembly.getState().target))).toBeLessThan(.00011);
   // Both snapshots have converged to the same native scroll position.
@@ -147,12 +166,14 @@ test('the interlude and descent answer every scroll step without a frozen openin
 test('wheel input during the descent is followed within a few frames', async ({ page }) => {
   await ready(page); await seek(page, .82);
   const before = await page.evaluate(() => window.__inlineAssembly.getState());
-  await page.mouse.move(200, 400); await page.mouse.wheel(0, 160);
-  await expect.poll(() => page.evaluate(() => window.__inlineAssembly.getState().target)).toBeGreaterThan(before.target + .001);
-  const early = await page.evaluate(() => window.__inlineAssembly.getState());
-  await page.waitForTimeout(120);
-  const later = await page.evaluate(() => window.__inlineAssembly.getState());
-  expect(later.progress).toBeGreaterThan(early.progress);
+  const samples = await wheelFrames(page, 160), early = samples[0];
+  expect(samples.at(-1).target).toBeGreaterThan(before.target + .001);
+  expect(samples.at(-1).progress).toBeGreaterThan(early.progress);
+  // Count rendered frames instead of assuming a GPU frame rate on CI.
+  // With no further wheel input, each update must close the remaining gap.
+  for (let i = 1; i < samples.length; i++) {
+    expect(Math.abs(samples[i].target - samples[i].progress)).toBeLessThanOrEqual(Math.abs(samples[i - 1].target - samples[i - 1].progress));
+  }
   await expect.poll(() => page.evaluate(() => {
     const state = window.__inlineAssembly.getState();
     return Math.abs(state.progress - state.target);

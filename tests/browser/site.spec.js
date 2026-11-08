@@ -199,38 +199,43 @@ test('animation chunk failure leaves functional UI available', async ({ page }) 
 });
 
 
-test('process autoplay advances every three seconds, wraps and resets after manual selection', async ({ page }) => {
-  await page.clock.install();
+async function freezeProcessClock(page) {
+  const time = new Date('2026-11-08T00:00:00Z');
+  await page.clock.install({ time });
+  await page.clock.pauseAt(time);
   await page.goto('./');
   await expect(page.locator('html')).toHaveAttribute('data-ready', 'true');
-  await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now() + 5000)));
+}
+
+test('process autoplay advances every three seconds, wraps and resets after manual selection', async ({ page }) => {
+  await freezeProcessClock(page);
   await page.locator('[data-step="0"]').evaluate((button) => button.click());
-  await page.clock.runFor(2999);
+  // No interval elapses more than once in each advance. fastForward keeps
+  // the exact 2999/3000ms boundaries without drawing 180 CPU WebGL frames.
+  await page.clock.fastForward(2999);
   await expect(page.locator('#process-current')).toHaveText('01');
-  await page.clock.runFor(1);
+  await page.clock.fastForward(1);
   await expect(page.locator('#process-current')).toHaveText('02');
   await expect(page.locator('[data-step="1"]')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('[data-process-photo]:not([hidden])')).toHaveAttribute('data-process-photo', '1');
   await expect(page.locator('#process-credit')).toHaveAttribute('href', /thdb7o0nLyc$/);
   await expect(page.locator('#process-description')).toHaveAttribute('aria-live', 'off');
-  await page.clock.runFor(3000);
+  await page.clock.fastForward(3000);
   await expect(page.locator('#process-current')).toHaveText('03');
-  await page.clock.runFor(3000);
+  await page.clock.fastForward(3000);
   await expect(page.locator('#process-current')).toHaveText('01');
-  await page.clock.runFor(2000);
+  await page.clock.fastForward(2000);
   await page.locator('[data-step="2"]').evaluate((button) => button.click());
-  await page.clock.runFor(2999);
+  await page.clock.fastForward(2999);
   await expect(page.locator('#process-current')).toHaveText('03');
-  await page.clock.runFor(1);
+  await page.clock.fastForward(1);
   await expect(page.locator('#process-current')).toHaveText('01');
 });
 
 test('process scrolling never selects images and playback can pause and resume', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await page.clock.install();
-  await page.goto('./');
+  await freezeProcessClock(page);
   await expect(page.locator('html')).toHaveAttribute('data-motion', 'full');
-  await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now() + 5000)));
   await page.locator('[data-step="1"]').evaluate((button) => button.click());
   // Trigger the former wheel/touch/key reset paths and traverse the old ScrollTrigger range.
   await page.evaluate(() => {
@@ -239,18 +244,33 @@ test('process scrolling never selects images and playback can pause and resume',
     document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'PageDown', bubbles: true }));
     document.querySelector('#process').scrollIntoView({ behavior: 'instant', block: 'end' });
   });
-  await page.clock.runFor(100);
+  await page.clock.fastForward(100);
   await expect(page.locator('#process-current')).toHaveText('02');
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
-  await page.clock.runFor(100);
+  await page.clock.fastForward(100);
   await expect(page.locator('#process-current')).toHaveText('02');
   await page.locator('#process-playback').evaluate((button) => button.click());
   await expect(page.locator('#process-playback')).toHaveText('继续播放');
-  await page.clock.runFor(9000);
+  await page.clock.fastForward(9000);
   await expect(page.locator('#process-current')).toHaveText('02');
   await page.locator('#process-playback').evaluate((button) => button.click());
-  await page.clock.runFor(2999);
+  await page.clock.fastForward(2999);
   await expect(page.locator('#process-current')).toHaveText('02');
-  await page.clock.runFor(1);
+  await page.clock.fastForward(1);
   await expect(page.locator('#process-current')).toHaveText('03');
+});
+
+test('process photos advance on the real clock and stay paused with the full page loaded', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('./#process');
+  await expect(page.locator('html')).toHaveAttribute('data-ready', 'true');
+  await expect(page.locator('html')).toHaveAttribute('data-anchor-restoring', 'false');
+  await page.locator('[data-step="0"]').click();
+  await expect(page.locator('#process-current')).toHaveText('02', { timeout: 7000 });
+  await page.locator('#process-playback').click();
+  const paused = await page.locator('#process-current').textContent();
+  await page.waitForTimeout(3200);
+  await expect(page.locator('#process-current')).toHaveText(paused);
+  expect(errors).toEqual([]);
 });

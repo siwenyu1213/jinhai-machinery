@@ -71,10 +71,19 @@ test('scroll steps reveal one impact at a time, with a hard stop, two shakes and
       if (++count < 2000 && intro.state !== 'complete') requestAnimationFrame(sample);
     } requestAnimationFrame(sample);
   });
+  // Send the burst in the same event turn as the real first wheel input.
+  // Separate protocol calls can arrive after an impact has finished and
+  // correctly count as a fresh request instead of input during the title.
+  await page.evaluate(() => window.addEventListener('wheel', () => {
+    window.__introBurstBlocked = Array.from({ length: 5 }, () => {
+      const event = new WheelEvent('wheel', { deltaY: 1800, cancelable: true });
+      window.dispatchEvent(event); return event.defaultPrevented;
+    });
+  }, { once: true }));
   await page.mouse.move(200, 350); await page.mouse.wheel(0, 3200);
   await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'waiting-title');
   const anchor = await page.evaluate(() => window.__equipmentIntro.getState().anchor);
-  for (let i = 0; i < 5; i++) { await page.mouse.wheel(0, 1800); await page.waitForTimeout(60); }
+  expect(await page.evaluate(() => window.__introBurstBlocked)).toEqual([true, true, true, true, true]);
   expect(Math.abs(await page.evaluate(() => scrollY) - anchor)).toBeLessThan(2);
   await expect.poll(() => page.evaluate(() => window.__equipmentIntro.getState().landed)).toBe(1);
   await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'awaiting-input');

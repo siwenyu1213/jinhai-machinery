@@ -8,6 +8,12 @@ test('business copy is vertically centered and scroll inks characters in reading
   await expect(paragraph).toHaveText(text);
   for (const width of [1280, 375]) {
     await page.setViewportSize({ width, height: 900 });
+    // ScrollTrigger clears its fixed pin dimensions on the next refresh.
+    // Centering alone also passes for the previous viewport's stale width.
+    await expect.poll(() => paragraph.evaluate((node, width) => {
+      const copy = node.getBoundingClientRect();
+      return copy.x > 0 && copy.right < width;
+    }, width)).toBe(true);
     await expect.poll(() => paragraph.evaluate(node => {
       const copy = node.getBoundingClientRect(), section = node.closest('section').getBoundingClientRect();
       return Math.abs(copy.y + copy.height / 2 - section.y - section.height / 2);

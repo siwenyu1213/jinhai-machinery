@@ -447,30 +447,30 @@ test('each front machine fills more of the frame while the rear machines stay vi
 
 test('every part Box3 corner stays inside the frame from p=.24 through the finished triangle', async ({ page }) => {
   await ready(page);
+  const expectCorners = (points, label) => {
+    expect(points.length).toBe(91 * 8);
+    // Extrema cover every projected corner with the same inclusive limits.
+    // Thousands of individual Playwright assertions only inflate trace and
+    // reporter work; they can exhaust the test timeout before geometry fails.
+    for (const axis of [0, 1]) {
+      const values = points.map(point => point[axis]);
+      expect(Math.min(...values), `${label} axis ${axis} minimum`).toBeGreaterThanOrEqual(-.99);
+      expect(Math.max(...values), `${label} axis ${axis} maximum`).toBeLessThanOrEqual(.99);
+    }
+  };
   for (const progress of [.24, .42, .63, .74, .86]) {
     await page.evaluate((value) => window.__workshopDemo.setProgress(value), progress);
     await frames(page, 2);
     const extents = (await geometry(page)).points;
-    expect(extents.length).toBe(91 * 8);
     // Projected part corners, not visible flags, define the on-screen bounds.
-    for (const [x, y] of extents) {
-      expect(x, `p=${progress} x`).toBeGreaterThanOrEqual(-.99);
-      expect(x, `p=${progress} x`).toBeLessThanOrEqual(.99);
-      expect(y, `p=${progress} y`).toBeGreaterThanOrEqual(-.99);
-      expect(y, `p=${progress} y`).toBeLessThanOrEqual(.99);
-    }
+    expectCorners(extents, `p=${progress}`);
   }
   await page.evaluate(() => window.__workshopDemo.setProgress(.94));
   await waitLocked(page);
   await page.getByRole('button', { name: '暂停轮换' }).click();
   await frames(page, 2);
   const layout = await geometry(page);
-  for (const [x, y] of layout.points) {
-    expect(x).toBeGreaterThanOrEqual(-.99);
-    expect(x).toBeLessThanOrEqual(.99);
-    expect(y).toBeGreaterThanOrEqual(-.99);
-    expect(y).toBeLessThanOrEqual(.99);
-  }
+  expectCorners(layout.points, 'finished triangle');
 });
 
 test('crossing every breakpoint keeps the same triangle, all 91 homes and progress', async ({ page }) => {
@@ -985,6 +985,14 @@ test('a large back-row rotation persists when selected to the front and resized;
   expect(await page.evaluate(() => window.__workshopDemo.getShowcaseState().machines.find(m => m.id === 'lathe').rotation)).toEqual(rotation);
   expectFramed(await geometry(page), 'resized large rotation');
   await expectFixedCamera(page);
+  // The inspected machine still owns its three-second return timer, even
+  // when automatic triangle rotation is paused. Wait for that real return
+  // before asserting that an idle scene stops drawing.
+  await expect.poll(() => page.evaluate(() => {
+    const state = window.__workshopDemo.getShowcaseState();
+    return !state.moving && state.machines.every(machine => machine.returnAt === null && !machine.returning);
+  }), { timeout: 10000 }).toBe(true);
+  await frames(page, 2);
   const rendered = await page.evaluate(() => window.__workshopDemo.getRenderStats().frames);
   await page.waitForTimeout(350);
   expect(await page.evaluate(() => window.__workshopDemo.getRenderStats().frames)).toBe(rendered);
