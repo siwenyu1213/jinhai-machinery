@@ -41,7 +41,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [site-1, site-2, site-3, site-4, demo]
+        suite: [site-1, site-2, site-3, site-4, demo-1, demo-2, demo-3, demo-4]
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7.1.0
@@ -50,14 +50,18 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - if: matrix.suite != 'demo'
+      - if: startsWith(matrix.suite, 'site-')
         env:
           SITE_SHARD: ${{ matrix.suite }}
         run: |
           npm run build
           npx playwright test --shard="${SITE_SHARD#site-}/4"
-      - if: matrix.suite == 'demo'
-        run: npm run test:demo
+      - if: startsWith(matrix.suite, 'demo-')
+        env:
+          DEMO_SHARD: ${{ matrix.suite }}
+        run: |
+          npm run demo:build
+          npx playwright test --config playwright.demo.config.js --shard="${DEMO_SHARD#demo-}/4"
   deploy:
     needs: [build, browser]
     runs-on: ubuntu-latest

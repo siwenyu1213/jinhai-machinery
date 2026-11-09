@@ -4,13 +4,16 @@ import { defineConfig, devices } from '@playwright/test';
 // configurable; the standalone demo keeps 4175 by default.
 const port = Number(process.env.MILL_DEMO_PORT || 4175);
 const origin = `http://127.0.0.1:${port}`;
+// Keep CSS viewports and real WebGL scenes in the Linux checks. A smaller
+// drawing buffer lets SwiftShader run input and timing assertions promptly.
+const softwareScale = process.env.CI ? { deviceScaleFactor: .5 } : {};
 
 export default defineConfig({
   testDir: './tests/demo-browser',
   fullyParallel: true,
-  workers: 2,
-  timeout: 45_000,
-  expect: { timeout: 10_000 },
+  workers: process.env.CI ? 1 : 2,
+  timeout: process.env.CI ? 120_000 : 45_000,
+  expect: { timeout: process.env.CI ? 15_000 : 10_000 },
   reporter: [['list']],
   outputDir: 'artifacts/tmp/mill-demo-tests',
   use: {
@@ -23,8 +26,8 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   projects: [
-    { name: 'demo-desktop', use: { viewport: { width: 1280, height: 900 } } },
-    { name: 'demo-mobile', use: { ...devices['iPhone 13'], viewport: { width: 375, height: 812 }, defaultBrowserType: 'chromium' } },
+    { name: 'demo-desktop', use: { viewport: { width: 1280, height: 900 }, ...softwareScale } },
+    { name: 'demo-mobile', use: { ...devices['iPhone 13'], viewport: { width: 375, height: 812 }, defaultBrowserType: 'chromium', ...softwareScale } },
   ],
   webServer: {
     command: `npm run demo:preview -- --port ${port}`,

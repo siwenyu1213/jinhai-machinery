@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 // Three-machine workshop preview at /workshop.html. Every geometric claim below
 // is read from real part objects, not from mirrored UI text.
-const TIMEOUT = 45_000;
+const TIMEOUT = process.env.CI ? 120_000 : 45_000;
 test.describe.configure({ timeout: TIMEOUT });
 
 async function ready(page) {
@@ -19,6 +19,17 @@ async function frames(page, count = 6) {
     function step() { if (--left <= 0) resolve(); else requestAnimationFrame(step); }
     requestAnimationFrame(step);
   }), count);
+}
+
+async function freezeInspectionClock(page) {
+  const time = await page.evaluate(() => Date.now() + 5000);
+  await page.clock.pauseAt(new Date(time));
+}
+
+async function advanceInspectionClock(page, milliseconds) {
+  await page.clock.fastForward(milliseconds);
+  // A timer can queue a paint on the following frame.
+  await page.clock.fastForward(50);
 }
 
 async function waitLocked(page) {
@@ -803,11 +814,13 @@ test('clicking a real back machine body on the canvas brings that machine to the
 // Real pointer drag on the canvas: only the dragged machine's poses change, its
 // internal proportions stay fixed, nothing is sent to the front, camera stays put.
 test('dragging a real machine on the canvas rotates only that machine and never the camera', async ({ page }) => {
+  await page.clock.install();
   await ready(page);
   await page.getByRole('button', { name: '查看完成' }).click();
   await waitLocked(page);
   await page.getByRole('button', { name: '暂停轮换' }).click();
   await frames(page, 3);
+  await freezeInspectionClock(page);
   const capture = () => page.evaluate(() => ({
     front: window.__workshopDemo.getState().showcase.frontId,
     camera: window.__workshopDemo.getCamera().getWorldDirection(window.__workshopDemo.getCamera().position.clone()).toArray(),
@@ -827,7 +840,7 @@ test('dragging a real machine on the canvas rotates only that machine and never 
   for (const id of ['mill', 'lathe', 'laser']) {
     expect(await page.evaluate(() => window.__workshopDemo.getState().showcase.frontId)).toBe('mill');
     await expect.poll(() => page.evaluate(() => window.__workshopDemo.getState().showcase.moving), { timeout: 4000 }).toBe(false);
-    await frames(page, 2);
+    await page.clock.fastForward(50);
     const point = await bodyPoint(page, id);
     expect(point, `body point of ${id}`).not.toBeNull();
     const before = await capture();
@@ -835,13 +848,13 @@ test('dragging a real machine on the canvas rotates only that machine and never 
     await page.mouse.move(point.x, point.y);
     await page.mouse.down();
     await page.mouse.move(point.x + 24, point.y + 10, { steps: 6 });
-    await frames(page, 2);
+    await page.clock.fastForward(50);
     const during = await capture();
     expect(during.cameraPosition).toEqual(before.cameraPosition);
     expect(during.labels).toEqual(before.labels);
     expect(during.parts.filter(part => part.machineId !== id)).toEqual(before.parts.filter(part => part.machineId !== id));
     await page.mouse.up();
-    await frames(page, 2);
+    await page.clock.fastForward(50);
     const after = await capture();
     expect(after.cameraPosition).toEqual(before.cameraPosition);
     expect(after.labels).toEqual(before.labels);
@@ -862,60 +875,67 @@ test('dragging a real machine on the canvas rotates only that machine and never 
 });
 
 test('an inspected model returns after three idle seconds; a new click restarts the delay without moving the shared frame', async ({ page }) => {
+  await page.clock.install();
   await ready(page);
   await page.locator('#complete').click();
   await page.locator('#toggle-showcase').click();
   await frames(page, 3);
+  await freezeInspectionClock(page);
   const fixed = await page.evaluate(() => ({ camera: window.__workshopDemo.getCamera().position.toArray(),
     labels: [...document.querySelectorAll('.machine-label')].map(node => node.style.transform) }));
   const point = await bodyPoint(page, 'mill');
   await page.mouse.move(point.x, point.y); await page.mouse.down();
   await page.mouse.move(point.x + 90, point.y - 50, { steps: 8 });
-  await page.mouse.up(); await frames(page, 3);
+  await page.mouse.up(); await page.clock.fastForward(50);
   const rotation = await page.evaluate(() => window.__workshopDemo.getShowcaseState().machines.find(m => m.id === 'mill').rotation);
   expect(Math.abs(rotation[3])).toBeLessThan(.95);
-  await page.waitForTimeout(1800);
+  await advanceInspectionClock(page, 1800);
   // Clicking this same front label leaves the layout fixed and renews inspection.
-  await page.getByRole('button', { name: '将铣床移到前方' }).click();
-  await page.waitForTimeout(1800);
+  await page.getByRole('button', { name: '将铣床移到前方' }).evaluate(button => button.click());
+  await advanceInspectionClock(page, 1800);
   expect(await page.evaluate(() => window.__workshopDemo.getShowcaseState().machines.find(m => m.id === 'mill').rotation)).toEqual(rotation);
-  await expect.poll(() => page.evaluate(() => window.__workshopDemo.getShowcaseState().machines.find(m => m.id === 'mill').rotation), { timeout: 4000 }).toEqual([0, 0, 0, 1]);
+  await advanceInspectionClock(page, 1900);
+  expect(await page.evaluate(() => window.__workshopDemo.getShowcaseState().machines.find(m => m.id === 'mill').rotation)).toEqual([0, 0, 0, 1]);
   const after = await page.evaluate(() => ({ camera: window.__workshopDemo.getCamera().position.toArray(),
     labels: [...document.querySelectorAll('.machine-label')].map(node => node.style.transform),
     scales: window.__workshopDemo.getParts().map(part => part.object.scale.toArray()) }));
   expect(after.camera).toEqual(fixed.camera); expect(after.labels).toEqual(fixed.labels);
   expect(after.scales.every(scale => scale.every(value => value === 1))).toBe(true);
   const rendered = await page.evaluate(() => window.__workshopDemo.getRenderStats().frames);
-  await page.waitForTimeout(200);
+  await advanceInspectionClock(page, 200);
   expect(await page.evaluate(() => window.__workshopDemo.getRenderStats().frames)).toBe(rendered);
 });
 
 test('each model keeps its own three-second return clock while another model is held or clicked', async ({ page }) => {
+  await page.clock.install();
   await ready(page); await page.locator('#complete').click(); await page.locator('#toggle-showcase').click();
   await frames(page, 3);
+  await freezeInspectionClock(page);
   const machine = id => page.evaluate(id => window.__workshopDemo.getShowcaseState().machines.find(m => m.id === id), id);
   const first = await bodyPoint(page, 'mill');
   await page.mouse.move(first.x, first.y); await page.mouse.down();
   await page.mouse.move(first.x + 55, first.y - 24, { steps: 6 }); await page.mouse.up();
   const firstDeadline = (await machine('mill')).returnAt;
   expect(firstDeadline).not.toBeNull();
-  await page.waitForTimeout(600);
+  await advanceInspectionClock(page, 600);
   const second = await bodyPoint(page, 'lathe');
   await page.mouse.move(second.x, second.y); await page.mouse.down();
-  await page.mouse.move(second.x + 40, second.y - 20, { steps: 6 }); await frames(page, 2);
+  await page.mouse.move(second.x + 40, second.y - 20, { steps: 6 }); await page.clock.fastForward(50);
   const held = await machine('lathe');
   expect(held.returnAt).toBeNull(); expect(Math.abs(held.rotation[3])).toBeLessThan(.99);
   expect((await machine('mill')).returnAt).toBe(firstDeadline);
   // The mill reaches its own deadline while the pointer still holds the lathe.
-  await expect.poll(async () => (await machine('mill')).rotation, { timeout: 5000 }).toEqual([0, 0, 0, 1]);
+  await advanceInspectionClock(page, 3800);
+  expect((await machine('mill')).rotation).toEqual([0, 0, 0, 1]);
   expect((await machine('lathe')).rotation).toEqual(held.rotation);
   expect(await page.evaluate(() => window.__workshopDemo.getShowcaseState().draggingId)).toBe('lathe');
   await page.mouse.up();
   const secondDeadline = (await machine('lathe')).returnAt;
   expect(secondDeadline).toBeGreaterThan(firstDeadline + 3000);
-  await page.getByRole('button', { name: '将铣床移到前方' }).click();
+  await page.getByRole('button', { name: '将铣床移到前方' }).evaluate(button => button.click());
   expect((await machine('lathe')).returnAt).toBe(secondDeadline);
-  await expect.poll(async () => (await machine('lathe')).rotation, { timeout: 5000 }).toEqual([0, 0, 0, 1]);
+  await advanceInspectionClock(page, 3800);
+  expect((await machine('lathe')).rotation).toEqual([0, 0, 0, 1]);
   expect(await page.evaluate(() => window.__workshopDemo.getShowcaseState().machines.every(m => m.returnAt === null && !m.returning))).toBe(true);
 });
 
@@ -957,17 +977,19 @@ test('scrolling naturally into completion locks the machines until replay', asyn
 });
 
 test('a large back-row rotation persists when selected to the front and resized; idle rendering stops', async ({ page }) => {
+  await page.clock.install();
   await ready(page);
   await page.getByRole('button', { name: '查看完成' }).click();
   await page.getByRole('button', { name: '暂停轮换' }).click();
   await frames(page, 3);
+  await freezeInspectionClock(page);
   const point = await bodyPoint(page, 'lathe');
   expect(point).not.toBeNull();
   await page.mouse.move(point.x, point.y);
   await page.mouse.down();
   await page.mouse.move(point.x + 120, point.y - 180, { steps: 10 });
   await page.mouse.up();
-  await frames(page, 3);
+  await page.clock.fastForward(50);
   const state = await page.evaluate(() => window.__workshopDemo.getShowcaseState());
   expect(state.frontId).toBe('mill');
   const rotation = state.machines.find(m => m.id === 'lathe').rotation;
@@ -976,25 +998,29 @@ test('a large back-row rotation persists when selected to the front and resized;
   const rotatedPoint = await bodyPoint(page, 'lathe');
   expect(rotatedPoint).not.toBeNull();
   await page.mouse.click(rotatedPoint.x, rotatedPoint.y);
+  await advanceInspectionClock(page, 1450);
   await expect.poll(() => page.evaluate(() => window.__workshopDemo.getShowcaseState().frontId)).toBe('lathe');
   expect(await page.evaluate(() => window.__workshopDemo.getShowcaseState().machines.find(m => m.id === 'lathe').rotation)).toEqual(rotation);
   expectFramed(await geometry(page), 'large front rotation');
   const size = page.viewportSize();
-  await page.setViewportSize({ width: size.width === 375 ? 1280 : 375, height: 812 });
-  await frames(page, 3);
+  const width = size.width === 375 ? 1280 : 375;
+  await page.setViewportSize({ width, height: 812 });
+  await page.clock.fastForward(50);
+  await expect.poll(() => page.evaluate(() => window.__workshopDemo.getCamera().aspect)).toBeCloseTo(width / 812, 5);
   expect(await page.evaluate(() => window.__workshopDemo.getShowcaseState().machines.find(m => m.id === 'lathe').rotation)).toEqual(rotation);
   expectFramed(await geometry(page), 'resized large rotation');
   await expectFixedCamera(page);
   // The inspected machine still owns its three-second return timer, even
   // when automatic triangle rotation is paused. Wait for that real return
   // before asserting that an idle scene stops drawing.
+  await advanceInspectionClock(page, 3800);
   await expect.poll(() => page.evaluate(() => {
     const state = window.__workshopDemo.getShowcaseState();
     return !state.moving && state.machines.every(machine => machine.returnAt === null && !machine.returning);
   }), { timeout: 10000 }).toBe(true);
-  await frames(page, 2);
+  await page.clock.fastForward(50);
   const rendered = await page.evaluate(() => window.__workshopDemo.getRenderStats().frames);
-  await page.waitForTimeout(350);
+  await advanceInspectionClock(page, 350);
   expect(await page.evaluate(() => window.__workshopDemo.getRenderStats().frames)).toBe(rendered);
 });
 
