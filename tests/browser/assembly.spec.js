@@ -9,6 +9,13 @@ async function selected(page, id) {
   await expect.poll(() => page.evaluate(() => window.__machineHero.getState().active)).toBe(id);
   await expect(page.locator('.hero')).toHaveAttribute('data-machine', id);
 }
+async function waitForPaint(page) {
+  // The renderer can be one animation frame behind the selected or paused
+  // state. Let invalidations and resize callbacks paint before measuring.
+  await page.evaluate(() => new Promise(resolve => {
+    requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  }));
+}
 test('the website renders the actual three machines and all 91 model parts', async ({page}) => {
   const errors=[];page.on('pageerror',e=>errors.push(e.message));await ready(page);
   const actual=await page.evaluate(()=>({state:window.__machineHero.getState(),models:window.__machineHero.getModels().map(m=>({id:m.id,count:m.parts.length,visible:m.group.visible}))}));
@@ -27,8 +34,11 @@ test('real five-second autoplay advances a model and pause freezes all scene dra
   await ready(page,false);await selected(page,'mill');
   await expect.poll(()=>page.evaluate(()=>window.__machineHero.getState().active),{timeout:10000}).toBe('lathe');
   await page.locator('#hero-pause').click();await expect.poll(()=>page.evaluate(()=>window.__machineHero.getState().moving)).toBe(false);
-  await page.waitForTimeout(150);const before=await page.evaluate(()=>window.__machineHero.getRenderStats().frames);
-  await page.waitForTimeout(400);expect(await page.evaluate(()=>window.__machineHero.getRenderStats().frames)).toBe(before);
+  await expect(page.locator('#hero-pause')).toHaveAttribute('aria-pressed','true');
+  await waitForPaint(page);
+  const before=await page.evaluate(()=>window.__machineHero.getRenderStats().frames);
+  await page.waitForTimeout(400);await waitForPaint(page);
+  expect(await page.evaluate(()=>window.__machineHero.getRenderStats().frames)).toBe(before);
   await page.locator('.hero-controls [data-hero-machine="laser"]').click();await selected(page,'laser');
 });
 test('reduced motion keeps manual controls but no autonomous model loop', async ({page})=>{
@@ -38,10 +48,20 @@ test('reduced motion keeps manual controls but no autonomous model loop', async 
   expect(await page.evaluate(()=>window.__machineHero.getState().reducedMotion)).toBe(true);
 });
 test('leaving the opening stops its animation and repeated switches keep GPU resources stable', async ({page})=>{
-  await ready(page);for(const id of ['mill','lathe','laser'])await page.evaluate(value=>window.__machineHero.select(value,true),id);
-  await page.waitForTimeout(200);const before=await page.evaluate(()=>window.__machineHero.getRenderStats());
-  for(let i=0;i<12;i++)await page.evaluate(id=>window.__machineHero.select(id,true),['mill','lathe','laser'][i%3]);
-  await page.waitForTimeout(200);const after=await page.evaluate(()=>window.__machineHero.getRenderStats());
+  await ready(page);
+  const renderSelection = async id => {
+    const before = await page.evaluate(id => {
+      const hero = window.__machineHero;
+      const frames = hero.getRenderStats().frames;
+      hero.select(id, true);
+      return frames;
+    }, id);
+    await expect.poll(() => page.evaluate(() => window.__machineHero.getRenderStats().frames)).toBeGreaterThan(before);
+  };
+  for (const id of ['mill','lathe','laser']) await renderSelection(id);
+  const before=await page.evaluate(()=>window.__machineHero.getRenderStats());
+  for (let i=0;i<12;i++) await renderSelection(['mill','lathe','laser'][i%3]);
+  const after=await page.evaluate(()=>window.__machineHero.getRenderStats());
   expect(after.geometries).toBeLessThanOrEqual(before.geometries);expect(after.textures).toBeLessThanOrEqual(before.textures);
   await page.locator('#equipment').scrollIntoViewIfNeeded();await expect.poll(()=>page.evaluate(()=>window.__machineHero.getState().visible)).toBe(false);
   await page.waitForTimeout(150);const frames=await page.evaluate(()=>window.__machineHero.getRenderStats().frames);
