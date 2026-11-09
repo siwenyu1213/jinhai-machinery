@@ -143,9 +143,9 @@ export function initInlineAssembly() {
         onLost() { section.dataset.renderer = 'fallback'; section.classList.remove('is-ready'); sync(); },
         onRestore() { scene?.dispose(); scene = null; boot(); },
       });
+      await document.fonts.ready;
       if (disposed || request !== generation) { candidate.dispose(); return; }
       scene?.dispose(); scene = candidate; section.dataset.renderer = 'ready'; section.classList.add('is-ready');
-      await document.fonts.ready;
       setEnhanced();
       measure(); scrollTarget(); current = target; paint(); wake();
     } catch {

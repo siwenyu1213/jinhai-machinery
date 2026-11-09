@@ -1,8 +1,11 @@
 import { test, expect } from '@playwright/test';
 
 test('business copy is vertically centered and scroll inks characters in reading order', async ({ page }) => {
+  // This test covers GSAP and text layout. The independent 3D suites exercise WebGL.
+  await page.route(/\/assets\/machine-(hero|assembly)-[^/]+\.js$/, route => route.abort());
   await page.emulateMedia({ reducedMotion: 'no-preference' }); await page.goto('./');
   await expect(page.locator('html')).toHaveAttribute('data-motion', 'full');
+  await page.evaluate(() => document.fonts.ready);
   const paragraph = page.locator('.risk-intro p');
   const text = '非标零配件与设备定制、钣金定制、维修服务。面向食品、印刷与包装行业。';
   await expect(paragraph).toHaveText(text);
@@ -26,7 +29,13 @@ test('business copy is vertically centered and scroll inks characters in reading
     await page.evaluate(fraction => {
       const {start, end} = window.__businessIntro.getState();
       scrollTo({ top: start + (end - start) * fraction, behavior: 'instant' });
-    }, fraction); await page.waitForTimeout(500);
+    }, fraction);
+    await expect.poll(() => page.evaluate(fraction => {
+      const { start, end, active } = window.__businessIntro.getState();
+      return Math.abs(scrollY - (start + (end - start) * fraction)) <= 1 &&
+        (fraction === 0 || fraction === 1 || active);
+    }, fraction)).toBe(true);
+    await page.waitForTimeout(500);
     return paragraph.locator('.intro-char').evaluateAll(nodes => nodes.map(node => getComputedStyle(node).color));
   }
   const before = await seek(0);

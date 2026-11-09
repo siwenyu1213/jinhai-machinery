@@ -4,11 +4,14 @@ on:
     branches: [main]
     paths:
       - 'site/**'
+      - 'demos/**'
       - 'scripts/**'
       - 'tests/**'
       - 'package*.json'
       - 'vite.config.js'
+      - 'vite.demo.config.js'
       - 'playwright.config.js'
+      - 'playwright.demo.config.js'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 permissions:
@@ -28,14 +31,35 @@ jobs:
       - run: npm ci
       - run: python3 -m unittest discover -s tests -v
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
-      - run: npm test
+      - run: npm run test:model
       - uses: actions/configure-pages@v6.0.0
       - uses: actions/upload-pages-artifact@v5.0.0
         with:
           path: dist
+  browser:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [site-1, site-2, site-3, site-4, demo]
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - if: matrix.suite != 'demo'
+        env:
+          SITE_SHARD: ${{ matrix.suite }}
+        run: |
+          npm run build
+          npx playwright test --shard="${SITE_SHARD#site-}/4"
+      - if: matrix.suite == 'demo'
+        run: npm run test:demo
   deploy:
-    needs: build
+    needs: [build, browser]
     runs-on: ubuntu-latest
     permissions:
       pages: write

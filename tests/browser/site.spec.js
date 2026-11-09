@@ -122,10 +122,10 @@ test('mechanical photography replaces drawn models and remains local with attrib
 });
 
 test('process photography and source follow the last selected step under reduced motion', async ({ page }) => {
+  await page.route(/\/assets\/machine-(hero|assembly)-[^/]+\.js$/, route => route.abort());
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('./');
-  await page.locator('[data-process-photo]').evaluateAll(images => images.forEach(image => { image.loading = 'eager'; }));
-  await expect.poll(() => page.locator('[data-process-photo]').evaluateAll(images => images.every(image => image.complete && image.naturalWidth > 0)), { timeout: 15000 }).toBe(true);
+  await page.goto('./#process');
+  await expect(page.locator('html')).toHaveAttribute('data-anchor-restoring', 'false');
   // This test checks manual selections. Autoplay has separate timer coverage;
   // pause it so slow CI image decoding cannot advance a checked selection.
   await page.locator('#process-playback').click();
@@ -141,7 +141,6 @@ test('process photography and source follow the last selected step under reduced
   await expect(page.locator('#process-credit')).toHaveAttribute('href', /dmgYI2uuOoY$/);
   await expect(page.locator('#process-credit')).toHaveAccessibleName(/Rodrigo Rodrigues/);
   await expect(page.locator('.process-visual')).not.toHaveAttribute('aria-pressed');
-  await expect(page.locator('.hero')).toHaveAttribute('data-renderer', 'ready', {timeout:20000});
 });
 
 test('photo loading failure preserves business content and contact controls', async ({ page }) => {

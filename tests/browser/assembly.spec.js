@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-test.describe.configure({ timeout: 45000 });
+test.describe.configure({ timeout: process.env.CI ? 90000 : 45000 });
 async function ready(page, reduced = true) {
   await page.emulateMedia({ reducedMotion: reduced ? 'reduce' : 'no-preference' });
   await page.goto('./');

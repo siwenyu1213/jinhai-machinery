@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './tests/browser',
   fullyParallel: true,
-  workers: process.env.CI ? 2 : 3,
+  workers: process.env.CI ? 1 : 3,
   retries: process.env.CI ? 1 : 0,
   // CI renders the PBR environment on the CPU. Allow initialization time
   // without relaxing any geometry, interaction or fallback assertions.

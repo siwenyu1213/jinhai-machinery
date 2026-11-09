@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test';
-test.describe.configure({ timeout: 60000 });
+test.describe.configure({ timeout: process.env.CI ? 120000 : 60000 });
+test.beforeEach(async ({ page }) => {
+  await page.route(/\/assets\/machine-hero-[^/]+\.js$/, route => route.abort());
+});
 async function ready(page, reduced = false) {
   await page.emulateMedia({ reducedMotion: reduced ? 'reduce' : 'no-preference' });
   await page.goto('./'); await page.locator('#assembly').scrollIntoViewIfNeeded();

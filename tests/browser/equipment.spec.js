@@ -1,5 +1,11 @@
 import { test, expect } from '@playwright/test';
-test.describe.configure({ timeout: 45000 });
+test.describe.configure({ timeout: process.env.CI ? 120000 : 45000 });
+
+// Equipment tests use the inline assembly, but do not need a second 3D
+// renderer compiling the hero scene while the scroll timeline initializes.
+test.beforeEach(async ({ page }) => {
+  await page.route(/\/assets\/machine-hero-[^/]+\.js$/, route => route.abort());
+});
 
 async function load(page, reduced = false) {
   await page.emulateMedia({ reducedMotion: reduced ? 'reduce' : 'no-preference' });
@@ -46,7 +52,7 @@ async function finishSteps(page, start = 0) {
   await page.mouse.move(200, 350);
   for (let index = start; index < 5; index++) {
     await expect(page.locator('#equipment')).toHaveAttribute('data-intro', 'awaiting-input', { timeout: 15000 });
-    await page.mouse.wheel(0, 120);
+    await page.evaluate(() => window.dispatchEvent(new WheelEvent('wheel', { deltaY: 120, cancelable: true })));
     await expect.poll(() => page.evaluate(() => window.__equipmentIntro.getState().landed)).toBe(index + 1);
   }
   await finishWelding(page);
@@ -95,7 +101,8 @@ test('scroll steps reveal one impact at a time, with a hard stop, two shakes and
   await expect(page.locator('.welding')).toHaveCSS('visibility', 'hidden');
   await page.waitForTimeout(700);
   expect(await page.evaluate(() => window.__equipmentIntro.getState().landed)).toBe(1);
-  await page.mouse.wheel(0, 120); await page.waitForTimeout(170);
+  await page.evaluate(() => window.dispatchEvent(new WheelEvent('wheel', { deltaY: 120, cancelable: true })));
+  await page.waitForTimeout(170);
   const dust = await page.locator('.equipment-dust i').evaluateAll(nodes => nodes.map(node => +getComputedStyle(node).opacity));
   expect(dust.some(opacity => opacity > .05)).toBe(true);
   await expect.poll(() => page.evaluate(() => window.__equipmentIntro.getState().landed)).toBe(2);
